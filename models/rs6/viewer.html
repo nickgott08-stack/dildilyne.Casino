@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RS6 Avant Vorschau</title>
+<style>
+  html,body{margin:0;height:100%;background:#1b1d21;color:#ddd;font:14px system-ui,sans-serif;overflow:hidden}
+  #ui{position:fixed;left:12px;top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,input{background:#2b2f36;color:#ddd;border:1px solid #444;border-radius:6px;padding:6px 10px;cursor:pointer}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="ui">
+  <button id="spin">Räder drehen</button>
+  <button id="lights">Licht an/aus</button>
+  <label>Lack <input id="paint" type="color" value="#73787a"></label>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a2e35);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+sun.position.set(4, 8, 5); sun.castShadow = true;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -4;
+sun.shadow.camera.right = sun.shadow.camera.top = 4;
+scene.add(sun);
+// kantiger Boden aus Kacheln, passend zur Low-Poly-Umgebung
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40),
+  new THREE.MeshStandardMaterial({color:0x3a3f47, roughness:0.9}));
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+scene.add(new THREE.GridHelper(40, 40, 0x555b66, 0x444952));
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(5.5, 2.2, 6.5);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.6, 0); controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI/2 - 0.02;
+
+let wheels = [], spinning = false, lightsOn = true, mats = {};
+new GLTFLoader().load('rs6_avant.glb', gltf => {
+  gltf.scene.traverse(o => {
+    if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; mats[o.material.name] = o.material; }
+    if (o.name.startsWith('Wheel_')) wheels.push(o);
+  });
+  scene.add(gltf.scene);
+});
+
+document.getElementById('spin').onclick = () => spinning = !spinning;
+document.getElementById('lights').onclick = () => {
+  lightsOn = !lightsOn;
+  for (const n of ['HeadLight','TailLight']) if (mats[n]) mats[n].emissiveIntensity = lightsOn ? 2 : 0;
+};
+document.getElementById('paint').oninput = e => mats.Paint && mats.Paint.color.set(e.target.value).convertSRGBToLinear();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  // Raeder drehen um ihre lokale X-Achse (rechte Raeder sind um Y gedreht -> Vorzeichen beachten)
+  if (spinning) for (const w of wheels) w.rotateX((w.name.endsWith('R') ? -1 : 1) * dt * 12);
+  controls.update(); renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
