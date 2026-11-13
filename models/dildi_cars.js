@@ -7,7 +7,28 @@
  * Stil: echte Abmessungen, aber kantig/facettiert (Flat-Shading) - passt in eine Low-Poly-Stadt.
  * Die Geometrie wird hier per Code erzeugt, es werden KEINE externen Dateien/Texturen geladen.
  *
- * EINBAU (Hinweis fuer den Entwickler / die KI im dildi-City-Chat):
+ * ---------------------------------------------------------------------------------------------
+ * EINBAU IN DILDI CITY 3D (Hinweis fuer die KI im dildi-City-Chat) - empfohlener Weg:
+ *   Dildi City 3D hat eine Funktion, die Fahrzeugmodelle baut: sie bekommt (typ, farbe, tuning)
+ *   und gibt { group, tilt, body, lights, wheels:[{piv,w,front}], wheelR, siren } zurueck.
+ *   Fuer "rs6" und "ferrari" einfach ganz am Anfang dieser Funktion zurueckgeben:
+ *
+ *     if (typ === 'rs6' || typ === 'ferrari') {
+ *       const extra = [];   // optional: Tuning-Teile (Spoiler/Panzerung) als Geometrien hier rein
+ *       return DildiCars.dildiCityVehicle(THREE, typ, farbe,
+ *         { body: <bisheriges Karosserie-Material mit vertexColors>,
+ *           lights: <bisheriges Licht-Material mit vertexColors>.clone(),
+ *           wheel: <bisheriges Rad-Material mit vertexColors> }, extra);
+ *     }
+ *
+ *   - Lackfarbe kommt ueber "farbe" (Hex-String wie bisher), Dildi Customs funktioniert also weiter.
+ *   - Explosion/Abdunkeln ueber body.geometry.attributes.color funktioniert weiter.
+ *   - Vorne = +Z, Raeder: w.rotation.x = Rollen, piv.rotation.y = Lenken (wie bisher).
+ *   - Masse: RS6 4.99 x 1.95 m, Ferrari 4.56 x 1.96 m (passt zu len/wid in der Fahrzeugliste).
+ *   - Diese Datei muss VOR dem Spiel-Code geladen sein (oder Inhalt oben ins Script kopieren).
+ * ---------------------------------------------------------------------------------------------
+ *
+ * ALTERNATIV (eigenstaendige Nutzung in anderen three.js-Projekten):
  *   1. Diese Datei per <script src="dildi_cars.js"></script> einbinden ODER den Inhalt direkt in
  *      das Spiel-Script kopieren. Danach gibt es window.DildiCars = { createRS6, createFerrari }.
  *      (In ES-Modulen: das THREE-Objekt aus dem Import als ersten Parameter uebergeben.)
@@ -576,7 +597,109 @@
     return assemble(THREE, 'Ferrari_296', ferrariBody(), F_AXLES, o, { length: 4.56, width: 1.96, height: 1.19 });
   }
 
-  const api = { createRS6, createFerrari };
+  // ======================================================================
+  // Direkter Anschluss an Dildi City 3D
+  // ======================================================================
+  // Liefert genau das Objekt, das die Fahrzeug-Baufunktion von Dildi City 3D zurueckgibt:
+  //   { group, tilt, body, lights, wheels:[{piv, w, front}], wheelR, siren:null }
+  // - body:   EIN Mesh, Geometrie mit Vertex-Farben (Lack = color), Material = mats.body
+  // - lights: EIN Mesh mit Vertex-Farben (Scheinwerfer weiss, Ruecklichter rot), Material = mats.lights
+  // - wheels: piv = Lenk-Pivot (rotation.y), w = Rad-Mesh (rotation.x = Rollen), Material = mats.wheel
+  // extraGeos: optionale weitere Geometrien (z. B. Spoiler/Panzerung aus dem Tuning), werden in body gemischt.
+  const SRGB = {
+    Glass: [0.03, 0.035, 0.04], TrimGloss: [0.04, 0.04, 0.045], TrimMatte: [0.06, 0.06, 0.06],
+    Underbody: [0.03, 0.03, 0.03], Grille: [0.12, 0.12, 0.13], LightLens: [0.10, 0.11, 0.14],
+    Plate: [0.92, 0.92, 0.90], Exhaust: [0.45, 0.45, 0.47], Tire: [0.07, 0.07, 0.07],
+    RimInner: [0.08, 0.08, 0.09], BrakeDisc: [0.45, 0.45, 0.46],
+    HeadLight: [1.0, 0.98, 0.9], TailLight: [1.0, 0.1, 0.1],
+  };
+
+  function vcGeometry(THREE, mb, pick, colorOf, xform) {
+    let n = 0;
+    for (const m in mb.t) if (pick(m)) n += mb.t[m].length;
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    let v = 0;
+    for (const m in mb.t) {
+      if (!pick(m)) continue;
+      const c = colorOf(m);
+      for (const p0 of mb.t[m]) {
+        const p = xform ? xform(p0) : p0;
+        pos.set(p, v * 3); col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b; v++;
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+
+  function mergeVC(THREE, geos) {        // einfache Zusammenfuehrung (position/normal/color)
+    const parts = geos.map((g) => {
+      g = g.index ? g.toNonIndexed() : g;
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.attributes.color) {
+        const c = new Float32Array(g.attributes.position.count * 3).fill(1);
+        g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      }
+      return g;
+    });
+    const out = new THREE.BufferGeometry();
+    for (const a of ['position', 'normal', 'color']) {
+      const total = parts.reduce((s, g) => s + g.attributes[a].count * 3, 0);
+      const arr = new Float32Array(total);
+      let o = 0;
+      for (const g of parts) { const src = g.attributes[a]; for (let i = 0; i < src.count; i++) { arr[o++] = src.getX(i); arr[o++] = src.getY(i); arr[o++] = src.getZ(i); } }
+      out.setAttribute(a, new THREE.BufferAttribute(arr, 3));
+    }
+    out.computeBoundingSphere();
+    return out;
+  }
+
+  function dildiCityVehicle(THREE, type, color, mats, extraGeos) {
+    const isF = type === 'ferrari';
+    const mb = isF ? ferrariBody() : rs6Body();
+    const axles = isF ? F_AXLES : RS6_AXLES;
+    const paint = new THREE.Color(color || (isF ? '#d40000' : '#8e9397'));
+    const caliper = new THREE.Color().setRGB(...(isF ? [0.95, 0.78, 0.05] : [0.75, 0.05, 0.04]), THREE.SRGBColorSpace);
+    const rim = new THREE.Color().setRGB(...(isF ? [0.32, 0.33, 0.35] : [0.55, 0.56, 0.58]), THREE.SRGBColorSpace);
+    const cache = {};
+    const colorOf = (m) => {
+      if (m === 'Paint') return paint;
+      if (m === 'Caliper') return caliper;
+      if (m === 'Rim') return rim;
+      return cache[m] || (cache[m] = new THREE.Color().setRGB(...(SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    };
+    const isLight = (m) => m === 'HeadLight' || m === 'TailLight';
+    let bodyGeo = vcGeometry(THREE, mb, (m) => !isLight(m), colorOf);
+    if (extraGeos && extraGeos.length) bodyGeo = mergeVC(THREE, [bodyGeo].concat(extraGeos));
+    const lightGeo = vcGeometry(THREE, mb, isLight, colorOf);
+
+    const body = new THREE.Mesh(bodyGeo, mats.body);
+    body.castShadow = true;
+    const lights = new THREE.Mesh(lightGeo, mats.lights);
+    const group = new THREE.Group(), tilt = new THREE.Group();
+    tilt.add(body, lights);
+    group.add(tilt);
+    const wheels = [];
+    axles.forEach((ax, ai) => {
+      const wmb = buildWheel(ax.r, ax.w);
+      const geoL = vcGeometry(THREE, wmb, () => true, colorOf);
+      const geoR = vcGeometry(THREE, wmb, () => true, colorOf, (p) => [-p[0], p[1], -p[2]]);  // Felge nach aussen
+      for (const s of SIDES) {
+        const piv = new THREE.Group();
+        piv.position.set(s * ax.x, ax.r, ax.z);
+        const w = new THREE.Mesh(s > 0 ? geoL : geoR, mats.wheel);
+        w.castShadow = true;
+        piv.add(w);
+        group.add(piv);
+        wheels.push({ piv, w, front: ai === 0 });
+      }
+    });
+    return { group, tilt, body, lights, wheels, wheelR: axles[1].r, siren: null };
+  }
+
+  const api = { createRS6, createFerrari, dildiCityVehicle };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);
