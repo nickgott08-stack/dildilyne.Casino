@@ -8,24 +8,44 @@
  * Die Geometrie wird hier per Code erzeugt, es werden KEINE externen Dateien/Texturen geladen.
  *
  * ---------------------------------------------------------------------------------------------
- * EINBAU IN DILDI CITY 3D (Hinweis fuer die KI im dildi-City-Chat) - empfohlener Weg:
- *   Dildi City 3D hat eine Funktion, die Fahrzeugmodelle baut: sie bekommt (typ, farbe, tuning)
- *   und gibt { group, tilt, body, lights, wheels:[{piv,w,front}], wheelR, siren } zurueck.
- *   Fuer "rs6" und "ferrari" einfach ganz am Anfang dieser Funktion zurueckgeben:
+ * EINBAU IN DILDI CITY 3D (Hinweis fuer die KI im dildi-City-Chat)
+ * Diese Datei muss VOR dem Spiel-Code geladen sein (oder Inhalt oben ins Script kopieren).
+ * THREE = das three.js-Namespace-Objekt des Spiels (import * as THREE from 'three').
  *
- *     if (typ === 'rs6' || typ === 'ferrari') {
- *       const extra = [];   // optional: Tuning-Teile (Spoiler/Panzerung) als Geometrien hier rein
- *       return DildiCars.dildiCityVehicle(THREE, typ, farbe,
- *         { body: <bisheriges Karosserie-Material mit vertexColors>,
- *           lights: <bisheriges Licht-Material mit vertexColors>.clone(),
- *           wheel: <bisheriges Rad-Material mit vertexColors> }, extra);
- *     }
+ * 1) FAHRZEUGE  -  Typen: 'rs6', 'ferrari', 'skoda', 'police', 'taxi', 'van'
+ *    Die Funktion, die Fahrzeugmodelle baut (bekommt typ, farbe, tuning und gibt
+ *    { group, tilt, body, lights, wheels:[{piv,w,front}], wheelR, siren } zurueck), ganz am Anfang:
  *
- *   - Lackfarbe kommt ueber "farbe" (Hex-String wie bisher), Dildi Customs funktioniert also weiter.
- *   - Explosion/Abdunkeln ueber body.geometry.attributes.color funktioniert weiter.
- *   - Vorne = +Z, Raeder: w.rotation.x = Rollen, piv.rotation.y = Lenken (wie bisher).
- *   - Masse: RS6 4.99 x 1.95 m, Ferrari 4.56 x 1.96 m (passt zu len/wid in der Fahrzeugliste).
- *   - Diese Datei muss VOR dem Spiel-Code geladen sein (oder Inhalt oben ins Script kopieren).
+ *      if (DildiCars.types.includes(typ)) {
+ *        const extra = [];   // optional: Tuning-Geometrien (Spoiler/Panzerung) hier rein
+ *        return DildiCars.dildiCityVehicle(THREE, typ, farbe,
+ *          { body: <Karosserie-Material mit vertexColors>,
+ *            lights: <Licht-Material mit vertexColors>.clone(),
+ *            wheel: <Rad-Material mit vertexColors> }, extra);
+ *      }
+ *    - Lackfarbe ueber "farbe" (Dildi Customs funktioniert weiter), Explosion ueber
+ *      body.geometry.attributes.color funktioniert weiter.
+ *    - 'police' liefert siren:{red,blue} (das Spiel laesst sie wie bisher blinken).
+ *    - 'van': Seitenwaende sitzen bei x = +-0.975, die Flaschenpost-Beklebung liegt sauber an.
+ *    - Masse passen zur Fahrzeugliste: RS6 5.0x1.95, Ferrari 4.6x1.96, Skoda 4.7x1.83, Van 5.1x1.95.
+ *
+ * 2) FLUGZEUG  -  in der Funktion, die das Flugzeug baut (gibt { root, tilt, prop } zurueck):
+ *      return DildiCars.dildiCityPlane(THREE, farbe, { body: <bisheriges Flugzeug-Material mit vertexColors> });
+ *    Nase = +Z, Propeller dreht wie bisher ueber prop.rotation.z, Raeder auf y = 0.
+ *
+ * 3) GEBAEUDE  -  die bestehenden Gebaeude (Waende, Kollision, Innenraum, Logik) BLEIBEN.
+ *    Direkt nach dem Bau des jeweiligen Gebaeudes nur eine Fassaden-Deko hinzufuegen:
+ *      const deko = DildiCars.dildiCityBuilding(THREE, art, params);  scene.add(deko);
+ *      W.signMats.push(deko.userData.glow);   // optional: Leuchtteile wie die Schilder behandeln
+ *    Parameter (x0/x1 = Aussenwaende links/rechts, z0 = Front-/Strassenseite, an der das Schild haengt):
+ *    - 'pizza'   { x0, x1, z0, z1, h: 7.2 }   = genau das Rechteck der Pizza-Capri-Waende.
+ *                Die alte gruene Markise (Box ueber der Front auf ~3.6 m Hoehe) bitte entfernen.
+ *    - 'depot'   { x0, x1, z0, z1, h: 10.2 }  = Flaschenpost-Halle (Tore bei x0+8, x0+22, x0+36).
+ *    - 'customs' { x0, x1, z0, z1, h: 11.2 }  = Dildi Customs, Torseite = x0 (Front zeigt nach -x).
+ *    - 'bank'    { x0, x1, zFront, zBack, cx, h: 14 } = Hauptgebaeude der Bank (Aussenwaende),
+ *                zFront = Frontwand mit dem Eingang, cx = Mitte des Eingangs. Eingang bleibt frei,
+ *                Saeulen-Positionen werden wie im Spiel berechnet (Basis + goldenes Kapitell).
+ *    Nichts davon ragt in Eingaenge oder Fahrwege; es wird keine Kollision hinzugefuegt.
  * ---------------------------------------------------------------------------------------------
  *
  * ALTERNATIV (eigenstaendige Nutzung in anderen three.js-Projekten):
@@ -1017,6 +1037,254 @@
     return { group, tilt, body, lights, wheels, wheelR: axles[1].r, siren };
   }
 
+  // ======================================================================
+  // Gebaeude-Aufwertungen fuer Dildi City 3D
+  // Die Grundgebaeude (Waende, Kollision, Innenraum, Logik) bleiben unveraendert -
+  // hier kommt nur Fassaden-Deko dazu, die keine Eingaenge oder Wege versperrt.
+  // Rueckgabe: THREE.Group mit .userData.glow (Material der Leuchtteile, z. B. fuer W.signMats)
+  // ======================================================================
+  const BPAL = {
+    Brick: [0.55, 0.24, 0.17], Cream: [0.96, 0.92, 0.84], Terracotta: [0.72, 0.36, 0.22], GreenTrim: [0.10, 0.36, 0.20],
+    AwnRed: [0.80, 0.12, 0.10], AwnWhite: [0.96, 0.95, 0.92], AwnGreen: [0.10, 0.50, 0.25], Wood: [0.35, 0.20, 0.10],
+    DarkGlass: [0.08, 0.10, 0.13], Crust: [0.85, 0.58, 0.25], Cheese: [0.98, 0.80, 0.30], Pepperoni: [0.70, 0.12, 0.08],
+    Steel: [0.55, 0.57, 0.60], DarkSteel: [0.22, 0.23, 0.25], Rib: [0.70, 0.82, 0.72], Hazard: [0.98, 0.78, 0.05], Black: [0.05, 0.05, 0.06],
+    BottleGreen: [0.10, 0.45, 0.18], Label: [0.95, 0.95, 0.90], Gold: [0.83, 0.66, 0.22], Marble: [0.93, 0.91, 0.86],
+    FlagPink: [1.0, 0.24, 0.94], Rubber: [0.07, 0.07, 0.07], Checker: [0.95, 0.95, 0.95],
+    // Leuchtteile
+    GlowWarm: [1.0, 0.85, 0.55], GlowWin: [1.0, 0.78, 0.45], GlowPink: [1.0, 0.24, 0.94], GlowCyan: [0.2, 0.9, 1.0], GlowWhite: [1.0, 1.0, 0.95],
+  };
+
+  function pizzaDecor(d, g, p) {
+    const { x0, x1, z0, z1, h } = p, W = x1 - x0, cx = (x0 + x1) / 2, f = z0;   // Front = -z bei z0
+    d.box('Brick', [x0 - 0.06, 0.2, f - 0.1], [x1 + 0.06, 1.0, f + 0.02]);                       // Sockel
+    d.box('Terracotta', [x0 - 0.3, h - 0.15, f - 0.35], [x1 + 0.3, h + 0.3, z1 + 0.3]);         // Gesims
+    d.box('Brick', [x1 - 3.0, h, z1 - 3.0], [x1 - 1.8, h + 2.6, z1 - 1.8]);                      // Kamin
+    d.box('Black', [x1 - 3.1, h + 2.6, z1 - 3.1], [x1 - 1.7, h + 2.8, z1 - 1.7]);
+    // Erdgeschoss: Tuer in der Mitte, Schaufenster links/rechts
+    d.box('GreenTrim', [cx - 1.0, 0.2, f - 0.12], [cx + 1.0, 2.8, f + 0.01]);
+    d.box('Wood', [cx - 0.8, 0.2, f - 0.14], [cx + 0.8, 2.6, f - 0.1]);
+    d.box('Gold', [cx + 0.5, 1.2, f - 0.18], [cx + 0.58, 1.6, f - 0.14]);
+    for (const s of SIDES) {
+      for (let x = cx + s * 2.2; s > 0 ? x < x1 - 1.6 : x > x0 + 1.6; x += s * 3.2) {
+        const a = Math.min(x, x + s * 2.6), b = Math.max(x, x + s * 2.6);
+        if (b > x1 - 0.8 || a < x0 + 0.8) continue;
+        d.box('GreenTrim', [a - 0.12, 1.0, f - 0.12], [b + 0.12, 3.05, f + 0.01]);
+        g.box('GlowWin', [a, 1.12, f - 0.14], [b, 2.93, f - 0.12]);
+        d.box('GreenTrim', [a, 2.0, f - 0.17], [b, 2.06, f - 0.13]);
+      }
+      g.box('GlowWarm', [cx + s * 1.35 - 0.12, 2.2, f - 0.35], [cx + s * 1.35 + 0.12, 2.6, f - 0.12]);  // Wandlampen
+    }
+    // Markise rot-weiss gestreift (ersetzt die gruene Markise)
+    let i = 0;
+    for (let x = x0 - 0.4; x < x1 + 0.4 - 1e-6; x += 0.6, i++) {
+      const xe = Math.min(x + 0.6, x1 + 0.4), m = i % 2 ? 'AwnWhite' : 'AwnRed';
+      d.hexa(m, [[x, 4.05, f - 0.02], [xe, 4.05, f - 0.02], [xe, 3.35, f - 2.3], [x, 3.35, f - 2.3],
+        [x, 4.13, f - 0.02], [xe, 4.13, f - 0.02], [xe, 3.43, f - 2.3], [x, 3.43, f - 2.3]]);
+      d.box(m, [x, 3.0, f - 2.34], [xe, 3.43, f - 2.28]);
+    }
+    for (let x = x0; x <= x1 + 1e-6; x += 1.2) g.box('GlowWarm', [x - 0.07, 2.88, f - 2.40], [x + 0.07, 3.0, f - 2.30]);
+    // Obergeschoss: Fenster mit gruenen Laeden (nicht hinter dem Schild in der Mitte)
+    for (let x = x0 + 2.0; x < x1 - 2.0; x += 3.0) {
+      if (Math.abs(x - cx) < 7.2) continue;
+      d.box('Cream', [x - 0.75, 4.5, f - 0.08], [x + 0.75, 6.3, f + 0.01]);
+      g.box('GlowWin', [x - 0.55, 4.65, f - 0.1], [x + 0.55, 6.15, f - 0.08]);
+      for (const s of SIDES) d.box('GreenTrim', [x + s * 0.6 - 0.25, 4.6, f - 0.16], [x + s * 0.6 + 0.25, 6.2, f - 0.1]);
+      d.box('Terracotta', [x - 0.8, 4.4, f - 0.25], [x + 0.8, 4.52, f]);
+    }
+    // Riesen-Pizza auf dem Dach
+    const pz = f + 1.2, py = h + 2.5;
+    for (const s of SIDES) d.box('DarkSteel', [cx + s * 0.9 - 0.08, h + 0.3, pz + 0.05], [cx + s * 0.9 + 0.08, py, pz + 0.2]);
+    d.prism('Crust', hexagon(cx, py, pz, 2.0, 14, 0, 1, 1), [0, 0, -0.18]);
+    d.prism('Cheese', hexagon(cx, py, pz - 0.18, 1.72, 14, 0, 1, 1), [0, 0, -0.05]);
+    for (const [ox, oy] of [[0, 0], [0.9, 0.5], [-0.8, 0.7], [0.7, -0.8], [-0.9, -0.5], [0.05, 1.15], [0.1, -1.2], [1.25, -0.15], [-1.25, 0.1]])
+      d.prism('Pepperoni', hexagon(cx + ox, py + oy, pz - 0.23, 0.22, 8, 0, 1, 1), [0, 0, -0.04]);
+    for (let k = 0; k < 3; k++) {   // Schnittlinien
+      const a = k * Math.PI / 3;
+      d.hexa('Crust', [[cx - Math.cos(a) * 1.7 - 0.02 * Math.sin(a), py - Math.sin(a) * 1.7, pz - 0.24], [cx + Math.cos(a) * 1.7, py + Math.sin(a) * 1.7, pz - 0.24],
+        [cx + Math.cos(a) * 1.7, py + Math.sin(a) * 1.7 + 0.04, pz - 0.24], [cx - Math.cos(a) * 1.7, py - Math.sin(a) * 1.7 + 0.04, pz - 0.24],
+        [cx - Math.cos(a) * 1.7, py - Math.sin(a) * 1.7, pz - 0.27], [cx + Math.cos(a) * 1.7, py + Math.sin(a) * 1.7, pz - 0.27],
+        [cx + Math.cos(a) * 1.7, py + Math.sin(a) * 1.7 + 0.04, pz - 0.27], [cx - Math.cos(a) * 1.7, py - Math.sin(a) * 1.7 + 0.04, pz - 0.27]]);
+    }
+  }
+
+  function depotDecor(d, g, p) {
+    const { x0, x1, z0, z1, h } = p, cx = (x0 + x1) / 2, f = z0;
+    const doors = [0, 1, 2].map((i) => x0 + 8 + i * 14);
+    const nearDoor = (x) => doors.some((dx) => Math.abs(x - dx) < 3.9);
+    // Wellblech-Rippen auf Front und Seiten
+    for (let x = x0 + 0.5; x < x1 - 0.3; x += 1.0) {
+      const y0 = nearDoor(x) ? 5.95 : 0.25;
+      d.box('Rib', [x - 0.07, y0, f - 0.06], [x + 0.07, h - 0.1, f + 0.01]);
+    }
+    for (const xs of [x0, x1]) for (let z = z0 + 0.8; z < z1 - 0.3; z += 1.0)
+      d.box('Rib', [xs === x0 ? xs - 0.06 : xs - 0.01, 0.25, z - 0.07], [xs === x0 ? xs + 0.01 : xs + 0.06, h - 0.1, z + 0.07]);
+    // Tore: Warnmarkierung schwarz-gelb + Lampen + Rammschutz
+    for (const dx of doors) {
+      for (const s of SIDES) {
+        for (let y = 0.2, k = 0; y < 5.8; y += 0.5, k++) d.box(k % 2 ? 'Black' : 'Hazard', [dx + s * 3.75 - 0.2, y, f - 0.2], [dx + s * 3.75 + 0.2, Math.min(y + 0.5, 5.8), f + 0.01]);
+        d.box('Black', [dx + s * 3.2 - 0.25, 0.2, f - 0.45], [dx + s * 3.2 + 0.25, 1.0, f - 0.15]);
+      }
+      d.box('Hazard', [dx - 3.95, 5.8, f - 0.2], [dx + 3.95, 6.1, f + 0.01]);
+      d.box('DarkSteel', [dx - 0.5, 6.35, f - 0.5], [dx + 0.5, 6.55, f]);
+      g.box('GlowWhite', [dx - 0.42, 6.28, f - 0.46], [dx + 0.42, 6.35, f - 0.04]);
+    }
+    // Buero-Fenster oben (nicht hinter dem grossen Schild)
+    for (let x = x0 + 2.5; x < x1 - 2.0; x += 3.0) {
+      if (Math.abs(x - cx) < 11.8) continue;
+      d.box('DarkSteel', [x - 1.1, 7.0, f - 0.1], [x + 1.1, 8.7, f + 0.01]);
+      g.box('GlowWin', [x - 0.95, 7.12, f - 0.12], [x + 0.95, 8.58, f - 0.1]);
+    }
+    // Dachkante, Lueftungsgeraete, Oberlichter
+    d.box('Steel', [x0 - 0.15, h - 0.1, z0 - 0.15], [x1 + 0.15, h + 0.5, z0 + 0.15]);
+    d.box('Steel', [x0 - 0.15, h - 0.1, z1 - 0.15], [x1 + 0.15, h + 0.5, z1 + 0.15]);
+    d.box('Steel', [x0 - 0.15, h - 0.1, z0], [x0 + 0.15, h + 0.5, z1]);
+    d.box('Steel', [x1 - 0.15, h - 0.1, z0], [x1 + 0.15, h + 0.5, z1]);
+    for (let i = 0; i < 3; i++) {
+      const ax = x1 - 6 - i * 5, az = z1 - 5;
+      d.box('Steel', [ax - 1.4, h, az - 1.0], [ax + 1.4, h + 1.3, az + 1.0]);
+      d.prism('DarkSteel', hexagon(ax, az, 0, 0.75, 10, 0, 1, 1).map(([x, z]) => [x, h + 1.3, z]), [0, 0.08, 0]);
+    }
+    for (let x = x0 + 14; x < x1 - 16; x += 7) d.slab('DarkGlass', [[x, h + 0.02, z0 + 9], [x + 3, h + 0.02, z0 + 9], [x + 3, h + 0.02, z1 - 9], [x, h + 0.02, z1 - 9]], [0, 0.4, 0]);
+    // Riesige Flaschenpost-Flasche auf dem Dach
+    const bx = x0 + 5, bz = z0 + 4.5;
+    const ring = (r, y, n = 8) => hexagon(bx, bz, 0, r, n, Math.PI / 8, 1, 1).map(([x, z]) => [x, y, z]);
+    d.prism('BottleGreen', ring(1.3, h + 0.2), [0, 3.4, 0]);
+    d.prism('Label', ring(1.34, h + 1.2), [0, 1.3, 0]);
+    d.convex('BottleGreen', [ring(1.3, h + 3.6), ring(0.5, h + 4.6)].concat(ring(1.3, h + 3.6).map((p, i, a) => [p, a[(i + 1) % 8], ring(0.5, h + 4.6)[(i + 1) % 8], ring(0.5, h + 4.6)[i]])));
+    d.prism('BottleGreen', ring(0.45, h + 4.6), [0, 1.5, 0]);
+    d.prism('Gold', ring(0.52, h + 6.1), [0, 0.35, 0]);
+  }
+
+  function customsDecor(d, g, p) {
+    const { x0, x1, z0, z1, h } = p, cz = (z0 + z1) / 2, f = x0;   // Front = -x bei x0
+    const doors = [0, 1, 2].map((i) => z0 + 7 + i * 14);
+    // Neon-Rahmen um die Front + Dachkante
+    g.box('GlowPink', [f - 0.2, h - 0.35, z0 - 0.1], [f - 0.05, h - 0.15, z1 + 0.1]);
+    g.box('GlowCyan', [f - 0.2, 0.25, z0 - 0.1], [f - 0.05, 0.4, z1 + 0.1]);
+    for (const zz of [z0, z1]) g.box('GlowPink', [f - 0.2, 0.25, zz - 0.1], [f - 0.05, h - 0.15, zz + 0.1]);
+    for (const zz of [z0, z1]) g.box('GlowCyan', [x0, h - 0.35, zz === z0 ? zz - 0.2 : zz + 0.05], [x1, h - 0.15, zz === z0 ? zz - 0.05 : zz + 0.2]);
+    // Zielflaggen-Band unter dem Schild
+    let k = 0;
+    for (let z = z0; z < z1 - 1e-6; z += 0.4, k++) {
+      for (let r = 0; r < 2; r++) d.box((k + r) % 2 ? 'Black' : 'Checker', [f - 0.1, 6.25 + r * 0.25, z], [f + 0.01, 6.5 + r * 0.25, Math.min(z + 0.4, z1)]);
+    }
+    // Tore: helle Lichtleisten oben, Neon-Saeulen dazwischen
+    for (const dz of doors) {
+      g.box('GlowWhite', [f - 0.35, 6.0, dz - 4.2], [f - 0.15, 6.08, dz + 4.2]);
+      d.box('DarkSteel', [f - 0.4, 6.05, dz - 4.4], [f, 6.2, dz + 4.4]);
+    }
+    for (let i = 0; i < 2; i++) g.box('GlowPink', [f - 0.2, 0.3, doors[i] + 6.7], [f - 0.08, 5.9, doors[i] + 7.3]);
+    // Reifenstapel an den Ecken
+    for (const [tx, tz] of [[f - 1.4, z0 + 1.2], [f - 1.4, z1 - 1.2], [f - 1.2, z0 + 2.8]]) {
+      for (let n = 0; n < 3; n++) {
+        d.prism('Rubber', hexagon(tx, tz, 0, 0.42, 12, 0, 1, 1).map(([x, z]) => [x, 0.22 + n * 0.26, z]), [0, 0.24, 0]);
+        d.prism('Steel', hexagon(tx, tz, 0, 0.22, 10, 0, 1, 1).map(([x, z]) => [x, 0.23 + n * 0.26, z]), [0, 0.245, 0]);
+      }
+    }
+    // Strahler am Dach, die aufs Schild zeigen
+    for (const dz of [-6, 0, 6]) {
+      d.box('DarkSteel', [f - 0.9, h + 0.05, cz + dz - 0.2], [f - 0.3, h + 0.35, cz + dz + 0.2]);
+      g.box('GlowWhite', [f - 0.92, h + 0.0, cz + dz - 0.15], [f - 0.85, h + 0.1, cz + dz + 0.15]);
+    }
+    // Show-Auto auf dem Dach: pinker RS6 auf Podest (Schraeg zur Strasse)
+    const car = rs6Body(), wh = buildWheel(0.365, 0.285);
+    const ang = -Math.PI / 2 + 0.5, ca = Math.cos(ang), sa = Math.sin(ang);
+    const px = x0 + 6.5, pz = cz, py = h + 0.5;
+    const place = (q) => [px + q[0] * ca + q[2] * sa, py + q[1], pz - q[0] * sa + q[2] * ca];
+    d.prism('DarkSteel', hexagon(px, pz, 0, 3.4, 12, 0, 1, 1).map(([x, z]) => [x, h, z]), [0, 0.5, 0]);
+    g.prism('GlowPink', hexagon(px, pz, 0, 3.45, 12, 0, 1, 1).map(([x, z]) => [x, h + 0.38, z]), [0, 0.08, 0]);
+    const carMat = (m) => (m === 'Paint' ? 'FlagPink' : m === 'HeadLight' ? 'GlowWhite' : m === 'TailLight' ? 'Pepperoni' : 'CAR_' + m);
+    for (const m in car.t) for (let i = 0; i < car.t[m].length; i += 3) d.tri(carMat(m), place(car.t[m][i]), place(car.t[m][i + 1]), place(car.t[m][i + 2]));
+    for (const ax of RS6_AXLES) for (const s of SIDES) {
+      for (const m in wh.t) for (let i = 0; i < wh.t[m].length; i += 3) {
+        const tr = (q) => place(s > 0 ? [q[0] + ax.x, q[1] + ax.r, q[2] + ax.z] : [-q[0] - ax.x, q[1] + ax.r, -q[2] + ax.z]);
+        d.tri('CAR_' + m, tr(wh.t[m][i]), tr(wh.t[m][i + 1]), tr(wh.t[m][i + 2]));
+      }
+    }
+  }
+
+  function bankDecor(d, g, p) {
+    const { x0: N, x1: X, zFront: M, zBack: z, cx: L } = p, H = p.h || 14;
+    const tt = 3.2;
+    // Saeulen: Basis + Kapitell (gleiche Positionen wie im Spiel)
+    for (let c = 0; c < 8; c++) {
+      const e = N + 2 + c * ((X - N - 4) / 7);
+      if (Math.abs(e - L) < tt + 0.8) continue;
+      const cz = M - 2.2;
+      d.box('Marble', [e - 0.95, 0.68, cz - 0.95], [e + 0.95, 0.98, cz + 0.95]);
+      d.box('Marble', [e - 0.85, 0.98, cz - 0.85], [e + 0.85, 1.15, cz + 0.85]);
+      d.box('Marble', [e - 0.8, 10.25, cz - 0.8], [e + 0.8, 10.45, cz + 0.8]);
+      d.box('Gold', [e - 1.0, 10.45, cz - 1.0], [e + 1.0, 10.72, cz + 1.0]);
+    }
+    // Gebaelk: goldenes Band + Zahnschnitt, Wappen im Giebel
+    d.box('Gold', [N - 0.55, 11.05, M - 4.16], [X + 0.55, 11.4, M - 4.08]);
+    for (let x = N - 0.3; x < X + 0.4; x += 0.6) d.box('Marble', [x - 0.15, 11.6, M - 4.25], [x + 0.15, 11.85, M - 4.08]);
+    d.prism('Gold', hexagon(L, 13.1, M - 4.12, 1.0, 16, 0, 1, 1), [0, 0, -0.12]);
+    d.prism('Marble', hexagon(L, 13.1, M - 4.24, 0.72, 16, 0, 1, 1), [0, 0, -0.04]);
+    d.box('Gold', [L - 0.12, 12.7, M - 4.32], [L + 0.12, 13.5, M - 4.26]);
+    d.box('Gold', [L - 0.35, 12.7, M - 4.32], [L - 0.1, 12.82, M - 4.26]);
+    d.box('Gold', [L - 0.35, 13.38, M - 4.32], [L - 0.1, 13.5, M - 4.26]);
+    // Goldenes Gesims oben an der Front + Balustrade auf dem Dach
+    d.box('Gold', [N - 0.1, H - 0.45, M - 0.12], [X + 0.1, H - 0.1, M + 0.02]);
+    const rail = (ax0, az0, ax1, az1) => {
+      const n = Math.max(1, Math.round(Math.hypot(ax1 - ax0, az1 - az0) / 0.55));
+      for (let i = 0; i <= n; i++) {
+        const x = ax0 + (ax1 - ax0) * i / n, zz = az0 + (az1 - az0) * i / n;
+        d.box('Marble', [x - 0.1, H, zz - 0.1], [x + 0.1, H + 0.85, zz + 0.1]);
+      }
+      d.box('Marble', [Math.min(ax0, ax1) - 0.18, H + 0.85, Math.min(az0, az1) - 0.18], [Math.max(ax0, ax1) + 0.18, H + 1.05, Math.max(az0, az1) + 0.18]);
+    };
+    rail(N + 0.3, M + 0.4, X - 0.3, M + 0.4); rail(N + 0.3, z - 0.4, X - 0.3, z - 0.4);
+    rail(N + 0.4, M + 0.4, N + 0.4, z - 0.4); rail(X - 0.4, M + 0.4, X - 0.4, z - 0.4);
+    // Fahnenmasten
+    for (const fx of [N + 2, X - 2]) {
+      d.box('Steel', [fx - 0.06, H + 1.05, M + 1.4], [fx + 0.06, H + 7.5, M + 1.52]);
+      d.box('Gold', [fx - 0.12, H + 7.5, M + 1.34], [fx + 0.12, H + 7.7, M + 1.58]);
+      d.box('FlagPink', [fx + 0.06, H + 5.6, M + 1.44], [fx + 2.2, H + 7.3, M + 1.48]);
+      d.box('Gold', [fx + 0.06, H + 6.3, M + 1.43], [fx + 2.2, H + 6.6, M + 1.49]);
+    }
+    // Eingang: goldener Rahmen (bleibt offen), Laternen, Geldautomaten, Kameras
+    for (const s of SIDES) {
+      d.box('Gold', [L + s * tt - (s > 0 ? 0 : 0.35), 0.4, M - 0.12], [L + s * tt + (s > 0 ? 0.35 : 0), 5.6, M + 0.02]);
+      d.box('DarkSteel', [L + s * 4.6 - 0.18, 2.6, M - 0.35], [L + s * 4.6 + 0.18, 3.0, M - 0.05]);
+      g.box('GlowWarm', [L + s * 4.6 - 0.15, 3.0, M - 0.32], [L + s * 4.6 + 0.15, 3.7, M - 0.08]);
+      d.box('DarkSteel', [L + s * 4.6 - 0.2, 3.7, M - 0.35], [L + s * 4.6 + 0.2, 3.85, M - 0.05]);
+      const ax = L + s * 7.0;
+      d.box('DarkSteel', [ax - 0.55, 0.7, M - 0.22], [ax + 0.55, 2.4, M + 0.01]);
+      g.box('GlowCyan', [ax - 0.35, 1.6, M - 0.24], [ax + 0.35, 2.1, M - 0.22]);
+      d.box('Black', [ax - 0.25, 1.15, M - 0.26], [ax + 0.25, 1.25, M - 0.22]);
+      d.box('DarkSteel', [N + 0.2 + (s > 0 ? X - N - 0.6 : 0), 7.0, M - 0.6], [N + 0.6 + (s > 0 ? X - N - 0.6 : 0), 7.3, M - 0.05]);
+    }
+    d.box('Gold', [L - tt - 0.35, 5.45, M - 0.12], [L + tt + 0.35, 5.9, M + 0.02]);
+  }
+
+  function dildiCityBuilding(THREE, kind, params, mats) {
+    const d = new MB(), g = new MB();
+    if (kind === 'pizza') pizzaDecor(d, g, params);
+    else if (kind === 'depot') depotDecor(d, g, params);
+    else if (kind === 'customs') customsDecor(d, g, params);
+    else if (kind === 'bank') bankDecor(d, g, params);
+    else throw new Error('DildiCars: unbekanntes Gebaeude ' + kind);
+    const cache = {};
+    const colorOf = (m) => {
+      if (cache[m]) return cache[m];
+      let c = BPAL[m];
+      if (!c && m.startsWith('CAR_')) c = SRGB[m.slice(4)] || (m === 'CAR_Rim' ? [0.55, 0.56, 0.58] : m === 'CAR_Caliper' ? [0.75, 0.05, 0.04] : [0.5, 0.5, 0.5]);
+      return (cache[m] = new THREE.Color().setRGB(...(c || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    };
+    const group = new THREE.Group();
+    const decor = new THREE.Mesh(vcGeometry(THREE, d, () => true, colorOf),
+      mats && mats.decor || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.1 }));
+    decor.castShadow = true;
+    decor.receiveShadow = true;
+    const glowMat = mats && mats.glow || new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    const glow = new THREE.Mesh(vcGeometry(THREE, g, () => true, colorOf), glowMat);
+    group.add(decor, glow);
+    group.name = 'Decor_' + kind;
+    group.userData.glow = glowMat;
+    return group;
+  }
+
   // Eigenstaendige Nutzung fuer alle Typen (eigene PBR-Materialien wie createRS6)
   function createVehicle(THREE, type, options) {
     const V = VEHICLES[type];
@@ -1027,7 +1295,7 @@
     return car;
   }
 
-  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, types: Object.keys(VEHICLES) };
+  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, types: Object.keys(VEHICLES) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);
