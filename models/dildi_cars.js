@@ -147,7 +147,7 @@
       if (override !== undefined) { inArch = override; if (inArch) ya = ax.r; }
       const liner = ax ? ax.liner : 0.64;
       if (inArch) {
-        const wm = Math.max(wm0, 0.975);
+        const wm = Math.max(wm0, spec.archW || 0.975);
         const ym2 = Math.min(Math.max(ym, ya + 0.06), ybl - 0.03);
         return [[0, yf], [liner, yf], [liner, ya], [wm - 0.03, ya], [wm, ya + 0.025],
           [wm, ym2], [wbl, ybl], [wwin, ywin], [wr, yr], [0, yc]];
@@ -490,6 +490,299 @@
     return mb;
   }
 
+  // Punkt an einer abgeschraegten Front/Heck-Ecke nach aussen schieben
+  const cornerOut = (p, d, s, x0, dx, dir) => {
+    const t = Math.min(1, Math.max(0, (Math.abs(p[0]) - x0) / dx));
+    let nrm = [s * t * 0.8, 0, dir * (1 - 0.4 * t)];
+    nrm = mul(nrm, 1 / len(nrm));
+    return add(p, mul(nrm, d));
+  };
+
+  // ======================================================================
+  // Skoda Octavia (Limousine/Liftback) - Varianten: '' | 'police' | 'taxi'
+  // ======================================================================
+  const OCT_AXLES = [
+    { z: 1.435, r: 0.32, w: 0.225, x: 0.78, arch: 0.38, liner: 0.60 },
+    { z: -1.255, r: 0.32, w: 0.225, x: 0.78, arch: 0.38, liner: 0.60 }];
+  function octaviaBody(variant) {
+    const mb = new MB();
+    const loft = makeLoft({
+      axles: OCT_AXLES, archW: 0.915,
+      extraZ: [0.45, -0.70, -0.80, -1.62, 1.90, -0.40],
+      keys: [
+        [2.345, .25, .62, .30, .78, .52, .72, .68, .48, .70, .22, .71, .71],
+        [2.29, .19, .74, .26, .88, .58, .83, .76, .56, .78, .25, .79, .795],
+        [2.00, .15, .80, .23, .905, .64, .86, .84, .58, .87, .27, .88, .885],
+        [1.435, .14, .82, .23, .915, .68, .88, .90, .60, .93, .29, .94, .945],
+        [0.85, .14, .82, .23, .91, .70, .87, .97, .62, 1.00, .31, 1.01, 1.015],
+        [0.80, .14, .82, .23, .91, .70, .87, .975, .76, .985, .68, .995, 1.00],
+        [-0.05, .14, .82, .23, .905, .70, .85, 1.00, .66, 1.40, .58, 1.455, 1.47],
+        [-0.85, .14, .82, .23, .905, .70, .85, 1.01, .66, 1.40, .58, 1.45, 1.465],
+        [-1.30, .14, .82, .23, .91, .71, .85, 1.02, .64, 1.36, .56, 1.41, 1.425],
+        [-2.10, .16, .80, .25, .89, .72, .82, 1.00, .58, 1.04, .50, 1.05, 1.055],
+        [-2.30, .22, .76, .30, .86, .70, .78, .98, .55, 1.00, .45, 1.005, 1.01],
+        [-2.345, .27, .70, .34, .80, .68, .72, .94, .50, .95, .40, .955, .955]],
+      mats: (z0, z1, a0, a1) => {
+        const zm = (z0 + z1) / 2;
+        const m = ['Underbody', 'Underbody', 'Underbody', 'TrimMatte', 'Paint', 'Paint', 'Paint', 'Paint', 'Paint'];
+        if (a0 && a1) m[3] = 'Paint';
+        if (Math.abs(z0 - z1) < 1e-6) { m[3] = 'Underbody'; m[4] = 'Underbody'; }
+        if (zm > 0.80 && zm < 0.85) { m[7] = 'TrimMatte'; m[8] = 'TrimMatte'; }
+        else if (zm > -0.05 && zm < 0.80) { m[6] = zm < 0.45 ? 'Glass' : 'Paint'; m[7] = 'TrimGloss'; m[8] = 'Glass'; }
+        else if (zm > -1.30 && zm < -0.05) { m[6] = (zm > -0.80 && zm < -0.70) ? 'TrimGloss' : 'Glass'; m[7] = 'TrimGloss'; }
+        else if (zm > -2.10 && zm < -1.30) { m[6] = zm > -1.62 ? 'Glass' : 'Paint'; m[7] = 'TrimGloss'; m[8] = 'Glass'; }
+        return m;
+      },
+    });
+    loft.build(mb);
+    const zf = 2.345, zr = -2.345;
+    // Front: Grill mit Chromrahmen + senkrechten Lamellen, unterer Einlass, Kennzeichen
+    const gr = [[-0.36, 0.665], [0.36, 0.665], [0.32, 0.53], [-0.32, 0.53]];
+    mb.slab('Chrome', gr.map(([x, y]) => [x, y, zf + 0.018]), [0, 0, -0.04]);
+    mb.slab('TrimGloss', gr.map(([x, y]) => [x * 0.93, y > 0.6 ? y - 0.012 : y + 0.012, zf + 0.022]), [0, 0, -0.04]);
+    for (let i = -6; i <= 6; i++) mb.box('Grille', [i * 0.05 - 0.008, 0.545, zf + 0.022], [i * 0.05 + 0.008, 0.65, zf + 0.03]);
+    mb.slab('TrimMatte', [[-0.56, 0.38, zf + 0.012], [0.56, 0.38, zf + 0.012], [0.50, 0.25, zf + 0.012], [-0.50, 0.25, zf + 0.012]], [0, 0, -0.04]);
+    mb.box('Plate', [-0.26, 0.40, zf + 0.012], [0.26, 0.51, zf + 0.024]);
+    // Heck: Kennzeichen, Stossfaenger unten schwarz
+    mb.box('Plate', [-0.26, 0.62, zr - 0.012], [0.26, 0.73, zr + 0.002]);
+    mb.hexa('TrimMatte', [[-0.80, 0.42, zr - 0.02], [0.80, 0.42, zr - 0.02], [0.78, 0.26, zr - 0.03], [-0.78, 0.26, zr - 0.03],
+      [-0.82, 0.42, -2.20], [0.82, 0.42, -2.20], [0.80, 0.24, -2.20], [-0.80, 0.24, -2.20]]);
+    for (const s of SIDES) {
+      // Scheinwerfer (schmal, eckig) + Tagfahrlicht
+      const co = (p, d) => cornerOut(p, d, s, 0.70, 0.16, 1);
+      const lens = [[s * 0.40, 0.700, zf], [s * 0.78, 0.765, 2.29], [s * 0.84, 0.675, 2.255], [s * 0.44, 0.625, zf]];
+      mb.hexa('LightLens', lens.map((p) => co(p, 0.02)).concat(lens.map((p) => co(p, -0.05))));
+      const drl = [[s * 0.42, 0.636, zf], [s * 0.82, 0.69, 2.262], [s * 0.83, 0.675, 2.256], [s * 0.43, 0.624, zf]];
+      mb.hexa('HeadLight', drl.map((p) => co(p, 0.028)).concat(drl.map((p) => co(p, 0))));
+      mb.hexa('HeadLight', [[s * 0.55, 0.70, zf], [s * 0.66, 0.72, zf], [s * 0.66, 0.66, zf], [s * 0.55, 0.645, zf]].map((p) => co(p, 0.026))
+        .concat([[s * 0.55, 0.70, zf], [s * 0.66, 0.72, zf], [s * 0.66, 0.66, zf], [s * 0.55, 0.645, zf]].map((p) => co(p, 0))));
+      // Nebelscheinwerfer
+      mb.box('HeadLight', [s * 0.62 - 0.05, 0.30, zf - 0.005], [s * 0.62 + 0.05, 0.33, zf + 0.012]);
+      // Rueckleuchten (C-Form angedeutet) + Ecke
+      const cr = (p, d) => cornerOut(p, d, s, 0.70, 0.16, -1);
+      const tl = [[s * 0.42, 0.93, zr], [s * 0.76, 0.93, zr], [s * 0.76, 0.82, zr], [s * 0.46, 0.84, zr]];
+      mb.hexa('TailLight', tl.map((p) => cr(p, 0.014)).concat(tl.map((p) => cr(p, -0.04))));
+      mb.hexa('TailLight', [[s * 0.76, 0.93, zr - 0.014], [s * 0.85, 0.97, -2.27], [s * 0.86, 0.86, -2.25], [s * 0.76, 0.82, zr - 0.014],
+        [s * 0.74, 0.93, zr + 0.04], [s * 0.83, 0.97, -2.24], [s * 0.84, 0.86, -2.22], [s * 0.74, 0.82, zr + 0.04]]);
+      mb.slab('LightLens', [[s * 0.50, 0.905, zr - 0.017], [s * 0.70, 0.905, zr - 0.017], [s * 0.70, 0.855, zr - 0.017], [s * 0.52, 0.86, zr - 0.017]], [0, 0, 0.01]);
+      mb.box('TailLight', [s * 0.70 - 0.05, 0.38, zr - 0.032], [s * 0.70 + 0.05, 0.40, zr - 0.02]);
+      // Spiegel, Tuergriffe, Schweller, Radhaeuser
+      mb.hexa('Paint', [[s * 0.84, 0.98, 0.76], [s * 1.0, 1.0, 0.71], [s * 1.0, 1.09, 0.71], [s * 0.84, 1.07, 0.76],
+        [s * 0.84, 0.98, 0.60], [s * 0.99, 0.99, 0.60], [s * 0.99, 1.08, 0.62], [s * 0.84, 1.06, 0.62]]);
+      mb.box('TrimGloss', [s * 0.84 - 0.03, 0.97, 0.62], [s * 0.84 + 0.03, 1.0, 0.72]);
+      for (const z of [0.15, -0.95]) mb.box('Chrome', [s > 0 ? 0.885 : -0.905, 0.90, z - 0.07], [s > 0 ? 0.905 : -0.885, 0.92, z + 0.07]);
+      for (const ax of OCT_AXLES) mb.box('Underbody', [s * ax.liner - 0.01, 0.10, ax.z - ax.arch], [s * ax.liner + 0.01, ax.r + ax.arch, ax.z + ax.arch]);
+      // Varianten-Beklebung an der Seite
+      if (variant === 'police') {
+        loft.decal(mb, 'PoliceBlue', [[1.00, 4.15], [1.00, 4.95], [-1.0, 4.95], [-1.0, 4.15]], s, 0.006, 0.01, 2, 6);
+        loft.decal(mb, 'PoliceYellow', [[1.00, 4.95], [1.00, 5.05], [-1.0, 5.05], [-1.0, 4.95]], s, 0.006, 0.01, 1, 6);
+      } else if (variant === 'taxi') {
+        loft.decal(mb, 'TrimGloss', [[0.90, 4.55], [0.90, 4.75], [-1.0, 4.75], [-1.0, 4.55]], s, 0.006, 0.01, 1, 6);
+      }
+    }
+    mb.hexa('TrimGloss', [[-0.03, 1.465, -0.75], [0.03, 1.465, -0.75], [0.015, 1.52, -0.86], [-0.015, 1.52, -0.86],
+      [-0.035, 1.46, -0.95], [0.035, 1.46, -0.95], [0.02, 1.47, -0.95], [-0.02, 1.47, -0.95]]);
+    if (variant === 'police') {
+      // Haube-Streifen + Lichtbalken-Basis (die blinkenden Teile kommen als "siren")
+      loft.decal(mb, 'PoliceBlue', [[2.25, 8.0], [2.25, 9.0], [0.88, 9.0], [0.88, 8.0]], 1, 0.004, 0.01, 2, 3);
+      loft.decal(mb, 'PoliceBlue', [[2.25, 8.0], [2.25, 9.0], [0.88, 9.0], [0.88, 8.0]], -1, 0.004, 0.01, 2, 3);
+      mb.box('TrimGloss', [-0.62, 1.465, -0.52], [0.62, 1.52, -0.28]);
+    } else if (variant === 'taxi') {
+      mb.box('TrimGloss', [-0.30, 1.465, -0.55], [0.30, 1.49, -0.35]);
+      mb.hexa('TaxiSign', [[-0.30, 1.49, -0.36], [0.30, 1.49, -0.36], [0.27, 1.65, -0.40], [-0.27, 1.65, -0.40],
+        [-0.30, 1.49, -0.54], [0.30, 1.49, -0.54], [0.27, 1.65, -0.50], [-0.27, 1.65, -0.50]]);
+    }
+    calipers(mb, OCT_AXLES, 0.03);
+    return mb;
+  }
+
+  // ======================================================================
+  // VW Transporter (Kastenwagen) - Seitenwaende fast senkrecht, damit
+  // Beklebungen des Spiels (Flaschenpost) sauber anliegen
+  // ======================================================================
+  const VAN_AXLES = [
+    { z: 1.60, r: 0.35, w: 0.235, x: 0.82, arch: 0.41, liner: 0.62 },
+    { z: -1.40, r: 0.35, w: 0.235, x: 0.82, arch: 0.41, liner: 0.62 }];
+  function vanBody() {
+    const mb = new MB();
+    const loft = makeLoft({
+      axles: VAN_AXLES, archW: 0.975,
+      extraZ: [1.90, 0.70, 0.62, 0.0, -0.8],
+      keys: [
+        [2.55, .30, .80, .36, .90, .62, .86, .92, .62, .95, .30, .96, .96],
+        [2.48, .24, .86, .30, .95, .66, .92, 1.02, .66, 1.05, .32, 1.06, 1.07],
+        [2.15, .20, .88, .28, .97, .70, .955, 1.15, .70, 1.18, .34, 1.19, 1.20],
+        [2.10, .20, .88, .28, .97, .70, .96, 1.16, .88, 1.17, .82, 1.18, 1.19],
+        [1.35, .20, .88, .28, .97, .72, .965, 1.18, .935, 1.88, .82, 1.96, 1.98],
+        [-2.40, .22, .88, .30, .97, .72, .965, 1.20, .945, 1.88, .82, 1.96, 1.98],
+        [-2.55, .30, .82, .36, .93, .70, .925, 1.18, .90, 1.86, .78, 1.93, 1.95]],
+      mats: (z0, z1, a0, a1) => {
+        const zm = (z0 + z1) / 2;
+        const m = ['Underbody', 'Underbody', 'Underbody', 'TrimMatte', 'Paint', 'Paint', 'Paint', 'Paint', 'Paint'];
+        if (a0 && a1) m[3] = 'Paint';
+        if (Math.abs(z0 - z1) < 1e-6) { m[3] = 'Underbody'; m[4] = 'Underbody'; }
+        if (zm > 2.10 && zm < 2.15) { m[7] = 'TrimMatte'; m[8] = 'TrimMatte'; }
+        else if (zm > 1.35 && zm < 2.10) { m[6] = zm < 1.90 ? 'Glass' : 'Paint'; m[7] = 'TrimGloss'; m[8] = 'Glass'; }
+        else if (zm > 0.70 && zm < 1.35) { m[6] = 'Glass'; m[7] = 'TrimGloss'; }
+        else if (zm > 0.62 && zm < 0.70) { m[6] = 'TrimGloss'; }
+        return m;
+      },
+    });
+    loft.build(mb);
+    const zf = 2.55, zr = -2.55;
+    // Front: Chrom-Querstreben zwischen den Scheinwerfern, grosser unterer Grill, Stossfaenger
+    mb.slab('TrimGloss', [[-0.56, 0.93, zf + 0.012], [0.56, 0.93, zf + 0.012], [0.56, 0.76, zf + 0.012], [-0.56, 0.76, zf + 0.012]], [0, 0, -0.05]);
+    for (const y of [0.80, 0.85, 0.90]) mb.box('Chrome', [-0.54, y - 0.007, zf + 0.012], [0.54, y + 0.007, zf + 0.022]);
+    mb.hexa('TrimMatte', [[-0.90, 0.66, zf + 0.04], [0.90, 0.66, zf + 0.04], [0.88, 0.30, zf + 0.05], [-0.88, 0.30, zf + 0.05],
+      [-0.94, 0.66, 2.30], [0.94, 0.66, 2.30], [0.92, 0.30, 2.30], [-0.92, 0.30, 2.30]]);
+    mb.slab('TrimGloss', [[-0.58, 0.62, zf + 0.052], [0.58, 0.62, zf + 0.052], [0.50, 0.36, zf + 0.055], [-0.50, 0.36, zf + 0.055]], [0, 0, -0.03]);
+    for (const y of [0.44, 0.52]) mb.box('Grille', [-0.52, y - 0.006, zf + 0.055], [0.52, y + 0.006, zf + 0.062]);
+    mb.box('Plate', [-0.26, 0.36, zf + 0.056], [0.26, 0.47, zf + 0.066]);
+    // Heck: zwei Fluegeltueren mit Fenstern, hohe Leuchten, Stossfaenger, 3. Bremsleuchte
+    for (const s of SIDES) mb.slab('Glass', [[s * 0.06, 1.80, zr - 0.012], [s * 0.78, 1.80, zr - 0.012], [s * 0.78, 1.32, zr - 0.012], [s * 0.06, 1.32, zr - 0.012]], [0, 0, 0.03]);
+    mb.box('TrimGloss', [-0.012, 0.42, zr - 0.014], [0.012, 1.86, zr + 0.01]);
+    mb.box('TailLight', [-0.25, 1.875, zr - 0.012], [0.25, 1.905, zr + 0.01]);
+    mb.box('Plate', [-0.26, 0.66, zr - 0.012], [0.26, 0.77, zr + 0.002]);
+    mb.hexa('TrimMatte', [[-0.92, 0.58, zr - 0.05], [0.92, 0.58, zr - 0.05], [0.90, 0.30, zr - 0.05], [-0.90, 0.30, zr - 0.05],
+      [-0.95, 0.58, -2.30], [0.95, 0.58, -2.30], [0.93, 0.30, -2.30], [-0.93, 0.30, -2.30]]);
+    for (const s of SIDES) {
+      // Scheinwerfer (eckig) + LED-Leiste
+      const co = (p, d) => cornerOut(p, d, s, 0.80, 0.14, 1);
+      const lens = [[s * 0.56, 0.95, zf], [s * 0.88, 0.97, 2.50], [s * 0.92, 0.80, 2.47], [s * 0.56, 0.77, zf]];
+      mb.hexa('LightLens', lens.map((p) => co(p, 0.022)).concat(lens.map((p) => co(p, -0.05))));
+      const drl = [[s * 0.58, 0.79, zf], [s * 0.90, 0.82, 2.475], [s * 0.905, 0.80, 2.47], [s * 0.58, 0.775, zf]];
+      mb.hexa('HeadLight', drl.map((p) => co(p, 0.03)).concat(drl.map((p) => co(p, 0))));
+      mb.box('HeadLight', [s * 0.70 - 0.07, 0.86, zf + 0.012], [s * 0.70 + 0.07, 0.93, zf + 0.03]);
+      // Rueckleuchten senkrecht an den Ecken
+      mb.slab('TailLight', [[s * 0.80, 1.45, zr - 0.012], [s * 0.93, 1.45, zr - 0.012], [s * 0.93, 0.95, zr - 0.012], [s * 0.80, 0.95, zr - 0.012]], [0, 0, 0.03]);
+      mb.slab('LightLens', [[s * 0.82, 1.20, zr - 0.016], [s * 0.91, 1.20, zr - 0.016], [s * 0.91, 1.10, zr - 0.016], [s * 0.82, 1.10, zr - 0.016]], [0, 0, 0.01]);
+      mb.box('Chrome', [s * 0.40 - 0.06, 1.15, zr - 0.02], [s * 0.40 + 0.06, 1.18, zr - 0.005]);
+      // grosse Spiegel
+      mb.hexa('TrimGloss', [[s * 0.95, 1.22, 1.98], [s * 1.14, 1.24, 1.92], [s * 1.14, 1.46, 1.92], [s * 0.95, 1.44, 1.98],
+        [s * 0.95, 1.22, 1.84], [s * 1.13, 1.23, 1.84], [s * 1.13, 1.45, 1.86], [s * 0.95, 1.43, 1.86]]);
+      // Schiebetuer-Schiene, Tuergriffe
+      mb.box('TrimGloss', [s > 0 ? 0.962 : -0.982, 1.50, -1.55], [s > 0 ? 0.982 : -0.962, 1.53, 0.66]);
+      for (const z of [1.10, 0.45]) mb.box('TrimGloss', [s > 0 ? 0.965 : -0.985, 1.05, z - 0.08], [s > 0 ? 0.985 : -0.965, 1.08, z + 0.08]);
+      for (const ax of VAN_AXLES) mb.box('Underbody', [s * ax.liner - 0.01, 0.12, ax.z - ax.arch], [s * ax.liner + 0.01, ax.r + ax.arch, ax.z + ax.arch]);
+    }
+    calipers(mb, VAN_AXLES, 0.03);
+    return mb;
+  }
+
+  // ======================================================================
+  // Flugzeug (einmotoriger Hochdecker, ~9.8 m lang, 11.2 m Spannweite)
+  // Nase = +Z, Raeder stehen auf y = 0. Propeller dreht um die lokale Z-Achse.
+  // ======================================================================
+  function planeParts() {
+    const mb = new MB(), prop = new MB();
+    // Rumpf: achteckige Querschnitte (z, unten, oben, halbe Breite)
+    const S = [
+      [4.65, 0.98, 1.62, 0.40], [4.30, 0.86, 1.78, 0.54], [3.40, 0.78, 1.92, 0.61], [2.70, 0.76, 1.98, 0.62],
+      [1.75, 0.76, 2.50, 0.62], [0.00, 0.78, 2.50, 0.62], [-0.70, 0.84, 2.46, 0.60], [-1.60, 0.98, 2.22, 0.50],
+      [-3.40, 1.30, 1.98, 0.30], [-5.00, 1.58, 1.96, 0.12]];
+    const ring = ([z, b, t, w]) => {
+      const h = t - b;
+      const r = [[0, b], [w * 0.72, b], [w, b + h * 0.30], [w, b + h * 0.62], [w * 0.82, t - h * 0.04], [0, t]];
+      return r.map(([x, y]) => [x, y, z]);
+    };
+    const R = S.map(ring);
+    const segMat = (zm, k) => {
+      if (k <= 1) return 'Paint';
+      if (k === 2) return 'PlaneWhite';
+      if (k === 3) {
+        if (zm < 2.70 && zm > -1.60) return (zm > 0.95 && zm < 1.05) || (zm > -0.75 && zm < -0.65) ? 'TrimGloss' : 'Glass';
+        return 'PlaneWhite';
+      }
+      if (zm < 2.70 && zm > 1.75) return 'Glass';   // Frontscheibe
+      return 'PlaneWhite';
+    };
+    for (let i = 0; i < R.length - 1; i++) {
+      const zm = (S[i][0] + S[i + 1][0]) / 2;
+      for (let k = 0; k < 5; k++) {
+        const a = R[i][k], b = R[i + 1][k], c = R[i + 1][k + 1], d = R[i][k + 1];
+        const m = segMat(zm, k);
+        mb.quad(m, a, b, c, d);
+        mb.quad(m, mirror(a), mirror(d), mirror(c), mirror(b));
+      }
+    }
+    // Rumpfenden zumachen
+    const cap = (r, facing) => {
+      const full = r.concat(r.slice().reverse().slice(1, -1).map(mirror));
+      let c = [0, 0, 0];
+      full.forEach((p) => { c = add(c, p); });
+      c = mul(c, 1 / full.length);
+      for (let i = 0; i < full.length; i++) {
+        const a = full[i], b = full[(i + 1) % full.length];
+        if (facing > 0) mb.tri('Grille', c, a, b); else mb.tri('Paint', c, b, a);
+      }
+    };
+    cap(R[0], 1); cap(R[R.length - 1], -1);
+    // Tragflaeche (Hochdecker) mit V-Stellung, Spitzen in Lackfarbe
+    for (const s of SIDES) {
+      const root = { x: 0.55, y: 2.50, zl: 1.75, zt: 0.05, th: 0.17 }, tip = { x: 5.30, y: 2.66, zl: 1.55, zt: 0.25, th: 0.10 };
+      const sec = (p) => [[s * p.x, p.y, p.zl], [s * p.x, p.y + p.th, p.zl - (p.zl - p.zt) * 0.28], [s * p.x, p.y + p.th * 0.4, p.zt], [s * p.x, p.y - 0.02, p.zl - (p.zl - p.zt) * 0.35]];
+      const a = sec(root), b = sec(tip);
+      mb.convex('PlaneWhite', [a, b, [a[0], a[1], b[1], b[0]], [a[1], a[2], b[2], b[1]], [a[2], a[3], b[3], b[2]], [a[3], a[0], b[0], b[3]]]);
+      const tp = { x: 5.62, y: 2.68, zl: 1.50, zt: 0.32, th: 0.08 };
+      const c = sec(tp);
+      mb.convex('Paint', [b, c, [b[0], b[1], c[1], c[0]], [b[1], b[2], c[2], c[1]], [b[2], b[3], c[3], c[2]], [b[3], b[0], c[0], c[3]]]);
+      mb.box(s > 0 ? 'NavRed' : 'NavGreen', [s * 5.64 - 0.04, 2.66, 1.30], [s * 5.64 + 0.04, 2.74, 1.42]);
+      // Fluegelstrebe
+      mb.hexa('Exhaust', [[s * 0.58, 1.02, 0.95], [s * 0.58, 1.08, 0.95], [s * 0.58, 1.08, 0.82], [s * 0.58, 1.02, 0.82],
+        [s * 2.40, 2.48, 0.95], [s * 2.40, 2.54, 0.95], [s * 2.40, 2.54, 0.82], [s * 2.40, 2.48, 0.82]]);
+      // Hauptfahrwerk: Federbein, Radverkleidung, Rad
+      mb.hexa('Exhaust', [[s * 0.58, 0.88, 1.06], [s * 0.58, 0.95, 1.06], [s * 0.58, 0.95, 0.94], [s * 0.58, 0.88, 0.94],
+        [s * 1.10, 0.36, 1.06], [s * 1.10, 0.43, 1.06], [s * 1.10, 0.43, 0.94], [s * 1.10, 0.36, 0.94]]);
+      const wx = s * 1.15;
+      mb.prism('Tire', hexagon(0.30, 0, 0, 0.30, 12, 0, 1, 1).map(([zz, y]) => [wx - 0.09, 0.30 + y, 1.0 + zz - 0.30]), [0.18, 0, 0]);
+      mb.hexa('Paint', [[wx - 0.14, 0.42, 1.45], [wx + 0.14, 0.42, 1.45], [wx + 0.12, 0.66, 1.25], [wx - 0.12, 0.66, 1.25],
+        [wx - 0.14, 0.42, 0.55], [wx + 0.14, 0.42, 0.55], [wx + 0.12, 0.62, 0.75], [wx - 0.12, 0.62, 0.75]]);
+    }
+    // Bugrad
+    mb.box('Exhaust', [-0.04, 0.22, 3.56], [0.04, 0.90, 3.64]);
+    mb.prism('Tire', hexagon(0.2, 0, 0, 0.2, 10, 0, 1, 1).map(([zz, y]) => [-0.06, 0.20 + y, 3.6 + zz - 0.2]), [0.12, 0, 0]);
+    // Hoehenleitwerk + Seitenleitwerk
+    for (const s of SIDES) {
+      mb.slab('PlaneWhite', [[0, 1.84, -4.02], [s * 1.8, 1.86, -4.42], [s * 1.8, 1.86, -4.95], [0, 1.84, -4.99]], [0, 0.06, 0]);
+      mb.slab('Paint', [[s * 1.62, 1.855, -4.38], [s * 1.81, 1.858, -4.42], [s * 1.81, 1.858, -4.96], [s * 1.62, 1.855, -4.96]], [0, 0.07, 0]);
+    }
+    const fin = [[-0.06, 1.90, -3.20], [-0.03, 3.20, -4.40], [-0.03, 3.20, -5.04], [-0.06, 1.90, -5.02]];
+    mb.hexa('Paint', fin.concat(fin.map(([x, y, z]) => [-x, y, z])));
+    for (const s of SIDES) {
+      mb.slab('PlaneWhite', [[s * 0.062, 2.30, -3.95], [s * 0.05, 2.75, -4.30], [s * 0.05, 2.75, -4.50], [s * 0.062, 2.30, -4.40]], [s * 0.004, 0, 0]);
+      mb.slab('TailLight', [[s * 0.05, 2.80, -4.36], [s * 0.035, 3.10, -4.58], [s * 0.035, 3.10, -5.02], [s * 0.05, 2.80, -5.01]], [s * 0.004, 0, 0]);
+    }
+    // Motorhaube: Lufteinlaesse + Auspuff
+    for (const s of SIDES) mb.box('TrimGloss', [s * 0.18 - 0.1, 1.00, 4.62], [s * 0.18 + 0.1, 1.12, 4.70]);
+    mb.prism('Exhaust', hexagon(0.35, 0.86, 3.6, 0.04, 6, 0, 1, 1), [0, -0.02, -0.35]);
+    // Propeller (eigenes Mesh, Mitte = Drehpunkt): Spinner + 2 Blaetter
+    const sp = hexagon(0, 0, -0.18, 0.22, 8, 0, 1, 1);
+    prop.convex('Paint', [sp].concat(sp.map((p, i) => [p, sp[(i + 1) % 8], [0, 0, 0.18]])));
+    for (const s of SIDES) {
+      prop.hexa('TrimGloss', [[s * 0.10, -0.06, 0.02], [s * 1.15, -0.04, 0.0], [s * 1.15, 0.04, -0.02], [s * 0.10, 0.07, -0.04],
+        [s * 0.10, -0.06, -0.04], [s * 1.15, -0.04, -0.03], [s * 1.15, 0.04, -0.05], [s * 0.10, 0.07, -0.08]]);
+      prop.box('PlaneTip', [s * 1.05 - 0.05, -0.045, -0.05], [s * 1.15, 0.045, 0.005]);
+    }
+    return { mb, prop };
+  }
+
+  // Gibt genau das zurueck, was die Flugzeug-Baufunktion von Dildi City 3D liefert: { root, tilt, prop }
+  function dildiCityPlane(THREE, color, mats) {
+    const { mb, prop } = planeParts();
+    const paint = new THREE.Color(color || '#2471a3');
+    const fixed = Object.assign({}, SRGB, { PlaneWhite: [0.93, 0.93, 0.92], NavRed: [1, 0.1, 0.1], NavGreen: [0.1, 1, 0.2], PlaneTip: [0.95, 0.75, 0.1] });
+    const cache = {};
+    const colorOf = (m) => (m === 'Paint' ? paint : cache[m] || (cache[m] = new THREE.Color().setRGB(...(fixed[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace)));
+    const body = new THREE.Mesh(vcGeometry(THREE, mb, () => true, colorOf), mats.body);
+    body.castShadow = true;
+    const p = new THREE.Mesh(vcGeometry(THREE, prop, () => true, colorOf), mats.prop || mats.body);
+    p.position.set(0, 1.30, 4.88);
+    const root = new THREE.Group(), tilt = new THREE.Group();
+    tilt.add(body, p);
+    root.add(tilt);
+    return { root, tilt, prop: p };
+  }
+
   // ======================================================================
   // three.js-Aufbau
   // ======================================================================
@@ -513,6 +806,10 @@
       RimInner: [[0.08, 0.08, 0.09], 0.6, 0.5],
       BrakeDisc: [[0.45, 0.45, 0.46], 1.0, 0.45],
       Caliper: [o.caliper, 0.2, 0.35],
+      Chrome: [[0.78, 0.79, 0.81], 1.0, 0.15],
+      PoliceBlue: [[0.12, 0.31, 0.66], 0.1, 0.4],
+      PoliceYellow: [[0.79, 0.83, 0.0], 0.0, 0.4],
+      TaxiSign: [[1.0, 0.97, 0.85], 0.0, 0.3, [1, 0.95, 0.8]],
     };
     const mats = {};
     for (const [name, [col, metal, rough, emi]] of Object.entries(def)) {
@@ -611,7 +908,8 @@
     Underbody: [0.03, 0.03, 0.03], Grille: [0.12, 0.12, 0.13], LightLens: [0.10, 0.11, 0.14],
     Plate: [0.92, 0.92, 0.90], Exhaust: [0.45, 0.45, 0.47], Tire: [0.07, 0.07, 0.07],
     RimInner: [0.08, 0.08, 0.09], BrakeDisc: [0.45, 0.45, 0.46],
-    HeadLight: [1.0, 0.98, 0.9], TailLight: [1.0, 0.1, 0.1],
+    HeadLight: [1.0, 0.98, 0.9], TailLight: [1.0, 0.1, 0.1], TaxiSign: [1.0, 0.95, 0.75],
+    Chrome: [0.70, 0.71, 0.73], PoliceBlue: [0.12, 0.31, 0.66], PoliceYellow: [0.79, 0.83, 0.0],
   };
 
   function vcGeometry(THREE, mb, pick, colorOf, xform) {
@@ -656,13 +954,24 @@
     return out;
   }
 
+  const RED_CAL = [0.75, 0.05, 0.04], GREY_CAL = [0.35, 0.36, 0.38];
+  const VEHICLES = {
+    rs6: { body: () => rs6Body(), axles: RS6_AXLES, paint: '#8e9397', rim: [0.55, 0.56, 0.58], caliper: RED_CAL },
+    ferrari: { body: () => ferrariBody(), axles: F_AXLES, paint: '#d40000', rim: [0.32, 0.33, 0.35], caliper: [0.95, 0.78, 0.05] },
+    skoda: { body: () => octaviaBody(''), axles: OCT_AXLES, paint: '#7f8c8d', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL },
+    police: { body: () => octaviaBody('police'), axles: OCT_AXLES, paint: '#e8eef5', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL, siren: true },
+    taxi: { body: () => octaviaBody('taxi'), axles: OCT_AXLES, paint: '#f4c20d', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL },
+    van: { body: () => vanBody(), axles: VAN_AXLES, paint: '#f5f5f5', rim: [0.60, 0.61, 0.63], caliper: GREY_CAL },
+  };
+
   function dildiCityVehicle(THREE, type, color, mats, extraGeos) {
-    const isF = type === 'ferrari';
-    const mb = isF ? ferrariBody() : rs6Body();
-    const axles = isF ? F_AXLES : RS6_AXLES;
-    const paint = new THREE.Color(color || (isF ? '#d40000' : '#8e9397'));
-    const caliper = new THREE.Color().setRGB(...(isF ? [0.95, 0.78, 0.05] : [0.75, 0.05, 0.04]), THREE.SRGBColorSpace);
-    const rim = new THREE.Color().setRGB(...(isF ? [0.32, 0.33, 0.35] : [0.55, 0.56, 0.58]), THREE.SRGBColorSpace);
+    const V = VEHICLES[type];
+    if (!V) throw new Error('DildiCars: unbekannter Fahrzeugtyp ' + type);
+    const mb = V.body();
+    const axles = V.axles;
+    const paint = new THREE.Color(color || V.paint);
+    const caliper = new THREE.Color().setRGB(...V.caliper, THREE.SRGBColorSpace);
+    const rim = new THREE.Color().setRGB(...V.rim, THREE.SRGBColorSpace);
     const cache = {};
     const colorOf = (m) => {
       if (m === 'Paint') return paint;
@@ -670,7 +979,7 @@
       if (m === 'Rim') return rim;
       return cache[m] || (cache[m] = new THREE.Color().setRGB(...(SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
     };
-    const isLight = (m) => m === 'HeadLight' || m === 'TailLight';
+    const isLight = (m) => m === 'HeadLight' || m === 'TailLight' || m === 'TaxiSign';
     let bodyGeo = vcGeometry(THREE, mb, (m) => !isLight(m), colorOf);
     if (extraGeos && extraGeos.length) bodyGeo = mergeVC(THREE, [bodyGeo].concat(extraGeos));
     const lightGeo = vcGeometry(THREE, mb, isLight, colorOf);
@@ -696,10 +1005,29 @@
         wheels.push({ piv, w, front: ai === 0 });
       }
     });
-    return { group, tilt, body, lights, wheels, wheelR: axles[1].r, siren: null };
+    let siren = null;
+    if (V.siren) {   // Blaulicht: das Spiel setzt red/blue.material.color selbst (blinken)
+      const red = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.22), new THREE.MeshBasicMaterial({ color: '#ff0000', toneMapped: false }));
+      const blue = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.22), new THREE.MeshBasicMaterial({ color: '#0044ff', toneMapped: false }));
+      red.position.set(-0.3, 1.58, -0.4);
+      blue.position.set(0.3, 1.58, -0.4);
+      tilt.add(red, blue);
+      siren = { red, blue };
+    }
+    return { group, tilt, body, lights, wheels, wheelR: axles[1].r, siren };
   }
 
-  const api = { createRS6, createFerrari, dildiCityVehicle };
+  // Eigenstaendige Nutzung fuer alle Typen (eigene PBR-Materialien wie createRS6)
+  function createVehicle(THREE, type, options) {
+    const V = VEHICLES[type];
+    const toArr = (c) => (Array.isArray(c) ? c : c);
+    const o = opt(options, { paint: V.paint, paintRough: 0.3, rim: V.rim, caliper: V.caliper });
+    o.paint = toArr(o.paint);
+    const car = assemble(THREE, type, V.body(), V.axles, o, null);
+    return car;
+  }
+
+  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, types: Object.keys(VEHICLES) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);
