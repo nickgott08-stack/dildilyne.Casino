@@ -107,7 +107,7 @@ export function buildMapCanvas() {
   for (const D of DESERTS) label(D.name.toUpperCase(), D.x, D.z - 200);
   label('DOCKS', -120, -480);
   label('FLUGHAFEN', 120, -480);
-  label('RADJ-INSEL', RADJ.x - 150, RADJ.z + 150);
+  label('RADJ-INSEL', RADJ.x, RADJ.z - RADJ.rz - 22);
   return mapCanvas;
 }
 
