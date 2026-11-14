@@ -52,5 +52,5 @@ Im Casino wird der Casino-Name als Online-Name vorgeschlagen; Online-Server = `D
   Max. 10 pro Raum, 10 Snapshots/s, Eingaben werden geprüft und gedrosselt.
 - Server-Adresse: `?server=wss://…/ws` in der URL, im Online-Menü unter „Server“, sonst gleicher Host
   (wenn vom Server ausgeliefert), sonst `DEFAULT_SERVER` in `online.js`.
-- Deployment: `render.yaml` im Repo-Root (Render Free Tier, schläft nach ~15 Min ohne Besucher ein).
+- Deployment: Render-Webservice https://dildilyne-casino-1.onrender.com (Free Tier, schläft nach ~15 Min ohne Besucher ein; Auto-Deploy von `main`). `render.yaml` im Repo-Root.
 - Lokal testen: `cd city3d && node build.mjs && cd .. && node server/server.js` → http://localhost:8080
