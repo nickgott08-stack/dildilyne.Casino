@@ -1493,7 +1493,7 @@ setControlsMode();
 
 // ---------- main loop ----------
 let last = performance.now();
-let fpsAcc = 0, fpsN = 0, fpsCheckT = 0, autoChecked = false;
+let fpsAcc = 0, fpsN = 0, fpsCheckT = 0, autoChecked = false, slowN = 0;
 let mapT = 0, spawnT = 0;
 function loop(now) {
   requestAnimationFrame(loop);
@@ -1574,8 +1574,25 @@ function tickFps(dt) {
     fpsT = 0; fpsFrames = 0;
   }
 }
+// distance culling: terrain tiles, outskirts tiles and horizon mountains that lie completely
+// behind the fog are invisible anyway, so they are not drawn at all (big saving outside the city)
+let cullList = null, cullT = 0;
+function distCull() {
+  if (!cullList) {
+    cullList = [];
+    for (const m of (world.terrainChunks || []).concat(world.cullList || [])) {
+      m.geometry.computeBoundingSphere();
+      const s = m.geometry.boundingSphere;
+      cullList.push({ m, x: s.center.x, z: s.center.z, r: s.radius });
+    }
+  }
+  const far = (scene.fog ? scene.fog.far : 700) + 40, cx = camera.position.x, cz = camera.position.z;
+  for (const c of cullList) c.m.visible = Math.hypot(c.x - cx, c.z - cz) - c.r < far;
+}
 function render(dt) {
   tickFps(dt);
+  cullT -= dt;
+  if (cullT <= 0) { cullT = 0.2; distCull(); }
   const focus = player.inVehicle ? player.inVehicle.pos : player.pos;
   updateSky(sky, G.cycle, focus, dt, Q);
   camera.updateMatrixWorld();
@@ -1601,15 +1618,18 @@ function render(dt) {
     if (fpsCheckT > 4) {
       const fps = fpsN / fpsAcc;
       fpsAcc = 0; fpsN = 0; fpsCheckT = 0;
-      // dynamic resolution: render fewer pixels when the device struggles, more when it has headroom
-      const cur = renderer.getPixelRatio();
-      if (fps < 32 && cur > 0.7) { renderer.setPixelRatio(Math.max(0.7, cur - 0.15)); resize(); }
-      else if (fps > 52 && cur < Q.pr) { renderer.setPixelRatio(Math.min(Q.pr, cur + 0.1)); resize(); }
-      // still too slow at low resolution: step the quality down (unless chosen by hand)
-      if (fps < 24 && renderer.getPixelRatio() <= 0.75 && !store.get('dc3d_qmanual')) {
-        if (qName === 'hoch') { qName = 'mittel'; applyQuality(); markQ(); toast('Grafik automatisch auf MITTEL gestellt (flüssiger)'); }
-        else if (qName === 'mittel') { qName = 'niedrig'; applyQuality(); markQ(); toast('Grafik automatisch auf NIEDRIG gestellt (flüssiger)'); }
-      }
+      // when the device struggles: first simplify the graphics (shadows, traffic, details), only then
+      // lower the resolution – and never below 1.0 (below that the picture gets pixelated)
+      const cur = renderer.getPixelRatio(), MIN_PR = 1;
+      slowN = fps < 30 ? slowN + 1 : 0; // react only after two slow measurements in a row (~8 s)
+      if (slowN >= 2) {
+        slowN = 0;
+        if (qName !== 'niedrig' && !store.get('dc3d_qmanual')) {
+          qName = qName === 'hoch' ? 'mittel' : 'niedrig';
+          applyQuality(); markQ();
+          toast(`Grafik automatisch auf ${qName.toUpperCase()} gestellt (flüssiger)`);
+        } else if (cur > MIN_PR + 0.01) { renderer.setPixelRatio(Math.max(MIN_PR, cur - 0.1)); resize(); }
+      } else if (fps > 54 && cur < Q.pr - 0.01) { renderer.setPixelRatio(Math.min(Q.pr, cur + 0.1)); resize(); }
     }
   }
 }

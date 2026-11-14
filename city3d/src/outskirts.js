@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './dildi_cars.js';
 const DC = globalThis.DildiCars;
-import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, lerp, clamp } from './util.js';
+import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, lerp, clamp, tiledMeshes } from './util.js';
 import { world, roadC, RW, BOUND, H } from './world.js';
 import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround } from './geo.js';
 
@@ -257,16 +257,12 @@ export function buildOutskirts(scene, K) {
       }
     }
   }
-  const roadMesh = new THREE.Mesh(merge(asphaltGeos, true), world.asphaltMat);
-  roadMesh.receiveShadow = true;
-  scene.add(roadMesh);
-  const dirtMesh = new THREE.Mesh(merge(dirtGeos, true), new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1 }));
-  dirtMesh.receiveShadow = true;
-  scene.add(dirtMesh);
-  const deckMesh = new THREE.Mesh(merge(deckBody), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }));
-  deckMesh.castShadow = true;
-  deckMesh.receiveShadow = true;
-  scene.add(deckMesh);
+  // roads etc. in map tiles so far / hidden parts are skipped (see distance culling in main.js)
+  world.cullList = world.cullList || [];
+  const rcv = (m) => { m.receiveShadow = true; };
+  world.cullList.push(...tiledMeshes(scene, asphaltGeos, world.asphaltMat, 250, true, rcv));
+  world.cullList.push(...tiledMeshes(scene, dirtGeos, new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1 }), 250, true, rcv));
+  world.cullList.push(...tiledMeshes(scene, deckBody, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), 250, false, (m) => { m.castShadow = true; m.receiveShadow = true; }));
   // sign on the flyover
   signs('DILDI-KREUZ', '#ffffff', 0, 15, -324, Math.PI, 16, 2.4, { bg: '#1f5fa8', size: 120 });
   for (const sx of [-8.5, 8.5]) metal.push(cbox(0.35, 6.5, 0.35, sx, 12.2, -324, '#555'));
@@ -623,10 +619,8 @@ export function buildOutskirts(scene, K) {
         addCirc(x, z, r * 0.8, y + r, y - 2);
       }
     }
-    const decoMesh = new THREE.Mesh(merge(deco), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }));
-    decoMesh.castShadow = true;
-    decoMesh.receiveShadow = true;
-    scene.add(decoMesh);
+    world.cullList = world.cullList || [];
+    world.cullList.push(...tiledMeshes(scene, deco, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 200, false, (m) => { m.castShadow = true; m.receiveShadow = true; }));
   }
   // world limits (invisible) + far horizon
   {
@@ -643,7 +637,7 @@ export function buildOutskirts(scene, K) {
     for (let k = 0; k < 30; k++) mountain(srange(-1100, 1100), WORLD.z1 + srange(80, 500), srange(120, 220), srange(90, 220));
     for (let k = 0; k < 18; k++) { mountain(WORLD.x0 - srange(80, 400), srange(-500, 1400), srange(120, 220), srange(90, 220)); mountain(WORLD.x1 + srange(80, 400), srange(-500, 1400), srange(120, 220), srange(90, 220)); }
     for (let k = 0; k < 8; k++) mountain((k % 2 ? 1 : -1) * srange(500, 900), -1200 - srange(0, 300), srange(60, 120), srange(20, 60), spick(['#4f6b4a', '#5b7752']));
-    scene.add(new THREE.Mesh(merge(ring), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true })));
+    world.cullList.push(...tiledMeshes(scene, ring, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 400));
   }
 
   world.hotspots = [
