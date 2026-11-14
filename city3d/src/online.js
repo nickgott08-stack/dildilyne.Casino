@@ -9,7 +9,7 @@ import { Plane } from './plane.js';
 import { angleWrap, store } from './util.js';
 
 // Nach dem Hochladen auf Render hier die Adresse eintragen (oder im Online-Menü unter "Server").
-export const DEFAULT_SERVER = 'wss://dildi-city.onrender.com/ws';
+export const DEFAULT_SERVER = 'wss://dildilyne-casino-1.onrender.com/ws';
 const SEND_HZ = 10;
 const DELAY = 0.15; // s Interpolations-Puffer
 const TAG_DIST = 220; // m: Namen nur bis zu dieser Entfernung
