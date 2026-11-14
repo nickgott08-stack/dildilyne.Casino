@@ -1,6 +1,28 @@
 // Road graph + shortest path (for the GPS line to markers)
 import { world, NB, roadC } from './world.js';
-import { ROADS, WALL_OUT } from './geo.js';
+import * as THREE from 'three';
+import { ROADS, WALL_OUT, radjE } from './geo.js';
+import { ISL } from './radj.js';
+
+// Radj's island is not connected to the mainland road graph (you get there by plane):
+// routes on the island follow its own forest road, routes between island and mainland get no GPS line.
+const onIsland = (x, z) => radjE(x, z) < 1.3;
+let islRoads = null;
+function islandRoute(ax, az, bx, bz) {
+  if (!islRoads) islRoads = [ISL.road, ISL.helRoad].map((pts) => new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'catmullrom', 0.4).getSpacedPoints(120).map((p) => ({ x: p.x, z: p.z })));
+  const direct = Math.hypot(bx - ax, bz - az);
+  let best = null;
+  for (const R of islRoads) {
+    let ia = 0, ib = 0, da = Infinity, db = Infinity;
+    R.forEach((p, i) => { const d1 = Math.hypot(p.x - ax, p.z - az), d2 = Math.hypot(p.x - bx, p.z - bz); if (d1 < da) { da = d1; ia = i; } if (d2 < db) { db = d2; ib = i; } });
+    // only worth it if the road actually helps (both ends reasonably close to it, and they are far apart along it)
+    if (da > 45 || db > 45 || Math.abs(ia - ib) < 3) continue;
+    const seg = ia < ib ? R.slice(ia, ib + 1) : R.slice(ib, ia + 1).reverse();
+    const len = da + db + seg.reduce((s, p, i) => s + (i ? Math.hypot(p.x - seg[i - 1].x, p.z - seg[i - 1].z) : 0), 0);
+    if (len < direct * 3 && (!best || len < best.len)) best = { len, seg };
+  }
+  return best ? [{ x: ax, z: az }, ...best.seg, { x: bx, z: bz }] : [{ x: ax, z: az }, { x: bx, z: bz }];
+}
 
 let nodes = null; // {x,z,adj:[[idx,cost]]}
 const link = (a, b) => {
@@ -92,6 +114,9 @@ function nearestNode(x, z) {
 
 // returns [{x,z}] from (ax,az) to (bx,bz) along roads
 export function findRoute(ax, az, bx, bz) {
+  const ia = onIsland(ax, az), ib = onIsland(bx, bz);
+  if (ia && ib) return islandRoute(ax, az, bx, bz);
+  if (ia || ib) return null; // island <-> mainland: fly there, no road line
   if (!nodes) buildRouteGraph();
   const s = nearestNode(ax, az), t = nearestNode(bx, bz);
   const n = nodes.length;

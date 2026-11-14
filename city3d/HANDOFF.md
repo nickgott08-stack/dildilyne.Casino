@@ -62,3 +62,12 @@ Im Casino wird der Casino-Name als Online-Name vorgeschlagen; Online-Server = `D
 - „Mittel“: Schattenbereich ±62 m statt ±90 m (schärfer bei 1024er-Map), Schatten nur jedes 2. Bild neu (`shadowEvery`).
 - Passanten werfen nur in der Nähe Schatten (`pedShadow`-Meter, `pedShadow()` in main.js) – spart viele Draw-Calls im Schattenpass.
 - Pausenmenü: „📊 FPS-Anzeige“ (FPS, Stufe, Auflösungsfaktor) zum Testen am Handy.
+
+## Radj-Insel überarbeitet (14.11.2026)
+- Karte: reicht jetzt bis z ≈ −1490, die Insel wird in `drawRadjIsland()` (map.js) gezeichnet (Strand, Wald, Wege, Landebahn,
+  Anwesen, Villa, Pool, Heli-Platz). Minikarte zeigt im Finale die Taschenlampen-Kegel der Wachen (gelb, rot nach Alarm;
+  gleiche Reichweite/Winkel wie die Erkennung in heist.js).
+- Wald: instanzierte Kiefern (3 Kegel), Laubbäume (Icosaeder-Gruppen) und Büsche, flat-shaded wie die Stadtbäume; gleiche Positionen/Kollision.
+- Waldweg: Schotter-Textur mit Spurrillen und Grasrand (`gravelRoad`), Feldsteine statt weißer Bordsteine.
+- Villa: Sockel, Gesimse, Eckquader, Walmdächer in Terrakotta (`hipRoof`), Mittelgiebel mit goldenem Rundfenster (`gable`),
+  weiße Fensterrahmen, Fenster aus dunklem Glas die nachts leuchten (`world.windowMats`), Balustraden. Kollision/Aufzug unverändert.
