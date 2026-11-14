@@ -46,6 +46,20 @@
  *                zFront = Frontwand mit dem Eingang, cx = Mitte des Eingangs. Eingang bleibt frei,
  *                Saeulen-Positionen werden wie im Spiel berechnet (Basis + goldenes Kapitell).
  *    Nichts davon ragt in Eingaenge oder Fahrwege; es wird keine Kollision hinzugefuegt.
+ *    - 'casino'  { x0, x1, z0, z1, h: 22 }    = Casino-Hauptgebaeude (z0 = Front mit Schild/Teppich).
+ *    - 'tower'   { cx, cz }                   = Mitte des Radj Towers (Sockel 26x26x120, Aufsatz 18x18 bis 140).
+ *
+ * 4) DOCKS & FLUGHAFEN  -  liefern fertige Geometrien mit Vertex-Farben fuer die gemergten Deko-Listen:
+ *    - Container:  statt k(2.45,2.6,6.1, x,y,z, farbe)  ->  DildiCars.dildiCityDocks.container(THREE, x, y, z, farbe)
+ *    - Kraene:     die Kran-Boxen (Fundament, 4 Beine, Kabine, Ausleger, Seil) an (x,z) entfernen und
+ *                  DildiCars.dildiCityDocks.crane(THREE, x, z) pushen (Kollision ueber dem Fundament bleibt).
+ *    - Frachter:   Rumpf, rotes Deckband, weisser Aufbau und Deck-Container des Schiffs (Mitte -110/-722)
+ *                  entfernen und DildiCars.dildiCityDocks.ship(THREE, -110, -722) pushen.
+ *    - Tower:      Schaft, Kanzel, Dach bei (190,-600) entfernen -> DildiCars.dildiCityAirport.tower(THREE, 190, -600)
+ *    - Hangars:    zusaetzlich pushen: DildiCars.dildiCityAirport.hangar(THREE, mitteX, mitteZ, nummer)  (1 und 2)
+ *    - Flugschule: zusaetzlich pushen: DildiCars.dildiCityAirport.terminal(THREE)  (60..140 / -540..-515, 10 m)
+ *    - Geparkte Deko-Flugzeuge: Rumpf-Geometrie ersetzen durch
+ *                  DildiCars.dildiCityAirport.parkedPlane(THREE, x, z, drehungY, farbe)  (Kollision bleibt)
  * ---------------------------------------------------------------------------------------------
  *
  * ALTERNATIV (eigenstaendige Nutzung in anderen three.js-Projekten):
@@ -112,6 +126,11 @@
       const [x0, y0, z0] = lo, [x1, y1, z1] = hi;
       this.hexa(m, [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1],
         [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]]);
+    }
+    poly(m, pts, center) {
+      let c = center;
+      if (!c) { c = [0, 0, 0]; pts.forEach((p) => { c = add(c, p); }); c = mul(c, 1 / pts.length); }
+      for (let i = 0; i < pts.length; i++) this.tri(m, c, pts[i], pts[(i + 1) % pts.length]);
     }
     slab(m, q, d) { this.hexa(m, q.concat(q.map((p) => add(p, d)))); }
     prism(m, ring, off) {
@@ -1258,12 +1277,360 @@
     d.box('Gold', [L - tt - 0.35, 5.45, M - 0.12], [L + tt + 0.35, 5.9, M + 0.02]);
   }
 
+  Object.assign(BPAL, {
+    HullBlue: [0.17, 0.24, 0.31], HullRed: [0.55, 0.12, 0.10], Deck: [0.33, 0.38, 0.34], Orange: [0.83, 0.33, 0.0],
+    White: [0.92, 0.93, 0.93], WinDark: [0.10, 0.13, 0.17], Concrete: [0.62, 0.62, 0.60], TowerGlass: [0.22, 0.42, 0.56],
+    DiceWhite: [0.97, 0.97, 0.95], ChipRed: [0.75, 0.08, 0.10], ChipBlue: [0.10, 0.25, 0.70], ChipBlack: [0.08, 0.08, 0.09],
+    GlowRed: [1.0, 0.12, 0.12], HangarGrey: [0.68, 0.71, 0.74], RoofGrey: [0.42, 0.44, 0.47],
+  });
+
+  // Gerader Balken zwischen zwei Punkten (fuer Fachwerk, Streben, Seile)
+  function strut(mb, m, a, b, w) {
+    const d = sub(b, a), L = len(d), u = mul(d, 1 / L);
+    let t = Math.abs(u[1]) < 0.9 ? cross(u, [0, 1, 0]) : cross(u, [1, 0, 0]);
+    t = mul(t, 1 / len(t));
+    const v = cross(u, t), hw = w / 2;
+    const o = (p, s1, s2) => add(add(p, mul(t, s1 * hw)), mul(v, s2 * hw));
+    mb.hexa(m, [o(a, -1, -1), o(a, 1, -1), o(a, 1, 1), o(a, -1, 1), o(b, -1, -1), o(b, 1, -1), o(b, 1, 1), o(b, -1, 1)]);
+  }
+
+  // Deterministischer Zufall (gleiche Stadt bei jedem Laden)
+  const rng = (seed) => () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+  // ---------- Casino Dildilyne ----------
+  function casinoDecor(d, g, p) {
+    const { x0, x1, z0, z1, h } = p, cx = (x0 + x1) / 2, f = z0;
+    // Gluehbirnen-Rahmen um das grosse DILDILYNE-Schild (30 x 7.5 m auf 14 m Hoehe)
+    for (let x = cx - 15.6; x <= cx + 15.6 + 1e-6; x += 0.78) {
+      for (const y of [10.0, 18.0]) g.box('GlowWarm', [x - 0.1, y - 0.1, f - 0.45], [x + 0.1, y + 0.1, f - 0.25]);
+    }
+    for (let y = 10.0; y <= 18.0 + 1e-6; y += 0.8) for (const s of SIDES) g.box('GlowWarm', [cx + s * 15.6 - 0.1, y - 0.1, f - 0.45], [cx + s * 15.6 + 0.1, y + 0.1, f - 0.25]);
+    d.box('Gold', [cx - 15.9, 9.7, f - 0.3], [cx + 15.9, 9.85, f]);
+    d.box('Gold', [cx - 15.9, 18.15, f - 0.3], [cx + 15.9, 18.3, f]);
+    // senkrechte Neon-Streifen neben dem Schild, goldene Gesimse
+    for (let x = x0 + 1.0; x < x1 - 0.5; x += 3.2) {
+      if (Math.abs(x - cx) < 16.3) continue;
+      g.box(Math.round((x - x0) / 3.2) % 2 ? 'GlowPink' : 'GlowWarm', [x - 0.12, 6.2, f - 0.18], [x + 0.12, h - 1.2, f - 0.02]);
+    }
+    for (const y of [9.2, h - 0.6]) d.box('Gold', [x0 - 0.3, y, f - 0.35], [x1 + 0.3, y + 0.4, f + 0.02]);
+    for (const xs of [x0, x1]) g.box('GlowPink', [xs - 0.2, 6.0, f - 0.2], [xs + 0.2, h, f + 0.1]);
+    // Krone: gestufte goldene Attika + Kugeln
+    d.box('Gold', [x0 - 0.2, h, z0 - 0.2], [x1 + 0.2, h + 0.8, z0 + 0.6]);
+    d.box('Gold', [cx - 9, h + 0.8, z0], [cx + 9, h + 2.2, z0 + 0.6]);
+    d.box('Gold', [cx - 4.5, h + 2.2, z0], [cx + 4.5, h + 3.6, z0 + 0.6]);
+    for (const x of [cx - 9, cx - 4.5, cx + 4.5, cx + 9]) d.prism('Gold', hexagon(x, z0 + 0.3, 0, 0.45, 8, 0, 1, 1).map(([a, b]) => [a, h + (Math.abs(x - cx) > 6 ? 2.2 : 3.6), b]), [0, 0.7, 0]);
+    // Dach: zwei Riesen-Wuerfel + Chip-Stapel
+    const dz = z0 + 8;
+    const die = (x, y, z, s, pips) => {
+      d.box('DiceWhite', [x - s, y, z - s], [x + s, y + 2 * s, z + s]);
+      for (const [px, py] of pips) d.box('ChipBlack', [x + px * s - 0.22, y + s + py * s - 0.22, z - s - 0.04], [x + px * s + 0.22, y + s + py * s + 0.22, z - s + 0.01]);
+      for (const [px, pz] of [[0, 0]]) d.box('ChipBlack', [x + px - 0.22, y + 2 * s - 0.01, z + pz - 0.22], [x + px + 0.22, y + 2 * s + 0.04, z + pz + 0.22]);
+    };
+    die(cx - 5, h, dz, 1.6, [[-0.5, 0.5], [0, 0], [0.5, -0.5]]);
+    die(cx - 1.4, h, dz + 1.2, 1.6, [[-0.5, 0.5], [0.5, 0.5], [-0.5, -0.5], [0.5, -0.5], [0, 0]]);
+    let k = 0;
+    for (const [sx, sz, n] of [[cx + 4.5, dz, 7], [cx + 7.5, dz + 1.5, 5]]) for (let i = 0; i < n; i++, k++)
+      d.prism(['ChipRed', 'ChipBlue', 'ChipBlack', 'Gold'][k % 4], hexagon(sx, sz, 0, 1.3, 14, 0, 1, 1).map(([a, b]) => [a, h + i * 0.34, b]), [0, 0.3, 0]);
+    // Eingang: Glastueren (leuchten) + goldene Pfosten mit rotem Seil am Teppich
+    const zd = f - 0.52;
+    d.box('Gold', [cx - 4.3, 0.2, zd - 0.06], [cx + 4.3, 4.3, zd + 0.02]);
+    g.box('GlowWin', [cx - 4.0, 0.25, zd - 0.1], [cx + 4.0, 4.0, zd - 0.06]);
+    for (let i = -3; i <= 3; i += 2) d.box('Gold', [cx + i - 0.04, 0.25, zd - 0.12], [cx + i + 0.04, 4.0, zd - 0.08]);
+    for (const s of SIDES) {
+      for (let z = f - 1.2; z >= f - 7.6; z -= 1.6) {
+        d.prism('Gold', hexagon(cx + s * 2.3, z, 0, 0.07, 6, 0, 1, 1).map(([a, b]) => [a, 0.22, b]), [0, 0.95, 0]);
+        d.prism('Gold', hexagon(cx + s * 2.3, z, 0, 0.12, 6, 0, 1, 1).map(([a, b]) => [a, 1.12, b]), [0, 0.14, 0]);
+      }
+      strut(d, 'ChipRed', [cx + s * 2.3, 1.0, f - 1.2], [cx + s * 2.3, 1.0, f - 7.6], 0.06);
+    }
+  }
+
+  // ---------- Radj Tower ----------
+  function towerDecor(d, g, p) {
+    const { cx, cz } = p;
+    const fins = (half, y0, y1, step, depth) => {
+      for (let o = -half + step; o < half - 0.5; o += step) for (const s of SIDES) {
+        d.box('DarkSteel', [cx + o - 0.12, y0, cz + s * half - (s > 0 ? 0 : depth)], [cx + o + 0.12, y1, cz + s * half + (s > 0 ? depth : 0)]);
+        d.box('DarkSteel', [cx + s * half - (s > 0 ? 0 : depth), y0, cz + o - 0.12], [cx + s * half + (s > 0 ? depth : 0), y1, cz + o + 0.12]);
+      }
+    };
+    fins(13, 6.5, 119.5, 2.6, 0.35);
+    fins(9, 120.5, 139.5, 2.0, 0.3);
+    // Leuchtbaender an den Absaetzen + rote Kanten oben
+    for (const [hf, y] of [[13.05, 119.4], [9.05, 139.4], [13.05, 6.2]]) {
+      g.box('GlowRed', [cx - hf - 0.15, y, cz - hf - 0.15], [cx + hf + 0.15, y + 0.35, cz - hf + 0.05]);
+      g.box('GlowRed', [cx - hf - 0.15, y, cz + hf - 0.05], [cx + hf + 0.15, y + 0.35, cz + hf + 0.15]);
+      g.box('GlowRed', [cx - hf - 0.15, y, cz - hf], [cx - hf + 0.05, y + 0.35, cz + hf]);
+      g.box('GlowRed', [cx + hf - 0.05, y, cz - hf], [cx + hf + 0.15, y + 0.35, cz + hf]);
+    }
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.box('GlowRed', [cx + sx * 9 - 0.2, 120.5, cz + sz * 9 - 0.2], [cx + sx * 9 + 0.2, 139.4, cz + sz * 9 + 0.2]);
+    // Terrasse mit Gelaender auf dem Absatz (120 m)
+    for (const s of SIDES) {
+      d.box('Steel', [cx - 12.8, 121.1, cz + s * 12.8 - 0.05], [cx + 12.8, 121.2, cz + s * 12.8 + 0.05]);
+      d.box('Steel', [cx + s * 12.8 - 0.05, 121.1, cz - 12.8], [cx + s * 12.8 + 0.05, 121.2, cz + 12.8]);
+    }
+    // Krone: schraeges Stahlgeruest um die Antenne + Leuchtfeuer
+    const top = 140, ap = [cx, top + 12, cz];
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) strut(d, 'Steel', [cx + sx * 8.5, top, cz + sz * 8.5], ap, 0.5);
+    for (const yy of [top + 3, top + 6.5]) {
+      const r = 8.5 * (1 - (yy - top) / 12);
+      for (const [a, b] of [[[-1, -1], [1, -1]], [[1, -1], [1, 1]], [[1, 1], [-1, 1]], [[-1, 1], [-1, -1]]])
+        strut(d, 'Steel', [cx + a[0] * r, yy, cz + a[1] * r], [cx + b[0] * r, yy, cz + b[1] * r], 0.3);
+    }
+    g.box('GlowRed', [cx - 0.5, 161.6, cz - 0.5], [cx + 0.5, 162.6, cz + 0.5]);
+    g.box('GlowRed', [cx - 0.35, 152, cz - 0.35], [cx + 0.35, 152.6, cz + 0.35]);
+    // Lobby-Vordaecher (Nord + Sued) mit Glastueren
+    for (const s of SIDES) {
+      const zf = cz + s * 13;
+      d.box('DarkSteel', [cx - 6, 5.0, Math.min(zf, zf + s * 4.5)], [cx + 6, 5.5, Math.max(zf, zf + s * 4.5)]);
+      g.box('GlowWhite', [cx - 5.6, 4.9, Math.min(zf + s * 4.2, zf + s * 4.4)], [cx + 5.6, 5.0, Math.max(zf + s * 4.2, zf + s * 4.4)]);
+      g.box('GlowWin', [cx - 4, 0.25, Math.min(zf, zf + s * 0.06)], [cx + 4, 4.6, Math.max(zf, zf + s * 0.06)]);
+      d.box('Gold', [cx - 4.3, 4.6, Math.min(zf, zf + s * 0.1)], [cx + 4.3, 4.9, Math.max(zf, zf + s * 0.1)]);
+    }
+  }
+
+  // ---------- Docks: Container (ersetzt die einfachen Container-Kisten) ----------
+  // Mitte (x,y,z), 2.45 breit (x), 2.6 hoch, 6.1 lang (z) - genau wie im Spiel
+  function containerParts(mb, x, y, z, along) {
+    const W = 1.225, H = 1.3, Lh = 3.05;
+    const P = (a, b, c) => (along === 'x' ? [x + c, y + b, z + a] : [x + a, y + b, z + c]);
+    const box = (m, lo, hi) => { const a = P(lo[0], lo[1], lo[2]), b = P(hi[0], hi[1], hi[2]); mb.box(m, [Math.min(a[0], b[0]), a[1], Math.min(a[2], b[2])], [Math.max(a[0], b[0]), b[1], Math.max(a[2], b[2])]); };
+    box('Paint', [-W + 0.05, -H, -Lh + 0.06], [W - 0.05, H - 0.04, Lh - 0.06]);
+    for (const s of SIDES) for (const t of SIDES) box('PaintDark', [s > 0 ? W - 0.15 : -W, -H, t > 0 ? Lh - 0.15 : -Lh], [s > 0 ? W : -W + 0.15, H, t > 0 ? Lh : -Lh + 0.15]);
+    for (const s of SIDES) {
+      for (let c = -Lh + 0.45; c < Lh - 0.3; c += 0.62) box('PaintDark', [s > 0 ? W - 0.06 : -W, -H + 0.12, c - 0.1], [s > 0 ? W : -W + 0.06, H - 0.12, c + 0.1]);
+      box('PaintDark', [-W, s * H - (s > 0 ? 0.1 : 0), -Lh], [W, s * H + (s > 0 ? 0 : 0.1), Lh]);
+    }
+    for (const bx of [-0.75, -0.3, 0.3, 0.75]) box('Steel', [bx - 0.03, -H + 0.12, -Lh - 0.03], [bx + 0.03, H - 0.12, -Lh + 0.01]);
+  }
+
+  // ---------- Docks: Containerbruecke / Kran ----------
+  function craneParts(mb, x, z) {
+    const legs = [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]];
+    mb.box('Concrete', [x - 1.6, 0, z - 1.6], [x + 1.6, 0.6, z + 1.6]);
+    for (const [a, b] of legs) mb.box('Orange', [x + a - 0.22, 0.6, z + b - 0.22], [x + a + 0.22, 31, z + b + 0.22]);
+    for (let y = 2; y < 30; y += 4) {
+      for (const [p, q] of [[0, 1], [1, 3], [3, 2], [2, 0]]) {
+        const A = legs[p], B = legs[q];
+        strut(mb, 'Orange', [x + A[0], y, z + A[1]], [x + B[0], y + 4, z + B[1]], 0.12);
+        strut(mb, 'Orange', [x + A[0], y + 4, z + A[1]], [x + B[0], y + 4, z + B[1]], 0.14);
+      }
+    }
+    // Maschinenhaus mit Fenstern + Fuehrerkabine
+    mb.box('Orange', [x - 1.8, 31, z - 1.8], [x + 1.8, 33.4, z + 2.6]);
+    mb.box('WinDark', [x - 1.82, 32.0, z - 1.0], [x + 1.82, 32.7, z + 2.0]);
+    mb.box('White', [x - 0.8, 29.6, z - 3.4], [x + 0.8, 31.2, z - 1.8]);
+    mb.box('WinDark', [x - 0.82, 30.1, z - 3.42], [x + 0.82, 30.9, z - 2.2]);
+    // Fachwerk-Ausleger (dreieckig) Richtung Wasser (-z) + Gegengewicht
+    const z0 = z + 8, z1 = z - 29, yb = 33.0, yt = 35.0;
+    const ch = [[-0.6, yb], [0.6, yb], [0, yt]];
+    for (const [cx, cy] of ch) mb.box('Orange', [x + cx - 0.12, cy - 0.12, z1], [x + cx + 0.12, cy + 0.12, z0]);
+    for (let zz = z1; zz < z0 - 0.1; zz += 2.0) {
+      const zn = Math.min(zz + 2.0, z0);
+      strut(mb, 'Orange', [x - 0.6, yb, zz], [x, yt, zn], 0.08);
+      strut(mb, 'Orange', [x + 0.6, yb, zz], [x, yt, zn], 0.08);
+      strut(mb, 'Orange', [x - 0.6, yb, zz], [x + 0.6, yb, zn], 0.08);
+    }
+    mb.box('Concrete', [x - 1.4, 31.5, z + 5.5], [x + 1.4, 33.0, z + 8.0]);
+    strut(mb, 'Steel', [x, 37.5, z], [x, yt, z1 + 1], 0.07);
+    strut(mb, 'Steel', [x, 37.5, z], [x, yt, z0 - 0.5], 0.07);
+    mb.box('Orange', [x - 0.3, 33.4, z - 0.3], [x + 0.3, 37.6, z + 0.3]);
+    mb.box('GlowRed', [x - 0.2, 37.6, z - 0.2], [x + 0.2, 37.9, z + 0.2]);
+    // Laufkatze + Seile + Spreader (haengt wie im Spiel bei z-24)
+    const zt = z - 24;
+    mb.box('DarkSteel', [x - 0.9, yb - 0.6, zt - 0.8], [x + 0.9, yb - 0.1, zt + 0.8]);
+    for (const s of SIDES) strut(mb, 'Black', [x + s * 0.3, yb - 0.6, zt], [x + s * 0.8, 15.4, zt], 0.05);
+    mb.box('Hazard', [x - 1.25, 14.8, zt - 3.05], [x + 1.25, 15.4, zt + 3.05]);
+  }
+
+  // ---------- Docks: Frachtschiff (ersetzt Rumpf/Aufbau am Kai) ----------
+  function shipParts(mb, cx, cz) {
+    // Laengsschnitte: x relativ zur Mitte (Bug bei -55, Heck bei +55), halbe Breite, Kiel-y, Deck-y
+    const S = [[-55, 0.3, 2.5, 6.6], [-52.5, 5.5, -0.5, 6.3], [-48, 9.5, -3.2, 5.9], [-40, 11.6, -4.0, 5.6], [-25, 12, -4.0, 5.4],
+      [30, 12, -4.0, 5.4], [44, 11.6, -3.6, 5.5], [52, 10.5, -1.8, 5.8], [55, 9.6, -0.6, 6.0]];
+    const ring = ([x, w, keel, deck]) => {
+      const wl = 0.3, k2 = Math.min(keel + 1.6, wl - 0.1);
+      const pts = [[0, keel], [w * 0.8, keel], [w, Math.max(k2, keel)], [w, Math.max(wl, k2)], [w, deck - 1.0], [w * 1.0, deck]];
+      return pts.map(([zz, y]) => [cx + x, y, zz]);
+    };
+    const R = S.map(ring);
+    const mats = ['HullRed', 'HullRed', 'HullRed', 'HullBlue', 'HullRed'];
+    for (let i = 0; i < R.length - 1; i++) for (let k = 0; k < 5; k++) {
+      const P = (r, j) => [r[j][0], r[j][1], cz + r[j][2]], M = (r, j) => [r[j][0], r[j][1], cz - r[j][2]];
+      const a = P(R[i], k), b = P(R[i + 1], k), c = P(R[i + 1], k + 1), dd = P(R[i], k + 1);
+      const ax = (p) => [p[0], 1.0, cz];
+      const O = (m, q) => { const ctr = ax(q[0]); mb.triO(m, q[0], q[1], q[2], ctr); mb.triO(m, q[0], q[2], q[3], ctr); };
+      O(mats[k], [a, b, c, dd]);
+      O(mats[k], [M(R[i], k), M(R[i + 1], k), M(R[i + 1], k + 1), M(R[i], k + 1)]);
+      if (k === 4) {
+        const q = [[R[i][5][0], R[i][5][1], cz - R[i][5][2]], [R[i + 1][5][0], R[i + 1][5][1], cz - R[i + 1][5][2]],
+          [R[i + 1][5][0], R[i + 1][5][1], cz + R[i + 1][5][2]], [R[i][5][0], R[i][5][1], cz + R[i][5][2]]];
+        mb.triO('Deck', q[0], q[1], q[2], [q[0][0], 0, cz]); mb.triO('Deck', q[0], q[2], q[3], [q[0][0], 0, cz]);
+      }
+    }
+    const last = R[R.length - 1], stern = last.map((p) => [p[0], p[1], cz + p[2]]).concat(last.slice().reverse().map((p) => [p[0], p[1], cz - p[2]]));
+    { let c = [0, 0, 0]; stern.forEach((p) => { c = add(c, p); }); c = mul(c, 1 / stern.length);
+      for (let i = 0; i < stern.length; i++) mb.triO('HullBlue', c, stern[i], stern[(i + 1) % stern.length], [c[0] - 5, c[1], c[2]]); }
+    // Ladung: Containerreihen auf Deck (laengs), 2-3 hoch
+    const r = rng(7), cols = ['ChipRed', 'ChipBlue', 'Orange', 'BottleGreen', 'Hazard', 'White', 'HangarGrey'];
+    for (let bx = -44; bx < 20; bx += 6.5) for (let row = -4; row < 4; row++) {
+      const hgt = 1 + Math.floor(r() * 3);
+      for (let k = 0; k < hgt; k++) {
+        const zz = cz + row * 2.6 + 1.3, yy = 5.5 + k * 2.6;
+        mb.box(cols[Math.floor(r() * cols.length)], [cx + bx - 3.0, yy, zz - 1.2], [cx + bx + 3.0, yy + 2.55, zz + 1.2]);
+      }
+    }
+    // Aufbau am Heck: Wohndeck, Bruecke mit Nocken, Schornstein, Mast mit Radar
+    const ax = cx + 38;
+    mb.box('White', [ax - 6, 5.4, cz - 9], [ax + 6, 17, cz + 9]);
+    for (let y = 7; y < 16.5; y += 2.6) mb.box('WinDark', [ax - 6.05, y, cz - 8], [ax - 5.95, y + 1.0, cz + 8]);
+    mb.box('White', [ax - 6.5, 17, cz - 12], [ax + 4, 19.6, cz + 12]);
+    mb.box('WinDark', [ax - 6.55, 17.9, cz - 11.5], [ax - 6.45, 19.2, cz + 11.5]);
+    mb.box('Concrete', [ax - 6.8, 19.6, cz - 12.2], [ax + 4.2, 19.9, cz + 12.2]);
+    mb.box('HullBlue', [ax + 7, 5.4, cz - 2.2], [ax + 11, 22, cz + 2.2]);
+    mb.box('Hazard', [ax + 6.98, 18.5, cz - 2.22], [ax + 11.02, 19.6, cz + 2.22]);
+    mb.box('Black', [ax + 7.2, 22, cz - 2.0], [ax + 10.8, 22.4, cz + 2.0]);
+    mb.box('White', [ax - 1, 19.9, cz - 0.2], [ax - 0.6, 26, cz + 0.2]);
+    mb.box('DarkSteel', [ax - 1.0, 24, cz - 1.8], [ax - 0.6, 24.3, cz + 1.8]);
+    mb.box('GlowRed', [ax - 0.95, 26, cz - 0.15], [ax - 0.65, 26.3, cz + 0.15]);
+    // Bugmast + Ankerkluesen
+    mb.box('White', [cx - 50.5, 6.3, cz - 0.15], [cx - 50.2, 13, cz + 0.15]);
+    for (const s of SIDES) mb.prism('Black', hexagon(cz + s * 3.6, 4.2, 0, 0.45, 8, 0, 1, 1).map(([a, b]) => [cx - 52.3 + 0.0, b, a]), [0.5, 0, 0]);
+  }
+
+  // ---------- Flughafen ----------
+  function towerAirportParts(mb, x, z) {
+    const oct = (r, y) => hexagon(x, z, 0, r, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, y, b]);
+    const band = (m, r0, y0, r1, y1) => {
+      const A = oct(r0, y0), B = oct(r1, y1);
+      mb.convex(m, [A, B].concat(A.map((p, i) => [p, A[(i + 1) % 8], B[(i + 1) % 8], B[i]])));
+    };
+    band('Concrete', 3.3, 0, 2.5, 23.8);
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI / 8 + i * Math.PI / 4;
+      if (i % 2) continue;
+      strut(mb, 'WinDark', [x + Math.cos(a) * 3.2, 2, z + Math.sin(a) * 3.2], [x + Math.cos(a) * 2.55, 22.5, z + Math.sin(a) * 2.55], 0.5);
+    }
+    band('White', 4.6, 23.8, 4.6, 25.9);
+    band('Steel', 4.75, 25.9, 4.75, 26.05);
+    band('TowerGlass', 4.3, 26.05, 5.3, 30.0);
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI / 8 + i * Math.PI / 4;
+      strut(mb, 'White', [x + Math.cos(a) * 4.32, 26.05, z + Math.sin(a) * 4.32], [x + Math.cos(a) * 5.32, 30.0, z + Math.sin(a) * 5.32], 0.18);
+    }
+    band('White', 5.5, 30.0, 4.8, 30.9);
+    mb.box('Steel', [x - 0.08, 30.9, z - 0.08], [x + 0.08, 35, z + 0.08]);
+    mb.box('GlowRed', [x - 0.2, 35, z - 0.2], [x + 0.2, 35.4, z + 0.2]);
+    mb.box('DarkSteel', [x + 1.6, 30.9, z - 0.2], [x + 1.9, 31.8, z + 0.2]);
+    mb.box('DarkSteel', [x + 0.6, 31.8, z - 0.15], [x + 2.9, 32.1, z + 0.15]);
+    mb.prism('White', hexagon(x - 2.2, z + 1.2, 0, 0.9, 10, 0, 1, 1).map(([a, b]) => [a, 30.9, b]), [0, 1.2, 0]);
+  }
+
+  function hangarParts(mb, cx, cz, num) {
+    // Tonnendach ueber dem flachen Dach (Oberkante 12.6), Front = -z
+    const N = 8, hw = 16.4, rise = 3.6, y0 = 12.6;
+    const arc = (i) => { const t = i / N, a = Math.PI * t; return [cx - hw * Math.cos(a), y0 + rise * Math.sin(a)]; };
+    for (let i = 0; i < N; i++) {
+      const [xa, ya] = arc(i), [xb, yb] = arc(i + 1);
+      mb.quad('RoofGrey', [xa, ya, cz - 11.4], [xa, ya, cz + 11.4], [xb, yb, cz + 11.4], [xb, yb, cz - 11.4]);
+    }
+    for (const s of SIDES) {
+      const zz = cz + s * 11.4, pts = [];
+      for (let i = 0; i <= N; i++) { const [xa, ya] = arc(i); pts.push([xa, ya, zz]); }
+      if (s < 0) mb.poly('HangarGrey', pts.slice().reverse(), [cx, y0, zz]); else mb.poly('HangarGrey', pts, [cx, y0, zz]);
+    }
+    // Schiebetore mit Streifen, Leuchten, Hangar-Nummer (7-Segment)
+    const f = cz - 11.1;
+    for (let i = 0; i < 6; i++) {
+      const x0 = cx - 12 + i * 4;
+      mb.box('Steel', [x0 + 0.05, 0.2, f - 0.35], [x0 + 3.95, 8.4, f - 0.25]);
+      mb.box('DarkSteel', [x0 + 0.05, 4.2, f - 0.38], [x0 + 3.95, 4.35, f - 0.34]);
+      for (let k = 0; k < 4; k++) mb.box(k % 2 ? 'Black' : 'Hazard', [x0 + k, 0.2, f - 0.4], [x0 + k + 1, 0.7, f - 0.36]);
+    }
+    mb.box('DarkSteel', [cx - 12.5, 8.4, f - 0.6], [cx + 12.5, 8.9, f - 0.2]);
+    for (const x of [cx - 9, cx - 3, cx + 3, cx + 9]) mb.box('GlowWarm', [x - 0.5, 8.3, f - 0.55], [x + 0.5, 8.4, f - 0.25]);
+    const seg = { 1: ['b', 'c'], 2: ['a', 'b', 'g', 'e', 'd'], 3: ['a', 'b', 'g', 'c', 'd'] }[num] || [];
+    const sx = cx, sy = 9.6, w = 1.2, hh = 1.0, t = 0.25;
+    const S7 = { a: [[-w / 2, hh * 2 - t], [w / 2, hh * 2]], b: [[w / 2 - t, hh], [w / 2, hh * 2]], c: [[w / 2 - t, 0], [w / 2, hh]],
+      d: [[-w / 2, 0], [w / 2, t]], e: [[-w / 2, 0], [-w / 2 + t, hh]], f: [[-w / 2, hh], [-w / 2 + t, hh * 2]], g: [[-w / 2, hh - t / 2], [w / 2, hh + t / 2]] };
+    mb.box('Black', [sx - 1.0, sy - 0.25, f - 0.25], [sx + 1.0, sy + 2.25, f - 0.2]);
+    for (const k of seg) mb.box('Hazard', [sx - S7[k][1][0], sy + S7[k][0][1], f - 0.3], [sx - S7[k][0][0], sy + S7[k][1][1], f - 0.25]);
+  }
+
+  function terminalParts(mb, x0, x1, z0, z1, h) {
+    const f = z0;   // Front (Flugschule-Seite) = -z
+    // auskragendes Vordach + Glasfassade mit Pfosten
+    mb.box('White', [x0 - 0.5, h - 0.2, f - 4.0], [x1 + 0.5, h + 0.35, f]);
+    mb.box('Steel', [x0 - 0.5, h - 0.4, f - 4.05], [x1 + 0.5, h - 0.2, f - 3.9]);
+    for (let x = x0 + 2.0; x < x1 - 1.9; x += 2.0) mb.box('DarkSteel', [x - 0.08, 2.0, f - 0.42], [x + 0.08, 7.0, f - 0.25]);
+    mb.box('DarkSteel', [x0 + 1.9, 6.9, f - 0.42], [x1 - 1.9, 7.1, f - 0.25]);
+    mb.box('GlowWin', [x0 + (x1 - x0) / 2 - 3, 0.2, f - 0.12], [x0 + (x1 - x0) / 2 + 3, 3.4, f - 0.05]);
+    // Dach: Lueftung + Radarkuppel + Windsack
+    for (let i = 0; i < 4; i++) mb.box('Steel', [x0 + 8 + i * 6, h, z1 - 8], [x0 + 11 + i * 6, h + 1.2, z1 - 5]);
+    const rx = x1 - 8, rz = (z0 + z1) / 2;
+    mb.box('Concrete', [rx - 1.2, h, rz - 1.2], [rx + 1.2, h + 1.6, rz + 1.2]);
+    const dome = (r, y) => hexagon(rx, rz, 0, r, 10, 0, 1, 1).map(([a, b]) => [a, y, b]);
+    mb.convex('White', [dome(1.8, h + 1.6), dome(1.6, h + 2.8), dome(0.9, h + 3.6)].concat(
+      dome(1.8, h + 1.6).map((p, i, A) => [p, A[(i + 1) % 10], dome(1.6, h + 2.8)[(i + 1) % 10], dome(1.6, h + 2.8)[i]]),
+      dome(1.6, h + 2.8).map((p, i, A) => [p, A[(i + 1) % 10], dome(0.9, h + 3.6)[(i + 1) % 10], dome(0.9, h + 3.6)[i]])));
+    mb.box('Steel', [x0 + 3 - 0.07, h, z0 + 3 - 0.07], [x0 + 3 + 0.07, h + 6, z0 + 3 + 0.07]);
+    for (let i = 0; i < 4; i++) {
+      const r0 = 0.45 - i * 0.07;
+      mb.prism(i % 2 ? 'White' : 'Orange', hexagon(h + 5.7, z0 + 3, 0, r0, 8, 0, 1, 1).map(([a, b]) => [x0 + 3.1 + i * 0.6, a, b]), [0.6, 0, 0]);
+    }
+  }
+
+  // Liefert fertige Geometrie mit Vertex-Farben (fuer die gemergten Deko-Listen des Spiels)
+  function toGeo(THREE, mb, paintHex) {
+    const paint = new THREE.Color(paintHex || '#888888');
+    const dark = paint.clone().multiplyScalar(0.62);
+    const cache = {};
+    const colorOf = (m) => {
+      if (m === 'Paint') return paint;
+      if (m === 'PaintDark') return dark;
+      if (cache[m]) return cache[m];
+      return (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    };
+    return vcGeometry(THREE, mb, () => true, colorOf);
+  }
+
+  const dildiCityDocks = {
+    // ersetzt k(2.45,2.6,6.1, x, y, z, farbe) bei den Container-Stapeln
+    container(THREE, x, y, z, color) { const mb = new MB(); containerParts(mb, x, y, z, 'z'); return toGeo(THREE, mb, color); },
+    // ersetzt die orangenen Kran-Boxen (Fundament, 4 Beine, Kabine, Ausleger, Seil) an (x, z)
+    crane(THREE, x, z) { const mb = new MB(); craneParts(mb, x, z); return toGeo(THREE, mb); },
+    // ersetzt Rumpf, Deckband, Aufbau und Deck-Container des Frachters (Mitte cx, cz)
+    ship(THREE, cx = -110, cz = -722) { const mb = new MB(); shipParts(mb, cx, cz); return toGeo(THREE, mb); },
+  };
+  const dildiCityAirport = {
+    // ersetzt Schaft, Kanzel und Dach des Towers bei (x, z)
+    tower(THREE, x = 190, z = -600) { const mb = new MB(); towerAirportParts(mb, x, z); return toGeo(THREE, mb); },
+    // Zusatz-Deko pro Hangar (Box + Dachplatte des Spiels bleiben): Mitte (cx, cz), Nummer 1/2
+    hangar(THREE, cx, cz, num) { const mb = new MB(); hangarParts(mb, cx, cz, num); return toGeo(THREE, mb); },
+    // Zusatz-Deko fuer Bilal's Flugschule / Terminal (Gebaeude bleibt): Rechteck + Hoehe
+    terminal(THREE, x0 = 60, x1 = 140, z0 = -540, z1 = -515, h = 10) { const mb = new MB(); terminalParts(mb, x0, x1, z0, z1, h); return toGeo(THREE, mb); },
+    // ersetzt die Geometrie eines geparkten Deko-Flugzeugs: Position, Drehung, Farbe
+    parkedPlane(THREE, x, z, rotY, color) {
+      const { mb, prop } = planeParts();
+      const all = new MB();
+      for (const m in mb.t) all.t[m] = mb.t[m].slice();
+      for (const m in prop.t) (all.t[m] = all.t[m] || []).push(...prop.t[m].map((p) => [p[0], p[1] + 1.30, p[2] + 4.88]));
+      const c = Math.cos(rotY), s = Math.sin(rotY);
+      for (const m in all.t) all.t[m] = all.t[m].map((p) => [x + p[0] * c + p[2] * s, p[1], z - p[0] * s + p[2] * c]);
+      const fixed = { PlaneWhite: [0.93, 0.93, 0.92], NavRed: [1, 0.1, 0.1], NavGreen: [0.1, 1, 0.2], PlaneTip: [0.95, 0.75, 0.1] };
+      Object.assign(BPAL, fixed);
+      return toGeo(THREE, all, color);
+    },
+  };
+
   function dildiCityBuilding(THREE, kind, params, mats) {
     const d = new MB(), g = new MB();
     if (kind === 'pizza') pizzaDecor(d, g, params);
     else if (kind === 'depot') depotDecor(d, g, params);
     else if (kind === 'customs') customsDecor(d, g, params);
     else if (kind === 'bank') bankDecor(d, g, params);
+    else if (kind === 'casino') casinoDecor(d, g, params);
+    else if (kind === 'tower') towerDecor(d, g, params);
     else throw new Error('DildiCars: unbekanntes Gebaeude ' + kind);
     const cache = {};
     const colorOf = (m) => {
@@ -1295,7 +1662,7 @@
     return car;
   }
 
-  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, types: Object.keys(VEHICLES) };
+  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, types: Object.keys(VEHICLES) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);
