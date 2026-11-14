@@ -12,7 +12,7 @@
  * Diese Datei muss VOR dem Spiel-Code geladen sein (oder Inhalt oben ins Script kopieren).
  * THREE = das three.js-Namespace-Objekt des Spiels (import * as THREE from 'three').
  *
- * 1) FAHRZEUGE  -  Typen: 'rs6', 'ferrari', 'skoda', 'police', 'taxi', 'van'
+ * 1) FAHRZEUGE  -  Typen: 'rs6', 'ferrari', 'skoda', 'police', 'taxi', 'van', 'jeep', 'bus', 'truck'
  *    Die Funktion, die Fahrzeugmodelle baut (bekommt typ, farbe, tuning und gibt
  *    { group, tilt, body, lights, wheels:[{piv,w,front}], wheelR, siren } zurueck), ganz am Anfang:
  *
@@ -27,6 +27,9 @@
  *      body.geometry.attributes.color funktioniert weiter.
  *    - 'police' liefert siren:{red,blue} (das Spiel laesst sie wie bisher blinken).
  *    - 'van': Seitenwaende sitzen bei x = +-0.975, die Flaschenpost-Beklebung liegt sauber an.
+ *    - NEU 'bus' (10.5x2.5x3.1 m) und 'truck' (7.3x2.45x3.6 m): in die Fahrzeugliste des Spiels eintragen, z. B.
+ *      bus:{name:"Dildi Bus",len:10.5,wid:2.5,maxSpeed:16,accel:4,brake:14,grip:6,turn:1.3,mass:3.5,colors:["#d81e2a","#f4c20d","#1f5fa8"]}
+ *      truck:{name:"LKW",len:7.3,wid:2.45,maxSpeed:19,accel:4.5,brake:14,grip:6,turn:1.4,mass:3,colors:["#1f5fa8","#c0392b","#f5f5f5"]}
  *    - Masse passen zur Fahrzeugliste: RS6 5.0x1.95, Ferrari 4.6x1.96, Skoda 4.7x1.83, Van 5.1x1.95.
  *
  * 2) FLUGZEUG  -  in der Funktion, die das Flugzeug baut (gibt { root, tilt, prop } zurueck):
@@ -48,6 +51,39 @@
  *    Nichts davon ragt in Eingaenge oder Fahrwege; es wird keine Kollision hinzugefuegt.
  *    - 'casino'  { x0, x1, z0, z1, h: 22 }    = Casino-Hauptgebaeude (z0 = Front mit Schild/Teppich).
  *    - 'tower'   { cx, cz }                   = Mitte des Radj Towers (Sockel 26x26x120, Aufsatz 18x18 bis 140).
+ *
+ * 5) DILDI-KREUZ ERSETZEN (zwischen Innenstadt und Bruecke zu Docks/Flughafen)
+ *    a) In der Strassenliste die drei alten Eintraege entfernen:
+ *       vn("Dildi-Kreuz",...), vn("Rampe West",...), vn("Rampe Ost",...)
+ *       und stattdessen eintragen:
+ *         for (const r of DildiCars.dildiKreuz.roads()) vn(r.name, r.pts, r.opts);
+ *       (pts im Format [x, z, y], kind "deck" -> macht alles befahrbar wie vorher).
+ *       WICHTIG: Die Optik (Fahrbahn, Schutzwaende, Markierung, Pfeiler, Laternen) liefert decor().
+ *       Fuer diese 5 Strassen bitte das spieleigene Fahrbahn-Mesh NICHT zeichnen (nur Physik/Hoehe nutzen),
+ *       sonst liegen zwei Fahrbahnen uebereinander. Die Hafenstrasse x=0 (z -236..-416) zeichnet decor()
+ *       ebenfalls - dort genauso nur die Physik behalten. Anschluesse an Stadt und Hafenstrasse bleiben gleich.
+ *       Neu: 4 Kleeblatt-Schleifen statt 2 Rampen - von jeder Richtung auf die Hafenstrasse und zurueck.
+ *    b) Deko (Schilderbruecken, Skatepark unter der Hochstrasse, Rasthof-Diner + Tanke, Motel mit Pool,
+ *       2 Leucht-Plakatwaende):
+ *         const deko = DildiCars.dildiKreuz.decor(THREE); scene.add(deko);
+ *         for (const c of deko.userData.colliders) Oe(c.x0, c.x1, c.z0, c.z1, c.h);   // Kollision
+ *         W.signMats.push(deko.userData.glow);
+ *    (dildiCityInterchange ist die grosse freistehende Variante, fuer Dildi City nicht noetig.)
+ *    Jeep: Typ 'jeep' ersetzt den Schmuggler-Jeep (Fahrzeug-Abschnitt 1).
+ *
+ * 6) UMFAHRBARE LATERNEN & MUELLEIMER (neu)
+ *      const props = DildiCars.dildiCityProps(THREE, scene, { respawn: 90 });
+ *      props.add('lamp', x, y, z, drehungY);      // Laterne, Ausleger zeigt in Blickrichtung (+Z lokal)
+ *      props.add('bin', x, y, z);                 // runder Strassen-Muelleimer
+ *      props.add('wheelie', x, y, z, drehungY);   // grosse gruene Muelltonne
+ *      props.scatterAlong('lamp', x0,z0, x1,z1, 18, 6.5);   // alle 18 m, 6.5 m neben der Linie
+ *    Pro Frame:  const hits = props.update(dt, J.vehicles);
+ *      -> Fahrzeuge (pos, vel, h, M.len/M.wid) stossen Objekte um: Laternen kippen (Licht flackert aus),
+ *         Muelleimer fliegen mit Deckel und Muell weg. Nach 'respawn' Sekunden steht alles wieder.
+ *      hits = [{car, kind, speed, x, z}] -> z. B. Geraeusch abspielen, Auto leicht abbremsen:
+ *         for (const h of hits) h.car.vel.multiplyScalar(h.kind === 'lamp' ? 0.8 : 0.95);
+ *    Die alten, festen Laternen (und ihre Kollision) dort entfernen, wo die neuen stehen.
+ *    Leuchtkoepfe nachts: W.signMats.push(props.glow).
  *
  * 4) DOCKS & FLUGHAFEN  -  liefern fertige Geometrien mit Vertex-Farben fuer die gemergten Deko-Listen:
  *    - Container:  statt k(2.45,2.6,6.1, x,y,z, farbe)  ->  DildiCars.dildiCityDocks.container(THREE, x, y, z, farbe)
@@ -822,6 +858,637 @@
     return { root, tilt, prop: p };
   }
 
+
+  // ======================================================================
+  // Linienbus (10.5 m) und LKW (7,5 t Koffer) - kastig, Radlaeufe ausgespart
+  // ======================================================================
+  const BUS_AXLES = [
+    { z: 3.0, r: 0.5, w: 0.30, x: 1.02, arch: 0.62, liner: 0.8 },
+    { z: -2.4, r: 0.5, w: 0.36, x: 1.0, arch: 0.62, liner: 0.8 }];
+  const TRUCK_AXLES = [
+    { z: 2.35, r: 0.48, w: 0.30, x: 0.98, arch: 0.6, liner: 0.75 },
+    { z: -1.9, r: 0.48, w: 0.36, x: 0.96, arch: 0.6, liner: 0.75 }];
+
+  // Unterteil mit Aussparungen fuer die Raeder
+  function skirt(mb, m, hw, y0, y1, zf, zr, axles) {
+    const cuts = axles.map((a) => [a.z - a.arch, a.z + a.arch]).sort((a, b) => a[0] - b[0]);
+    let z = zr;
+    for (const [c0, c1] of cuts) { if (c0 > z) mb.box(m, [-hw, y0, z], [hw, y1, c0]); z = c1; }
+    if (zf > z) mb.box(m, [-hw, y0, z], [hw, y1, zf]);
+    for (const a of axles) {
+      mb.box('Underbody', [-hw + 0.02, a.r + 0.05, a.z - a.arch], [hw - 0.02, y1, a.z + a.arch]);
+      for (const s of SIDES) mb.box('TrimGloss', [s * hw - 0.04, a.r + a.arch * 0.9, a.z - a.arch - 0.05], [s * hw + 0.04, a.r + a.arch * 0.9 + 0.08, a.z + a.arch + 0.05]);
+    }
+  }
+
+  function busBody() {
+    const mb = new MB(), hw = 1.25, zf = 5.25, zr = -5.25;
+    skirt(mb, 'Paint', hw, 0.32, 1.12, zf, zr, BUS_AXLES);
+    mb.hexa('Paint', [[-hw, 1.12, zf], [hw, 1.12, zf], [hw, 2.95, zf - 0.25], [-hw, 2.95, zf - 0.25],
+      [-hw, 1.12, zr], [hw, 1.12, zr], [hw, 2.95, zr + 0.1], [-hw, 2.95, zr + 0.1]]);
+    mb.box('Paint', [-hw + 0.15, 2.95, zr + 0.4], [hw - 0.15, 3.12, zf - 0.6]);
+    mb.box('Concrete', [-0.7, 3.12, -3.5], [0.7, 3.4, -1.8]);            // Klimaanlage
+    // Seitenfenster-Band + Tueren (rechte Seite = -X)
+    for (const s of SIDES) {
+      mb.box('Glass', [s * hw - 0.02 * s - 0.02, 1.35, zr + 0.6], [s * hw + 0.02 * s + 0.02, 2.65, zf - 0.6].map((v, i) => v));
+      for (let z = zr + 1.6; z < zf - 0.8; z += 1.5) mb.box('TrimGloss', [s * hw - 0.05, 1.33, z - 0.06], [s * hw + 0.05, 2.67, z + 0.06]);
+    }
+    for (const dz of [zf - 1.4, -0.4]) {
+      mb.box('Glass', [-hw - 0.05, 0.4, dz - 0.65], [-hw + 0.02, 2.7, dz + 0.65]);
+      mb.box('Chrome', [-hw - 0.07, 0.4, dz - 0.02], [-hw - 0.04, 2.7, dz + 0.02]);
+    }
+    mb.box('PoliceYellow', [-hw - 0.01, 1.14, zr + 0.3], [hw + 0.01, 1.24, zf - 0.3]);   // Zierlinie
+    // Front: grosse Scheibe, Zielanzeige, Lichter
+    mb.hexa('Glass', [[-hw + 0.08, 1.35, zf + 0.0], [hw - 0.08, 1.35, zf + 0.0], [hw - 0.08, 2.55, zf - 0.17], [-hw + 0.08, 2.55, zf - 0.17],
+      [-hw + 0.08, 1.35, zf + 0.03], [hw - 0.08, 1.35, zf + 0.03], [hw - 0.08, 2.55, zf - 0.14], [-hw + 0.08, 2.55, zf - 0.14]]);
+    mb.hexa('Black', [[-0.9, 2.6, zf - 0.18], [0.9, 2.6, zf - 0.18], [0.9, 2.88, zf - 0.22], [-0.9, 2.88, zf - 0.22],
+      [-0.9, 2.6, zf - 0.15], [0.9, 2.6, zf - 0.15], [0.9, 2.88, zf - 0.19], [-0.9, 2.88, zf - 0.19]]);
+    mb.box('TaxiSign', [-0.8, 2.64, zf - 0.24], [0.8, 2.84, zf - 0.2]);
+    mb.box('TrimGloss', [-hw, 0.32, zf], [hw, 0.75, zf + 0.08]);
+    mb.box('Plate', [-0.26, 0.45, zf + 0.08], [0.26, 0.56, zf + 0.1]);
+    for (const s of SIDES) {
+      mb.box('LightLens', [s * 0.95 - 0.25, 0.8, zf], [s * 0.95 + 0.25, 1.05, zf + 0.05]);
+      mb.box('HeadLight', [s * 0.95 - 0.2, 0.84, zf + 0.04], [s * 0.95 + 0.2, 0.92, zf + 0.06]);
+      mb.box('TrimGloss', [s * (hw + 0.02), 2.3, zf - 0.5], [s * (hw + 0.08), 2.35, zf - 0.1]);   // Spiegelarm
+      mb.box('TrimGloss', [s * (hw + 0.08) - 0.04, 1.9, zf - 0.15], [s * (hw + 0.08) + 0.04, 2.35, zf - 0.05]);
+      mb.box('TailLight', [s * 1.05 - 0.15, 0.7, zr - 0.04], [s * 1.05 + 0.15, 1.5, zr]);
+    }
+    mb.box('Glass', [-1.0, 1.9, zr - 0.03], [1.0, 2.7, zr]);
+    mb.box('TrimGloss', [-1.0, 1.25, zr - 0.04], [1.0, 1.65, zr]);   // Motorklappe
+    mb.box('Plate', [-0.26, 0.5, zr - 0.04], [0.26, 0.61, zr]);
+    mb.box('TrimGloss', [-hw, 0.32, zr - 0.08], [hw, 0.62, zr]);
+    return mb;
+  }
+
+  function truckBody() {
+    const mb = new MB(), hw = 1.22, zf = 3.55, zc = 1.45, zr = -3.7;
+    // Fahrerhaus (Frontlenker)
+    skirt(mb, 'Paint', hw, 0.45, 1.25, zf, zc, [TRUCK_AXLES[0]]);
+    mb.hexa('Paint', [[-hw, 1.25, zf], [hw, 1.25, zf], [hw, 2.95, zf - 0.22], [-hw, 2.95, zf - 0.22],
+      [-hw, 1.25, zc], [hw, 1.25, zc], [hw, 2.95, zc], [-hw, 2.95, zc]]);
+    mb.hexa('Paint', [[-hw + 0.1, 2.95, zf - 0.3], [hw - 0.1, 2.95, zf - 0.3], [hw - 0.2, 3.4, zf - 0.7], [-hw + 0.2, 3.4, zf - 0.7],
+      [-hw + 0.1, 2.95, zc], [hw - 0.1, 2.95, zc], [hw - 0.2, 3.4, zc], [-hw + 0.2, 3.4, zc]]);   // Windabweiser
+    mb.hexa('Glass', [[-hw + 0.1, 1.85, zf + 0.0], [hw - 0.1, 1.85, zf + 0.0], [hw - 0.1, 2.75, zf - 0.17], [-hw + 0.1, 2.75, zf - 0.17],
+      [-hw + 0.1, 1.85, zf + 0.03], [hw - 0.1, 1.85, zf + 0.03], [hw - 0.1, 2.75, zf - 0.14], [-hw + 0.1, 2.75, zf - 0.14]]);
+    for (const s of SIDES) {
+      mb.box('Glass', [s * hw - 0.03, 1.85, zf - 1.0], [s * hw + 0.03, 2.75, zf - 0.25]);
+      mb.box('TrimGloss', [s * (hw + 0.02), 2.6, zf - 0.6], [s * (hw + 0.25), 2.65, zf - 0.5]);
+      mb.box('TrimGloss', [s * (hw + 0.25) - 0.05, 1.9, zf - 0.6], [s * (hw + 0.25) + 0.05, 2.65, zf - 0.45]);
+      mb.box('Chrome', [s * hw - 0.03, 0.55, zf - 1.3], [s * hw + 0.03, 1.15, zf - 1.25]);   // Einstiegsgriff
+      mb.box('LightLens', [s * 0.9 - 0.25, 0.75, zf], [s * 0.9 + 0.25, 1.05, zf + 0.05]);
+      mb.box('HeadLight', [s * 0.9 - 0.2, 0.8, zf + 0.04], [s * 0.9 + 0.2, 0.9, zf + 0.06]);
+      mb.box('HeadLight', [s * 0.6 - 0.12, 3.3, zf - 0.68], [s * 0.6 + 0.12, 3.38, zf - 0.62]);   // Dachleuchten
+    }
+    // Kuehlergrill + Stossstange
+    mb.box('TrimGloss', [-0.7, 1.15, zf], [0.7, 1.75, zf + 0.04]);
+    for (const y of [1.25, 1.4, 1.55]) mb.box('Chrome', [-0.68, y, zf + 0.04], [0.68, y + 0.04, zf + 0.06]);
+    mb.box('TrimGloss', [-hw, 0.45, zf], [hw, 0.75, zf + 0.12]);
+    mb.box('Plate', [-0.26, 0.5, zf + 0.12], [0.26, 0.61, zf + 0.14]);
+    // Rahmen + Kofferaufbau
+    mb.box('Underbody', [-0.5, 0.55, zr + 0.2], [0.5, 0.95, zc]);
+    mb.box('TrimGloss', [-hw, 0.95, zr], [hw, 1.1, zc - 0.15]);
+    mb.box('White', [-hw - 0.03, 1.1, zr], [hw + 0.03, 3.6, zc - 0.2]);
+    for (let z = zr + 0.6; z < zc - 0.3; z += 0.6) for (const s of SIDES) mb.box('HangarGrey', [s * (hw + 0.03) - 0.02, 1.15, z - 0.03], [s * (hw + 0.03) + 0.02, 3.55, z + 0.03]);
+    mb.box('Paint', [-hw - 0.05, 2.4, zr - 0.01], [hw + 0.05, 2.9, zc - 0.25].map((v) => v));    // Firmenstreifen
+    for (const s of SIDES) mb.box('Paint', [s * (hw + 0.05) - 0.02, 2.4, zr], [s * (hw + 0.05) + 0.02, 2.9, zc - 0.2]);
+    // Hecktueren
+    mb.box('HangarGrey', [-hw, 1.1, zr - 0.04], [hw, 3.6, zr]);
+    mb.box('TrimGloss', [-0.02, 1.15, zr - 0.06], [0.02, 3.55, zr - 0.03]);
+    for (const x of [-0.6, 0.6]) mb.box('Chrome', [x - 0.03, 1.2, zr - 0.08], [x + 0.03, 3.5, zr - 0.04]);
+    for (const s of SIDES) {
+      mb.box('TailLight', [s * 1.0 - 0.15, 0.7, zr - 0.06], [s * 1.0 + 0.15, 0.9, zr - 0.02]);
+      mb.box('TrimGloss', [s * hw - 0.05, 0.45, zr + 0.6], [s * hw + 0.05, 0.95, zc - 0.6]);    // Seitenschutz
+      mb.box('Chrome', [s * 0.8 - 0.25, 0.55, -0.2], [s * 0.8 + 0.25, 0.95, 0.6]);           // Tank
+    }
+    mb.box('TrimGloss', [-hw, 0.5, zr - 0.06], [hw, 0.68, zr + 0.1]);
+    mb.box('Plate', [-0.26, 0.72, zr - 0.08], [0.26, 0.83, zr - 0.06]);
+    mb.box('TrimGloss', [-0.06, 2.95, zc - 0.05], [0.06, 3.5, zc + 0.05]);   // Auspuff hinterm Fahrerhaus
+    return mb;
+  }
+
+
+  // ======================================================================
+  // Offroad-Jeep (Radj-Insel): kastig, Rammbuegel, Ersatzrad, Dachtraeger
+  // ======================================================================
+  const JEEP_AXLES = [
+    { z: 1.25, r: 0.42, w: 0.30, x: 0.82, arch: 0.52, liner: 0.6 },
+    { z: -1.30, r: 0.42, w: 0.30, x: 0.82, arch: 0.52, liner: 0.6 }];
+  function jeepBody() {
+    const mb = new MB(), hw = 0.88, zf = 2.0, zr = -2.0;
+    skirt(mb, 'Paint', hw, 0.55, 1.05, zf, zr, JEEP_AXLES);
+    // Kotfluegel-Verbreiterungen
+    for (const a of JEEP_AXLES) for (const s of SIDES) mb.hexa('TrimMatte', [[s * hw, 1.0, a.z + 0.65], [s * (hw + 0.13), 0.98, a.z + 0.6], [s * (hw + 0.13), 0.98, a.z - 0.6], [s * hw, 1.0, a.z - 0.65],
+      [s * hw, 1.12, a.z + 0.65], [s * (hw + 0.13), 1.08, a.z + 0.6], [s * (hw + 0.13), 1.08, a.z - 0.6], [s * hw, 1.12, a.z - 0.65]]);
+    mb.box('Paint', [-hw, 1.05, zr], [hw, 1.35, zf]);
+    mb.hexa('Paint', [[-hw + 0.04, 1.35, zf], [hw - 0.04, 1.35, zf], [hw - 0.06, 1.42, 0.85], [-hw + 0.06, 1.42, 0.85],
+      [-hw + 0.04, 1.35, zf - 0.02], [hw - 0.04, 1.35, zf - 0.02], [hw - 0.06, 1.35, 0.85], [-hw + 0.06, 1.35, 0.85]]);   // Haube
+    // Kabine mit Hardtop (eckig), Scheiben
+    mb.hexa('Glass', [[-hw + 0.06, 1.42, 0.85], [hw - 0.06, 1.42, 0.85], [hw - 0.08, 2.0, 0.72], [-hw + 0.08, 2.0, 0.72],
+      [-hw + 0.06, 1.35, 0.75], [hw - 0.06, 1.35, 0.75], [hw - 0.08, 2.0, 0.62], [-hw + 0.08, 2.0, 0.62]]);
+    mb.box('Paint', [-hw + 0.02, 1.35, zr + 0.05], [hw - 0.02, 1.42, 0.75]);
+    mb.box('TrimMatte', [-hw + 0.03, 2.0, zr + 0.05], [hw - 0.03, 2.1, 0.75]);
+    for (const s of SIDES) {
+      mb.box('Glass', [s * (hw - 0.02) - 0.02, 1.47, zr + 0.25], [s * (hw - 0.02) + 0.02, 1.95, 0.65]);
+      for (const z of [0.05, -0.9]) mb.box('TrimMatte', [s * (hw - 0.02) - 0.03, 1.42, z - 0.05], [s * (hw - 0.02) + 0.03, 2.0, z + 0.05]);
+      mb.box('TrimMatte', [s * (hw - 0.0) - 0.05, 1.42, zr + 0.05], [s * hw + 0.05, 2.0, zr + 0.25]);
+      mb.box('TrimMatte', [s * (hw + 0.02), 0.62, -0.9], [s * (hw + 0.16), 0.7, 0.6]);           // Trittbrett
+      mb.box('TrimMatte', [s * (hw + 0.02), 1.6, 0.6], [s * (hw + 0.2), 1.75, 0.7]);             // Spiegel
+      mb.box('LightLens', [s * 0.62 - 0.14, 1.1, zf], [s * 0.62 + 0.14, 1.3, zf + 0.03]);
+      mb.box('HeadLight', [s * 0.62 - 0.1, 1.14, zf + 0.03], [s * 0.62 + 0.1, 1.26, zf + 0.05]);
+      mb.box('TailLight', [s * 0.75 - 0.08, 1.05, zr - 0.03], [s * 0.75 + 0.08, 1.35, zr]);
+      mb.box('HeadLight', [s * 0.35 - 0.12, 2.12, 0.6], [s * 0.35 + 0.12, 2.22, 0.68]);         // Zusatzscheinwerfer
+    }
+    // Grill mit senkrechten Schlitzen, Rammbuegel, Seilwinde
+    mb.box('TrimGloss', [-0.42, 1.05, zf], [0.42, 1.35, zf + 0.02]);
+    for (let i = -3; i <= 3; i++) mb.box('Paint', [i * 0.11 - 0.025, 1.08, zf + 0.02], [i * 0.11 + 0.025, 1.32, zf + 0.04]);
+    mb.box('TrimMatte', [-0.95, 0.55, zf + 0.05], [0.95, 0.8, zf + 0.3]);
+    for (const s of SIDES) strut(mb, 'TrimMatte', [s * 0.55, 0.8, zf + 0.25], [s * 0.45, 1.3, zf + 0.18], 0.07);
+    strut(mb, 'TrimMatte', [-0.45, 1.3, zf + 0.18], [0.45, 1.3, zf + 0.18], 0.07);
+    mb.box('DarkSteel', [-0.25, 0.6, zf + 0.3], [0.25, 0.78, zf + 0.42]);
+    // Dachtraeger mit Kanister, Schnorchel, Ersatzrad hinten
+    for (const s of SIDES) mb.box('TrimMatte', [s * 0.72 - 0.03, 2.1, zr + 0.15], [s * 0.72 + 0.03, 2.25, 0.6]);
+    for (let z = zr + 0.3; z < 0.6; z += 0.45) mb.box('TrimMatte', [-0.75, 2.22, z - 0.02], [0.75, 2.26, z + 0.02]);
+    mb.box('BottleGreen', [-0.55, 2.26, zr + 0.4], [-0.15, 2.6, zr + 0.75]);
+    mb.box('PoliceYellow', [0.1, 2.26, zr + 0.4], [0.5, 2.6, zr + 0.75]);
+    strut(mb, 'TrimMatte', [hw + 0.05, 1.1, 0.95], [hw + 0.05, 2.05, 0.85], 0.1);
+    mb.box('TrimMatte', [-0.72, 0.6, zr - 0.08], [0.72, 0.85, zr]);
+    mb.prism('Rubber', hexagon(0, 1.45, zr - 0.1, 0.4, 12, 0, 1, 1), [0, 0, -0.26]);
+    mb.prism('DarkSteel', hexagon(0, 1.45, zr - 0.36, 0.2, 8, 0, 1, 1), [0, 0, -0.02]);
+    mb.box('Plate', [-0.26, 0.62, zr - 0.1], [0.26, 0.73, zr - 0.08]);
+    return mb;
+  }
+
+  // ======================================================================
+  // Autobahnkreuz (Kleeblatt) + Gebaeude drumherum
+  // Mitte (cx, cz). Autobahn A laeuft ebenerdig in x-Richtung, Autobahn B
+  // als Bruecke (8 m) in z-Richtung; 4 Schleifenrampen verbinden beide.
+  // ======================================================================
+  function interchangeRoads(cx, cz) {
+    const roads = [];
+    const A = []; for (let x = -220; x <= 220; x += 10) A.push({ x: cx + x, y: 0.3, z: cz });
+    roads.push({ name: 'A', w: 18, samples: A });
+    const B = [];
+    for (let z = -220; z <= 220; z += 6) {
+      const a = Math.abs(z), y = a < 60 ? 8.3 : a < 140 ? 0.3 + 8 * (1 - (a - 60) / 80) : 0.3;
+      B.push({ x: cx, y, z: cz + z });
+    }
+    roads.push({ name: 'B', w: 18, samples: B });
+    for (const sx of SIDES) for (const sz of SIDES) {
+      const ccx = cx + sx * 46, ccz = cz + sz * 46, r = 37;
+      const a0 = sx > 0 ? Math.PI : 0, a1 = sz > 0 ? -Math.PI / 2 : Math.PI / 2;
+      let sweep = a1 - a0;
+      for (let k = -2; k <= 2; k++) if (Math.abs(Math.abs(a1 - a0 + 2 * Math.PI * k) - 1.5 * Math.PI) < 0.01) sweep = a1 - a0 + 2 * Math.PI * k;
+      const L = [];
+      for (let i = 0; i <= 36; i++) {
+        const t = i / 36, a = a0 + sweep * t;
+        L.push({ x: ccx + r * Math.cos(a), y: 8.3 + (0.3 - 8.3) * t, z: ccz + r * Math.sin(a) });
+      }
+      roads.push({ name: 'Rampe' + (sx > 0 ? 'O' : 'W') + (sz > 0 ? 'S' : 'N'), w: 7, samples: L });
+    }
+    return roads;
+  }
+
+  function deckParts(mb, road) {
+    const S = road.samples, hw = road.w / 2;
+    const side = (i) => {
+      const a = S[Math.max(0, i - 1)], b = S[Math.min(S.length - 1, i + 1)];
+      let dx = b.x - a.x, dz = b.z - a.z; const l = Math.hypot(dx, dz); dx /= l; dz /= l;
+      return [-dz, dx];
+    };
+    for (let i = 0; i < S.length - 1; i++) {
+      const p = S[i], q = S[i + 1], [nx, nz] = side(i), [mx, mz] = side(i + 1);
+      const L0 = [p.x + nx * hw, p.y, p.z + nz * hw], R0 = [p.x - nx * hw, p.y, p.z - nz * hw];
+      const L1 = [q.x + mx * hw, q.y, q.z + mz * hw], R1 = [q.x - mx * hw, q.y, q.z - mz * hw];
+      const dn = (v, d) => [v[0], v[1] - d, v[2]];
+      const elevated = Math.max(p.y, q.y) > 1.2;
+      const th = elevated ? 0.9 : 0.25;
+      mb.triO('Asphalt', L0, R0, R1, dn(L0, 5)); mb.triO('Asphalt', L0, R1, L1, dn(L0, 5));
+      mb.triO('Concrete', dn(L0, th), dn(R0, th), dn(R1, th), [L0[0], L0[1] + 5, L0[2]]); mb.triO('Concrete', dn(L0, th), dn(R1, th), dn(L1, th), [L0[0], L0[1] + 5, L0[2]]);
+      // Seitenflaechen
+      const mid = [(p.x + q.x) / 2, (p.y + q.y) / 2 - th / 2, (p.z + q.z) / 2];
+      mb.triO('Concrete', L0, L1, dn(L1, th), mid); mb.triO('Concrete', L0, dn(L1, th), dn(L0, th), mid);
+      mb.triO('Concrete', R0, R1, dn(R1, th), mid); mb.triO('Concrete', R0, dn(R1, th), dn(R0, th), mid);
+      // Leitplanken / Betonschutzwand
+      strut(mb, 'Concrete', [L0[0], L0[1] + 0.45, L0[2]], [L1[0], L1[1] + 0.45, L1[2]], 0.5);
+      strut(mb, 'Concrete', [R0[0], R0[1] + 0.45, R0[2]], [R1[0], R1[1] + 0.45, R1[2]], 0.5);
+      // Markierungen
+      if (i % 2 === 0) {
+        if (road.w > 10) {
+          strut(mb, 'LaneWhite', [p.x, p.y + 0.03, p.z], [q.x, q.y + 0.03, q.z], 0.25);
+          for (const k of [-0.5, 0.5]) strut(mb, 'LaneWhite', [p.x + nx * hw * k, p.y + 0.03, p.z + nz * hw * k], [(p.x + q.x) / 2 + nx * hw * k, (p.y + q.y) / 2 + 0.03, (p.z + q.z) / 2 + nz * hw * k], 0.15);
+        }
+      }
+      for (const k of [0.92, -0.92]) strut(mb, 'LaneWhite', [p.x + nx * hw * k, p.y + 0.03, p.z + nz * hw * k], [q.x + mx * hw * k, q.y + 0.03, q.z + mz * hw * k], 0.15);
+      // Pfeiler
+      if (elevated && i % 3 === 0 && p.y > 2) {
+        const off = road.w > 10 ? [-hw * 0.55, hw * 0.55] : [0];
+        strut(mb, 'Concrete', [p.x + nx * (hw - 0.5), p.y - th - 0.5, p.z + nz * (hw - 0.5)], [p.x - nx * (hw - 0.5), p.y - th - 0.5, p.z - nz * (hw - 0.5)], 1.0);
+        for (const o of off) {
+          const px = p.x + nx * o, pz = p.z + nz * o;
+          mb.prism('Concrete', hexagon(px, pz, 0, 0.8, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, 0, b]), [0, p.y - th, 0]);
+          mb.box('Concrete', [px - 1.4, p.y - th - 0.6, pz - 1.4], [px + 1.4, p.y - th, pz + 1.4]);
+        }
+      }
+    }
+  }
+
+  function signGantry(mb, x, z, along, y0, text) {
+    // Schilderbruecke ueber Autobahn (blau, Zeichen als Balken angedeutet)
+    const o = along === 'x' ? [0, 1] : [1, 0], hw = 10;
+    for (const s of SIDES) mb.box('Steel', [x + o[0] * s * hw - 0.2, y0, z + o[1] * s * hw - 0.2], [x + o[0] * s * hw + 0.2, y0 + 6.5, z + o[1] * s * hw + 0.2]);
+    strut(mb, 'Steel', [x - o[0] * hw, y0 + 6.3, z - o[1] * hw], [x + o[0] * hw, y0 + 6.3, z + o[1] * hw], 0.35);
+    for (const s of SIDES) {
+      const c = [x + o[0] * s * 4.5, z + o[1] * s * 4.5];
+      mb.box('SignBlue', [c[0] - (o[0] ? 3.6 : 0.1), y0 + 4.2, c[1] - (o[1] ? 3.6 : 0.1)], [c[0] + (o[0] ? 3.6 : 0.1), y0 + 6.2, c[1] + (o[1] ? 3.6 : 0.1)]);
+      for (let k = 0; k < 2; k++) mb.box('LaneWhite', [c[0] - (o[0] ? 2.8 - k : 0.12), y0 + 5.5 - k * 0.7, c[1] - (o[1] ? 2.8 - k : 0.12)], [c[0] + (o[0] ? 2.2 : 0.12), y0 + 5.75 - k * 0.7, c[1] + (o[1] ? 2.2 : 0.12)]);
+    }
+  }
+
+  // --- Einzigartige Gebaeude ---
+  function diner(d, g, x, z) {           // Rasthof-Diner (Retro), Front -z
+    const W = 12, D = 22;
+    d.box('Steel', [x - W, 0.2, z - D / 2], [x + W, 4.6, z + D / 2]);
+    for (let i = 0; i < 6; i++) d.box(i % 2 ? 'Steel' : 'HangarGrey', [x - W - 0.02, 0.2 + i * 0.6, z - D / 2 - 0.02], [x + W + 0.02, 0.5 + i * 0.6, z + D / 2 + 0.02]);
+    for (let xx = x - W + 1.5; xx < x + W - 1; xx += 2.6) g.box('GlowWin', [xx, 1.5, z - D / 2 - 0.08], [xx + 2.0, 3.6, z - D / 2 - 0.03]);
+    d.box('ChipRed', [x - W - 0.4, 4.6, z - D / 2 - 0.6], [x + W + 0.4, 5.3, z + D / 2 + 0.4]);
+    g.box('GlowCyan', [x - W - 0.45, 4.55, z - D / 2 - 0.65], [x + W + 0.45, 4.62, z - D / 2 - 0.55]);
+    d.box('ChipRed', [x - 2, 0.2, z - D / 2 - 0.5], [x + 2, 3.8, z - D / 2]);
+    g.box('GlowWin', [x - 1.4, 0.25, z - D / 2 - 0.55], [x + 1.4, 3.2, z - D / 2 - 0.5]);
+    // Pylon-Schild "DINER" (Pfeil)
+    d.box('Steel', [x + W + 3, 0, z - D / 2 - 3], [x + W + 3.6, 14, z - D / 2 - 2.4]);
+    d.box('ChipRed', [x + W + 1.5, 9, z - D / 2 - 2.9], [x + W + 7.5, 13, z - D / 2 - 2.5]);
+    g.box('GlowWarm', [x + W + 1.8, 9.4, z - D / 2 - 2.95], [x + W + 7.2, 9.6, z - D / 2 - 2.9]);
+    g.box('GlowWarm', [x + W + 1.8, 12.4, z - D / 2 - 2.95], [x + W + 7.2, 12.6, z - D / 2 - 2.9]);
+    g.hexa('GlowPink', [[x + W + 7.5, 10, z - D / 2 - 2.95], [x + W + 9.5, 11, z - D / 2 - 2.95], [x + W + 9.5, 11, z - D / 2 - 2.85], [x + W + 7.5, 10, z - D / 2 - 2.85],
+      [x + W + 7.5, 12, z - D / 2 - 2.95], [x + W + 9.5, 11.01, z - D / 2 - 2.95], [x + W + 9.5, 11.01, z - D / 2 - 2.85], [x + W + 7.5, 12, z - D / 2 - 2.85]]);
+    // Tankstelle daneben
+    const tx = x - W - 16;
+    d.box('White', [tx - 9, 5.2, z - 8], [tx + 9, 6.0, z + 8]);
+    g.box('GlowWhite', [tx - 8.5, 5.1, z - 7.5], [tx + 8.5, 5.2, z + 7.5]);
+    for (const [a, b] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) d.box('Steel', [tx + a - 0.25, 0, z + b - 0.25], [tx + a + 0.25, 5.2, z + b + 0.25]);
+    for (const a of [-3, 3]) { d.box('ChipRed', [tx + a - 0.5, 0.2, z - 0.35], [tx + a + 0.5, 1.9, z + 0.35]); d.box('Concrete', [tx + a - 1.5, 0.05, z - 1], [tx + a + 1.5, 0.25, z + 1]); }
+    return [{ x0: x - W, x1: x + W, z0: z - D / 2, z1: z + D / 2, h: 5.3 }, { x0: x + W + 3, x1: x + W + 3.6, z0: z - D / 2 - 3, z1: z - D / 2 - 2.4, h: 14 }];
+  }
+
+  function motel(d, g, x, z) {           // 2-stoeckiges Motel mit Laubengang, Front -z
+    const W = 24, D = 10;
+    d.box('Cream', [x - W, 0.2, z], [x + W, 7.0, z + D]);
+    d.box('Terracotta', [x - W - 0.4, 7.0, z - 2.6], [x + W + 0.4, 7.5, z + D + 0.4]);
+    d.box('Concrete', [x - W, 3.3, z - 2.2], [x + W, 3.6, z]);                         // Laubengang
+    d.box('Steel', [x - W, 4.5, z - 2.25], [x + W, 4.6, z - 2.15]);
+    for (let xx = x - W + 0.3; xx < x + W; xx += 4) for (const y0 of [0.2, 3.6]) {
+      d.box('Steel', [xx - 0.1, y0, z - 2.2], [xx + 0.1, y0 + 3.3, z - 2.0]);
+      d.box('Wood', [xx + 0.6, y0 + 0.1, z - 0.06], [xx + 1.6, y0 + 2.3, z]);
+      g.box('GlowWin', [xx + 2.0, y0 + 1.0, z - 0.06], [xx + 3.4, y0 + 2.3, z - 0.02]);
+    }
+    // grosser Pylon "INN"
+    d.box('Steel', [x - W - 6, 0, z - 6], [x - W - 5.2, 16, z - 5.2]);
+    d.box('BottleGreen', [x - W - 9, 11, z - 5.8], [x - W - 2.2, 16, z - 5.4]);
+    for (let i = 0; i < 3; i++) g.box('GlowWarm', [x - W - 8.4 + i * 2.1, 12, z - 5.85], [x - W - 7.0 + i * 2.1, 15, z - 5.8]);
+    // Pool
+    d.box('Concrete', [x - 8, 0.05, z - 16], [x + 8, 0.35, z - 7]);
+    d.box('ChipBlue', [x - 7.3, 0.1, z - 15.3], [x + 7.3, 0.36, z - 7.7]);
+    return [{ x0: x - W, x1: x + W, z0: z, z1: z + D, h: 7.5 }, { x0: x - W - 6, x1: x - W - 5.2, z0: z - 6, z1: z - 5.2, h: 16 }];
+  }
+
+  function logistics(d, g, x, z) {       // Logistikzentrum mit 6 Ladetoren, Front -z
+    const W = 30, D = 26, H = 12;
+    d.box('White', [x - W, 0.2, z], [x + W, H, z + D]);
+    d.box('ChipBlue', [x - W - 0.05, H - 2.5, z - 0.05], [x + W + 0.05, H - 1.2, z + D + 0.05]);
+    for (let i = 0; i < 6; i++) {
+      const dx = x - W + 6 + i * 9.5;
+      d.box('Concrete', [dx - 2.4, 0.2, z - 2.5], [dx + 2.4, 1.3, z]);                // Rampe
+      d.box('DarkSteel', [dx - 1.6, 1.3, z - 0.15], [dx + 1.6, 4.6, z]);
+      d.box('Black', [dx - 1.9, 1.3, z - 0.6], [dx + 1.9, 4.9, z - 0.2]);             // Torabdichtung
+      g.box('GlowWhite', [dx - 0.3, 5.1, z - 0.4], [dx + 0.3, 5.2, z - 0.1]);
+      d.box(i % 2 ? 'Hazard' : 'Black', [dx - 2.4, 0.2, z - 2.55], [dx + 2.4, 0.5, z - 2.5]);
+    }
+    for (let i = 0; i < 4; i++) d.box('Steel', [x - 20 + i * 12, H, z + 8], [x - 16 + i * 12, H + 1.5, z + 12]);
+    // Hochregal-Turm
+    d.box('HangarGrey', [x + W - 12, 0.2, z + D - 10], [x + W - 2, 26, z + D]);
+    d.box('ChipBlue', [x + W - 12.05, 22, z + D - 10.05], [x + W - 1.95, 24, z + D + 0.05]);
+    return [{ x0: x - W, x1: x + W, z0: z, z1: z + D, h: H }, { x0: x + W - 12, x1: x + W - 2, z0: z + D - 10, z1: z + D, h: 26 }];
+  }
+
+  function underBridge(d, g, cx, cz) {   // Skatepark + Graffiti unter der Bruecke (zwischen A und Rampen)
+    const z0 = cz + 16, z1 = cz + 40;
+    d.box('Concrete', [cx - 8, 0.05, z0], [cx + 8, 0.2, z1]);
+    for (const s of SIDES) {          // Quarterpipes
+      for (let i = 0; i < 5; i++) {
+        const a0 = i / 5 * Math.PI / 2, a1 = (i + 1) / 5 * Math.PI / 2, R = 2.4;
+        const P = (a) => [cx + s * (7.8 - R * Math.sin(a)), 0.2 + R - R * Math.cos(a)];
+        const [xa, ya] = P(a0), [xb, yb] = P(a1);
+        d.quad('Concrete', [xa, ya, z0 + 2], [xb, yb, z0 + 2], [xb, yb, z1 - 2], [xa, ya, z1 - 2]);
+        d.quad('Concrete', [xa, ya, z1 - 2], [xb, yb, z1 - 2], [xb, yb, z0 + 2], [xa, ya, z0 + 2]);
+      }
+      d.box('Steel', [cx + s * 7.8 - 0.05, 2.6, z0 + 2], [cx + s * 7.8 + 0.05, 2.7, z1 - 2]);
+    }
+    d.box('Concrete', [cx - 2, 0.2, (z0 + z1) / 2 - 2], [cx + 2, 0.9, (z0 + z1) / 2 + 2]);      // Funbox
+    d.box('Steel', [cx - 0.05, 0.9, (z0 + z1) / 2 - 2], [cx + 0.05, 1.0, (z0 + z1) / 2 + 2]);
+    // Graffiti-Waende (bunte Flaechen) + Strassenlaternen unter der Bruecke
+    const cols = ['GlowPink', 'GlowCyan', 'Hazard', 'ChipRed', 'BottleGreen'];
+    for (const s of SIDES) for (let k = 0; k < 6; k++) {
+      const zz = z0 + 1 + k * 4;
+      d.box(cols[k % 5], [cx + s * 8.6 - 0.05, 0.4 + (k % 2) * 0.6, zz], [cx + s * 8.6 + 0.05, 2.6 + (k % 3) * 0.5, zz + 3.2]);
+    }
+    for (let k = 0; k < 3; k++) g.box('GlowWarm', [cx - 1, 7.2, z0 + 4 + k * 8], [cx + 1, 7.35, z0 + 4.4 + k * 8]);
+    return [{ x0: cx - 2, x1: cx + 2, z0: (z0 + z1) / 2 - 2, z1: (z0 + z1) / 2 + 2, h: 1.0 }];
+  }
+
+  function billboard(d, g, x, z, ry) {
+    const c = Math.cos(ry), s = Math.sin(ry), P = (a, y, b) => [x + a * c + b * s, y, z - a * s + b * c];
+    d.prism('Steel', hexagon(x, z, 0, 0.7, 8, 0, 1, 1).map(([a, b]) => [a, 0, b]), [0, 14, 0]);
+    d.hexa('DarkSteel', [P(-8, 14, -0.3), P(8, 14, -0.3), P(8, 20, -0.3), P(-8, 20, -0.3), P(-8, 14, 0.3), P(8, 14, 0.3), P(8, 20, 0.3), P(-8, 20, 0.3)]);
+    g.hexa('GlowPink', [P(-7.6, 14.4, -0.35), P(0, 14.4, -0.35), P(0, 19.6, -0.35), P(-7.6, 19.6, -0.35), P(-7.6, 14.4, -0.31), P(0, 14.4, -0.31), P(0, 19.6, -0.31), P(-7.6, 19.6, -0.31)]);
+    g.hexa('GlowWarm', [P(0, 14.4, -0.35), P(7.6, 14.4, -0.35), P(7.6, 19.6, -0.35), P(0, 19.6, -0.35), P(0, 14.4, -0.31), P(7.6, 14.4, -0.31), P(7.6, 19.6, -0.31), P(0, 19.6, -0.31)]);
+    return [{ x0: x - 0.7, x1: x + 0.7, z0: z - 0.7, z1: z + 0.7, h: 20 }];
+  }
+
+  function dildiCityInterchange(THREE, opts) {
+    const o = Object.assign({ cx: 0, cz: 0, buildings: true }, opts || {}), cx = o.cx, cz = o.cz;
+    Object.assign(BPAL, { Asphalt: [0.20, 0.21, 0.22], LaneWhite: [0.92, 0.92, 0.88], SignBlue: [0.08, 0.25, 0.65] });
+    const roads = interchangeRoads(cx, cz);
+    const mb = new MB(), g = new MB();
+    for (const r of roads) deckParts(mb, r);
+    signGantry(mb, cx - 100, cz, 'x', 0.3);
+    signGantry(mb, cx + 100, cz, 'x', 0.3);
+    signGantry(mb, cx, cz + 175, 'z', 0.3);
+    let colliders = [];
+    if (o.buildings) {
+      colliders = colliders.concat(diner(mb, g, cx + 130, cz + 120), motel(mb, g, cx - 130, cz + 105),
+        logistics(mb, g, cx + 125, cz - 150), underBridge(mb, g, cx, cz), billboard(mb, g, cx - 110, cz - 95, 0.6));
+    }
+    const cache = {};
+    const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    const group = new THREE.Group();
+    const deck = new THREE.Mesh(vcGeometry(THREE, mb, () => true, colorOf), o.material || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }));
+    deck.castShadow = deck.receiveShadow = true;
+    const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    group.add(deck, new THREE.Mesh(vcGeometry(THREE, g, () => true, colorOf), glowMat));
+    group.name = 'Autobahnkreuz';
+    group.userData = { roads, colliders, glow: glowMat };
+    return group;
+  }
+
+
+  // ======================================================================
+  // DILDI-KREUZ (Ersatz fuer das alte Kreuz zwischen Innenstadt und Bruecke)
+  // Gleiche Anschluesse wie bisher: Stadtausfahrten (-136/-236) und (136/-236),
+  // Hafenstrasse x=0 von z=-236 bis -416 (zur Bruecke -> Docks/Flughafen).
+  // Neu: Kleeblatt mit 4 Schleifenrampen zwischen Hochstrasse (y=9, z=-320)
+  // und Hafenstrasse statt der 2 alten Rampen.
+  // ======================================================================
+  // Catmull-Rom-Glaettung: dichte, runde Punktfolge (alle ~3 m)
+  function smoothPts(P, step) {
+    const out = [];
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+      const n = Math.max(1, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+      for (let k = 0; k < n; k++) {
+        const t = k / n, t2 = t * t, t3 = t2 * t;
+        out.push([0, 1, 2].map((j) => +(0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)).toFixed(2)));
+      }
+    }
+    out.push(P[P.length - 1].slice());
+    return out;
+  }
+
+  function kreuzRoads() {
+    const R = [];
+    R.push({ name: 'Dildi-Kreuz', opts: { kind: 'deck', w: 14, lamps: true }, pts: smoothPts([[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -322, 9], [0, -322, 9], [60, -322, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]], 3) });
+    const r = 33;
+    for (const sx of SIDES) for (const sz of SIDES) {
+      const ccx = sx * 40, ccz = -322 + sz * 40;
+      const a0 = Math.atan2(-sz, 0), a1 = sx > 0 ? Math.PI : 0;
+      let sweep = a1 - a0;
+      for (let k = -2; k <= 2; k++) if (Math.abs(Math.abs(a1 - a0 + 2 * Math.PI * k) - 1.5 * Math.PI) < 0.01) sweep = a1 - a0 + 2 * Math.PI * k;
+      const pts = [], N = 52;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N, a = a0 + sweep * t, e = t * t * (3 - 2 * t);
+        pts.push([+(ccx + r * Math.cos(a)).toFixed(2), +(ccz + r * Math.sin(a)).toFixed(2), +(9 * (1 - e)).toFixed(2)]);
+      }
+      R.push({ name: 'Kleeblatt ' + (sz > 0 ? 'Nord' : 'Sued') + (sx > 0 ? 'ost' : 'west'), opts: { kind: 'deck', w: 9 }, pts });
+    }
+    return R;
+  }
+
+  function kreuzDecor(THREE, opts) {
+    Object.assign(BPAL, { Asphalt: [0.20, 0.21, 0.22], LaneWhite: [0.92, 0.92, 0.88], SignBlue: [0.08, 0.25, 0.65] });
+    const mb = new MB(), g = new MB();
+    let col = [];
+    if (!opts || opts.decks !== false) {
+      const all = kreuzRoads().map((r) => ({ w: r.opts.w, samples: r.pts.map(([x, z, y]) => ({ x, y: y + 0.3, z })) }));
+      all.push({ w: 12, samples: Array.from({ length: 46 }, (_, i) => ({ x: 0, y: 0.3, z: -236 - i * 4 })) });
+      for (const r of all) deckParts(mb, r);
+      // Strassenlaternen auf der Mittel-Leitwand der Hochstrasse
+      for (let x = -56; x <= 56; x += 16) {
+        mb.box('Steel', [x - 0.1, 9.3, -322.1], [x + 0.1, 16, -321.9]);
+        for (const s of SIDES) { mb.box('Steel', [x - 0.08, 15.9, -322 + (s > 0 ? 0 : -2.2)], [x + 0.08, 16.05, -322 + (s > 0 ? 2.2 : 0)]); g.box('GlowWarm', [x - 0.25, 15.75, -322 + s * 2.2 - 0.4], [x + 0.25, 15.9, -322 + s * 2.2 + 0.4]); }
+      }
+    }
+    signGantry(mb, 0, -252, 'z', 0.2);
+    signGantry(mb, 0, -404, 'z', 0.2);
+    col = col.concat(
+      underBridge(mb, g, 110, -350),            // Skatepark unter der Hochstrasse (Ost)
+      diner(mb, g, -105, -385),                 // Rasthof-Diner + Tankstelle (Suedwest, am Wasser)
+      motel(mb, g, 105, -398),                  // Motel mit Pool (Suedost)
+      billboard(mb, g, -96, -262, 0.5),         // Leucht-Plakatwand (Nordwest)
+      billboard(mb, g, 96, -262, -0.5));
+    const cache = {};
+    const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    const group = new THREE.Group();
+    const m = new THREE.Mesh(vcGeometry(THREE, mb, () => true, colorOf), (opts && opts.material) || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }));
+    m.castShadow = m.receiveShadow = true;
+    const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    group.add(m, new THREE.Mesh(vcGeometry(THREE, g, () => true, colorOf), glowMat));
+    group.name = 'Dildi-Kreuz-Deko';
+    group.userData = { colliders: col, glow: glowMat };
+    return group;
+  }
+  const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor };
+
+
+  // ======================================================================
+  // UMFAHRBARE STADTMOEBEL: Laternen, Mulleimer, Muelltonnen
+  // Eigenstaendiges System: stehende Objekte als InstancedMesh (schnell),
+  // beim Umfahren wird ein bewegliches Einzelteil erzeugt (kippt/fliegt).
+  // ======================================================================
+  function lampPoleParts(mb, g) {           // Pivot am Boden (y=0), Mast steht auf 0.35 m Sockel
+    const oct = (r, y) => hexagon(0, 0, 0, r, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, y, b]);
+    const band = (m, r0, y0, r1, y1) => { const A = oct(r0, y0), B = oct(r1, y1); mb.convex(m, [A, B].concat(A.map((p, i) => [p, A[(i + 1) % 8], B[(i + 1) % 8], B[i]]))); };
+    band('DarkSteel', 0.11, 0.35, 0.07, 7.2);
+    mb.box('Steel', [-0.07, 0.9, 0.105], [0.07, 1.25, 0.12]);          // Wartungsklappe
+    // Ausleger: geknickt
+    strut(mb, 'DarkSteel', [0, 7.0, 0], [0, 7.6, 0.6], 0.09);
+    strut(mb, 'DarkSteel', [0, 7.6, 0.6], [0, 7.7, 1.9], 0.08);
+    mb.box('DarkSteel', [-0.22, 7.55, 1.6], [0.22, 7.75, 2.5]);        // Leuchtenkopf
+    g.box('GlowWarm', [-0.17, 7.52, 1.68], [0.17, 7.56, 2.42]);
+  }
+  function lampStubParts(mb) {
+    mb.prism('Concrete', hexagon(0, 0, 0, 0.32, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, 0, b]), [0, 0.12, 0]);
+    mb.prism('DarkSteel', hexagon(0, 0, 0, 0.17, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, 0.12, b]), [0, 0.23, 0]);
+    for (const [a, b] of [[0.2, 0.2], [-0.2, 0.2], [0.2, -0.2], [-0.2, -0.2]]) mb.box('Steel', [a - 0.03, 0.12, b - 0.03], [a + 0.03, 0.17, b + 0.03]);
+  }
+  function binParts(mb) {                   // runder Strassen-Mulleimer (orange), Pivot unten Mitte
+    const ring = (r, y, n = 12) => hexagon(0, 0, 0, r, n, 0, 1, 1).map(([a, b]) => [a, y, b]);
+    mb.prism('Orange', ring(0.3, 0.05), [0, 0.8, 0]);
+    mb.prism('DarkSteel', ring(0.32, 0.0), [0, 0.06, 0]);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; mb.box('DarkSteel', [Math.cos(a) * 0.3 - 0.02, 0.1, Math.sin(a) * 0.3 - 0.02], [Math.cos(a) * 0.3 + 0.02, 0.85, Math.sin(a) * 0.3 + 0.02]); }
+    mb.box('LaneWhite', [-0.12, 0.45, 0.29], [0.12, 0.6, 0.31]);
+  }
+  function binLidParts(mb) {
+    const ring = (r, y, n = 12) => hexagon(0, 0, 0, r, n, 0, 1, 1).map(([a, b]) => [a, y, b]);
+    mb.prism('DarkSteel', ring(0.33, 0), [0, 0.07, 0]);
+    mb.prism('Black', ring(0.1, -0.01), [0, 0.09, 0]);
+  }
+  function wheelieParts(mb) {               // grosse Muelltonne (240 l), Pivot unten Mitte
+    mb.hexa('BottleGreen', [[-0.29, 0.06, -0.36], [0.29, 0.06, -0.36], [0.31, 1.0, -0.4], [-0.31, 1.0, -0.4], [-0.29, 0.06, 0.32], [0.29, 0.06, 0.32], [0.31, 1.0, 0.36], [-0.31, 1.0, 0.36]]);
+    mb.box('BottleGreen', [-0.33, 0.97, -0.42], [0.33, 1.05, 0.44]);  // Deckel
+    mb.box('BottleGreen', [-0.3, 0.9, 0.36], [0.3, 0.98, 0.48]);       // Griff
+    for (const s of SIDES) mb.prism('Rubber', hexagon(0.09, 0.1, 0, 0.1, 8, 0, 1, 1).map(([a, b]) => [s * 0.25, b, a + 0.24]), [s * 0.06, 0, 0]);
+  }
+  function trashParts(mb, rnd) {            // ein paar Muellteile zum Verstreuen
+    const cols = ['LaneWhite', 'ChipRed', 'Hazard', 'ChipBlue', 'Concrete'];
+    const s = 0.06 + rnd() * 0.08;
+    mb.box(cols[Math.floor(rnd() * cols.length)], [-s, 0, -s * 0.7], [s, s * 0.6, s * 0.7]);
+  }
+
+  function dildiCityProps(THREE, scene, opts) {
+    const o = Object.assign({ respawn: 90, max: 800, minSpeed: 2.5, material: null }, opts || {});
+    Object.assign(BPAL, { LaneWhite: [0.92, 0.92, 0.88] });
+    const cache = {};
+    const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    const geo = (fn) => { const mb = new MB(), g = new MB(); fn(mb, g); return [vcGeometry(THREE, mb, () => true, colorOf), g.t && Object.keys(g.t).length ? vcGeometry(THREE, g, () => true, colorOf) : null]; };
+    const mat = o.material || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 });
+    const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    const r = rng(11);
+    const KINDS = {
+      lamp: { parts: geo(lampPoleParts), stub: geo(lampStubParts)[0], radius: 0.25, height: 7.7, fall: 'tip' },
+      bin: { parts: geo(binParts), lid: geo(binLidParts)[0], radius: 0.35, height: 0.9, fall: 'fly', mass: 1 },
+      wheelie: { parts: geo(wheelieParts), radius: 0.42, height: 1.05, fall: 'fly', mass: 1.6 },
+    };
+    const trashGeos = Array.from({ length: 4 }, () => geo((mb) => trashParts(mb, r))[0]);
+    const root = new THREE.Group();
+    root.name = 'Stadtmoebel';
+    scene.add(root);
+    const items = [], grid = new Map(), cell = 8;
+    const key = (x, z) => Math.floor(x / cell) + ',' + Math.floor(z / cell);
+    const inst = {};
+    const dummy = new THREE.Object3D();
+    const makeInst = (k) => {
+      const K = KINDS[k], I = { body: new THREE.InstancedMesh(K.parts[0], mat, o.max), list: [] };
+      I.body.castShadow = true; I.body.count = 0; root.add(I.body);
+      if (K.parts[1]) { I.glow = new THREE.InstancedMesh(K.parts[1], glowMat, o.max); I.glow.count = 0; root.add(I.glow); }
+      if (K.stub) { I.stub = new THREE.InstancedMesh(K.stub, mat, o.max); I.stub.count = 0; I.stub.castShadow = true; root.add(I.stub); }
+      if (K.lid) { I.lid = new THREE.InstancedMesh(K.lid, mat, o.max); I.lid.count = 0; root.add(I.lid); }
+      return I;
+    };
+    const setMat = (it, visible) => {
+      const I = inst[it.kind];
+      dummy.position.set(it.x, it.y, it.z); dummy.rotation.set(0, it.ry, 0); dummy.scale.setScalar(visible ? 1 : 0); dummy.updateMatrix();
+      I.body.setMatrixAt(it.idx, dummy.matrix); I.body.instanceMatrix.needsUpdate = true;
+      if (I.glow) { I.glow.setMatrixAt(it.idx, dummy.matrix); I.glow.instanceMatrix.needsUpdate = true; }
+      if (I.lid) { dummy.position.y = it.y + 0.86; dummy.updateMatrix(); I.lid.setMatrixAt(it.idx, dummy.matrix); I.lid.instanceMatrix.needsUpdate = true; }
+    };
+    const loose = [];
+
+    function add(kind, x, y, z, ry = 0) {
+      const K = KINDS[kind];
+      if (!K) throw new Error('DildiCars props: unbekannt ' + kind);
+      const I = inst[kind] || (inst[kind] = makeInst(kind));
+      const it = { kind, x, y, z, ry, idx: I.body.count, down: false, t: 0 };
+      I.body.count++; if (I.glow) I.glow.count++; if (I.lid) I.lid.count++;
+      if (I.stub) { dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); I.stub.setMatrixAt(I.stub.count++, dummy.matrix); I.stub.instanceMatrix.needsUpdate = true; }
+      setMat(it, true);
+      items.push(it);
+      const kk = key(x, z); if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(it);
+      return it;
+    }
+
+    function knock(it, vx, vz, speed) {
+      it.down = true; it.t = o.respawn;
+      setMat(it, false);
+      const K = KINDS[it.kind], dir = Math.atan2(vx, vz);
+      const piece = (g, m) => { const ms = new THREE.Mesh(g, m); ms.castShadow = true; root.add(ms); return ms; };
+      if (K.fall === 'tip') {
+        const pv = new THREE.Group(); pv.position.set(it.x, it.y + 0.35, it.z); root.add(pv);
+        const yaw = new THREE.Group(); yaw.rotation.y = dir; pv.add(yaw);
+        const tilt = new THREE.Group(); yaw.add(tilt);
+        const inner = new THREE.Group(); inner.rotation.y = it.ry - dir; inner.position.y = -0.35; tilt.add(inner);
+        inner.add(piece(K.parts[0], mat)); const gl = piece(K.parts[1], glowMat); inner.add(gl);
+        loose.push({ type: 'tip', obj: pv, tilt, ang: 0, w: Math.min(2.5, speed * 0.08), it, glow: gl, life: o.respawn, flick: 1.2 });
+      } else {
+        const fly = (g, m, h0, boost) => {
+          const ms = piece(g, m); ms.position.set(it.x, it.y + h0, it.z); ms.rotation.y = it.ry;
+          const sp = speed * (0.6 + r() * 0.5) * boost / (K.mass || 1);
+          loose.push({ type: 'fly', obj: ms, vx: Math.sin(dir + (r() - 0.5) * 0.6) * sp, vz: Math.cos(dir + (r() - 0.5) * 0.6) * sp,
+            vy: 2 + speed * 0.12 * boost + r() * 2, sx: (r() - 0.5) * 12, sz: (r() - 0.5) * 12, ground: it.y, it, life: o.respawn });
+        };
+        fly(K.parts[0], mat, 0, 1);
+        if (K.lid) fly(K.lid, mat, 0.86, 1.4);
+        for (let i = 0; i < 6; i++) fly(trashGeos[i % 4], mat, 0.5, 0.9 + r());
+      }
+    }
+
+    // cars: Array von Fahrzeugen mit pos {x,y,z} und vel {x,y} (y = z-Richtung) oder vel {x,z}; Radius aus M.len/M.wid
+    function update(dt, cars) {
+      const hits = [];
+      for (const c of cars || []) {
+        if (!c || c.removed || c.dead || !c.pos) continue;
+        const vx = c.vel ? c.vel.x : 0, vz = c.vel ? (c.vel.z !== undefined ? c.vel.z : c.vel.y) : 0, sp = Math.hypot(vx, vz);
+        if (sp < o.minSpeed) continue;
+        const rad = c.M ? Math.max(c.M.wid / 2, c.M.len / 2 * 0.85) : 2.2, cx = Math.floor(c.pos.x / cell), cz = Math.floor(c.pos.z / cell);
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+          const L = grid.get((cx + a) + ',' + (cz + b)); if (!L) continue;
+          for (const it of L) {
+            if (it.down || Math.abs(c.pos.y - it.y) > 3) continue;
+            // grobe Box-Pruefung entlang Fahrzeugachse
+            const h = c.h !== undefined ? c.h : Math.atan2(vx, vz), fx = Math.sin(h), fz = Math.cos(h);
+            const dx = it.x - c.pos.x, dz = it.z - c.pos.z, along = dx * fx + dz * fz, side = -dx * fz + dz * fx;
+            const L2 = c.M ? c.M.len / 2 : 2.3, W2 = c.M ? c.M.wid / 2 : 1;
+            if (Math.abs(along) < L2 + KINDS[it.kind].radius && Math.abs(side) < W2 + KINDS[it.kind].radius) {
+              knock(it, vx, vz, sp); hits.push({ car: c, kind: it.kind, speed: sp, x: it.x, z: it.z });
+            }
+          }
+        }
+        void rad;
+      }
+      // bewegliche Teile
+      for (let i = loose.length - 1; i >= 0; i--) {
+        const L = loose[i];
+        L.life -= dt;
+        if (L.type === 'tip') {
+          if (L.ang < Math.PI / 2 - 0.02) { L.w += 2.2 * Math.sin(L.ang + 0.15) * dt * 3; L.ang = Math.min(Math.PI / 2 - 0.02, L.ang + L.w * dt); if (L.ang >= Math.PI / 2 - 0.02) L.w = 0; }
+          L.tilt.rotation.x = L.ang;
+          if (L.flick > 0) { L.flick -= dt; L.glow.visible = L.flick > 0 && Math.random() > 0.4; }
+        } else if (!L.rest) {
+          L.vy -= 9.81 * dt;
+          L.obj.position.x += L.vx * dt; L.obj.position.y += L.vy * dt; L.obj.position.z += L.vz * dt;
+          L.obj.rotation.x += L.sx * dt; L.obj.rotation.z += L.sz * dt;
+          if (L.obj.position.y < L.ground + 0.05) {
+            L.obj.position.y = L.ground + 0.05;
+            if (Math.abs(L.vy) < 1.5) { L.vy = 0; L.vx *= 0.9; L.vz *= 0.9; L.sx *= 0.9; L.sz *= 0.9; } else { L.vy = -L.vy * 0.35; L.vx *= 0.7; L.vz *= 0.7; }
+            if (Math.hypot(L.vx, L.vz) < 0.2 && L.vy === 0) {
+              L.rest = true;
+              const e = new THREE.Euler().setFromQuaternion(L.obj.quaternion);   // liegend ablegen
+              L.obj.rotation.set(Math.round(e.x / (Math.PI / 2)) * Math.PI / 2 || Math.PI / 2, e.y, Math.round(e.z / (Math.PI / 2)) * Math.PI / 2);
+            }
+          }
+        }
+        if (L.life <= 0) { root.remove(L.obj); loose.splice(i, 1); }
+      }
+      for (const it of items) if (it.down) { it.t -= dt; if (it.t <= 0) { it.down = false; setMat(it, true); } }
+      return hits;
+    }
+
+    // Komfort: Laternen/Mulleimer entlang einer Strecke verteilen
+    function scatterAlong(kind, x0, z0, x1, z1, step, offset, y = 0.2) {
+      const L = Math.hypot(x1 - x0, z1 - z0), nx = -(z1 - z0) / L, nz = (x1 - x0) / L;
+      for (let d = step / 2; d < L; d += step) add(kind, x0 + (x1 - x0) * d / L + nx * offset, y, z0 + (z1 - z0) * d / L + nz * offset, Math.atan2(-nx, -nz));
+    }
+    return { group: root, add, update, scatterAlong, items, glow: glowMat };
+  }
+
   // ======================================================================
   // three.js-Aufbau
   // ======================================================================
@@ -1000,6 +1667,9 @@
     skoda: { body: () => octaviaBody(''), axles: OCT_AXLES, paint: '#7f8c8d', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL },
     police: { body: () => octaviaBody('police'), axles: OCT_AXLES, paint: '#e8eef5', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL, siren: true },
     taxi: { body: () => octaviaBody('taxi'), axles: OCT_AXLES, paint: '#f4c20d', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL },
+    bus: { body: () => busBody(), axles: BUS_AXLES, paint: '#d81e2a', rim: [0.75, 0.76, 0.78], caliper: GREY_CAL },
+    truck: { body: () => truckBody(), axles: TRUCK_AXLES, paint: '#1f5fa8', rim: [0.75, 0.76, 0.78], caliper: GREY_CAL },
+    jeep: { body: () => jeepBody(), axles: JEEP_AXLES, paint: '#5b6b3a', rim: [0.15, 0.15, 0.16], caliper: GREY_CAL },
     van: { body: () => vanBody(), axles: VAN_AXLES, paint: '#f5f5f5', rim: [0.60, 0.61, 0.63], caliper: GREY_CAL },
   };
 
@@ -1662,7 +2332,7 @@
     return car;
   }
 
-  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, types: Object.keys(VEHICLES) };
+  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, dildiCityInterchange, dildiKreuz, dildiCityProps, types: Object.keys(VEHICLES) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);

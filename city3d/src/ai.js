@@ -196,25 +196,130 @@ function distToSeg(px, pz, ax, az, bx, bz) {
 }
 
 // obstacle in front (vehicles, peds, player)
-function obstacleDist(v, G, range = 22) {
+function obstacleDist(v, G, range = 22, ignoreOncoming = false) {
   const f = v.fwd;
   let best = range;
   const halfW = v.M.wid / 2 + 0.6;
-  const check = (x, z, r, y) => {
+  const check = (x, z, r, y, o) => {
     const dx = x - v.pos.x, dz = z - v.pos.z;
     const lf = dx * f.x + dz * f.z;
+    // outside the city: oncoming cars drive in their own lane – only stop for them right in front of the bumper
+    if (ignoreOncoming && o && lf > 3.5) { const of = o.fwd; if (of.x * f.x + of.z * f.z < -0.5) return; }
     if (lf < 0 || lf > range + 5) return;
     if (Math.abs(y - v.pos.y) > 3) return;
     const lx = Math.abs(dx * -f.z + dz * f.x);
     if (lx < halfW + r) best = Math.min(best, lf - v.M.len / 2 - r);
   };
-  for (const o of G.vehicles) if (o !== v && !o.removed) check(o.pos.x, o.pos.z, o.M.wid / 2 + (o.M.len / 2) * 0.5, o.pos.y);
+  for (const o of G.vehicles) if (o !== v && !o.removed) check(o.pos.x, o.pos.z, o.M.wid / 2 + (o.M.len / 2) * 0.5, o.pos.y, o);
   for (const p of G.peds) if (!p.dead && !p.removed) check(p.pos.x, p.pos.z, 0.4, p.pos.y);
   if (!G.player.inVehicle) check(G.player.pos.x, G.player.pos.z, 0.4, G.player.pos.y);
   return best;
 }
 
 const inCityArea = (x, z) => Math.abs(x) < WALL_OUT + 4 && Math.abs(z) < WALL_OUT + 4;
+
+// arms of a ring road: other roads whose end lies at the ring (cached)
+function ringExits(ring) {
+  if (ring._exits) return ring._exits;
+  const S = ring.samples, ex = [];
+  for (const r of world.outRoads || []) {
+    if (r === ring || !r.traffic) continue;
+    for (const [ri, dir] of [[0, 1], [r.samples.length - 1, -1]]) {
+      const e = r.samples[ri];
+      let bi = -1, bd = 12;
+      S.forEach((s, i) => { const d = Math.hypot(s.x - e.x, s.z - e.z); if (d < bd) { bd = d; bi = i; } });
+      if (bi >= 0) ex.push({ idx: bi, road: r, ridx: ri, dir: r.oneway && dir < 0 ? 1 : dir });
+    }
+  }
+  return (ring._exits = ex);
+}
+
+// ---------- service vehicles on a fixed round (airport shuttle bus, docks truck) ----------
+// route = closed list of {x, z} on the right lane; stops = [{ i, t, name }] (index into the route, wait seconds)
+export class LoopDriver {
+  constructor(veh, route, stops, speed) {
+    this.veh = veh; this.route = route; this.stops = stops; this.base = speed;
+    this.waitT = 0; this.atStop = null; this.lastStop = null; this.stuck = 0; this.reverseT = 0;
+    let bi = 0, bd = 1e9;
+    route.forEach((p, i) => { const d = Math.hypot(p.x - veh.pos.x, p.z - veh.pos.z); if (d < bd) { bd = d; bi = i; } });
+    this.i = bi;
+  }
+  onAttacked() { this.waitT = Math.min(this.waitT, 1); }
+  update(dt, G) {
+    const v = this.veh, R = this.route, N = R.length, f = v.fwd;
+    for (let k = 0; k < 6; k++) {
+      const p = R[(this.i + 1) % N];
+      if ((p.x - v.pos.x) * f.x + (p.z - v.pos.z) * f.z < 3) this.i = (this.i + 1) % N; else break;
+    }
+    // next stop ahead (distance along the route)
+    let want = this.base, stopIn = 1e9, next = null;
+    for (const s of this.stops) {
+      if (s === this.lastStop) continue;
+      const di = (s.i - this.i + N) % N;
+      if (di < 12) { let d = Math.hypot(R[s.i].x - v.pos.x, R[s.i].z - v.pos.z); if (d < stopIn) { stopIn = d; next = s; } }
+    }
+    if (this.atStop) {
+      this.waitT -= dt;
+      want = 0;
+      if (this.waitT <= 0) { this.lastStop = this.atStop; this.atStop = null; }
+    } else if (next) {
+      want = Math.min(want, Math.max(1.2, stopIn * 0.55));
+      if (stopIn < 2.2 && Math.abs(v.vF) < 1.2) { this.atStop = next; this.waitT = next.t; }
+    }
+    if (this.lastStop && (this.lastStop.i - this.i + N) % N > 20 && (this.lastStop.i - this.i + N) % N < N - 20) this.lastStop = null;
+    // steering: pure pursuit on the route
+    const look = Math.max(2, Math.round((5 + Math.abs(v.vF) * 0.6) / 3));
+    const t = R[(this.i + look) % N];
+    const dx = t.x - v.pos.x, dz = t.z - v.pos.z;
+    const ang = Math.atan2(dx * -f.z + dz * f.x, dx * f.x + dz * f.z);
+    const a = R[this.i], b = R[(this.i + 1) % N], c = R[(this.i + 7) % N], d2 = R[(this.i + 8) % N];
+    const turn = Math.abs(angleWrap(Math.atan2(d2.x - c.x, d2.z - c.z) - Math.atan2(b.x - a.x, b.z - a.z)));
+    want = Math.min(want, this.base + (5 - this.base) * clamp(turn / 1.1, 0, 1));
+    const free = want;
+    if (this.ignoreT > 0) this.ignoreT -= dt;
+    const ob = obstacleDist(v, G, this.ignoreT > 0 ? 4 : 20, true);
+    if (this.ignoreT > 0) { if (ob < 1.2) want = 0; else want = Math.min(want, 3); }
+    else if (ob < 20) want = Math.min(want, Math.max(0, (ob - 2.5) * 0.9));
+    // blocked (e.g. people standing on the road): honk so they step aside, then creep past
+    if (free > 2 && want < 0.5 && Math.abs(v.vF) < 0.6) this.blockT = (this.blockT || 0) + dt; else this.blockT = 0;
+    if (this.blockT > 2.5 && !this.honked) {
+      this.honked = true;
+      if (G.audio && G.audio.honkAt) G.audio.honkAt(v.pos, this);
+      for (const p of G.peds) if (!p.dead && Math.hypot(p.pos.x - v.pos.x, p.pos.z - v.pos.z) < 16 && p.scare) p.scare(v.pos.x, v.pos.z, 3);
+    }
+    if (this.blockT > 6) { this.blockT = 0; this.honked = false; this.ignoreT = 3; }
+    if (this.blockT === 0) this.honked = false;
+    if (this.reverseT > 0) { this.reverseT -= dt; v.input.throttle = -0.6; v.input.steer = -clamp(ang * 2.2, -1, 1); v.input.handbrake = false; return; }
+    v.input.steer = clamp(ang * 2.2, -1, 1);
+    v.input.throttle = clamp((want - v.vF) * 0.45, -1, 1);
+    v.input.handbrake = want < 0.3 && v.vF < 1;
+    if (want > 3 && Math.abs(v.vF) < 0.5 && ob > 6) this.stuck += dt; else this.stuck = Math.max(0, this.stuck - dt);
+    if (this.stuck > 4) { this.stuck = 0; this.reverseT = 1.5; }
+  }
+}
+// builds a closed route on the right-hand lane from pieces of roads: [[roadName, fromXZ, toXZ, dir], ...]
+export function buildRoute(pieces, lane = 2.8) {
+  const out = [];
+  for (const [name, a, b] of pieces) {
+    const r = (world.outRoads || []).find((q) => q.name === name);
+    if (!r) continue;
+    const S = r.samples, near = (p) => { let bi = 0, bd = 1e9; S.forEach((s, i) => { const d = Math.hypot(s.x - p[0], s.z - p[1]); if (d < bd) { bd = d; bi = i; } }); return bi; };
+    const i0 = a ? near(a) : 0, i1 = b ? near(b) : S.length - 1;
+    // one-way rings are always driven forwards (wrapping over the end); other roads in either direction
+    const idxs = [];
+    if (r.oneway) { for (let i = i0, k = 0; k < S.length * 2; i = (i + 1) % (S.length - 1), k++) { idxs.push(i); if (i === i1 && k > 0) break; } }
+    else { const st = i1 >= i0 ? 1 : -1; for (let i = i0; st > 0 ? i <= i1 : i >= i1; i += st) idxs.push(i); }
+    const fwd = r.oneway || i1 >= i0 ? 1 : -1;
+    for (const i of idxs) {
+      const st = fwd;
+      const s = S[i], q = S[Math.min(S.length - 1, Math.max(0, i + st))], o = S[Math.min(S.length - 1, Math.max(0, i - st))];
+      let fx = q.x - o.x, fz = q.z - o.z; const l = Math.hypot(fx, fz) || 1; fx /= l; fz /= l;
+      out.push({ x: s.x - fz * lane, z: s.z + fx * lane }); // right of the driving direction
+    }
+  }
+  // drop points that are too close (piece joins)
+  return out.filter((p, i) => i === 0 || Math.hypot(p.x - out[i - 1].x, p.z - out[i - 1].z) > 1.2);
+}
 
 // nearest sample on any outskirts road
 export function nearestRoad(x, z, maxD = 30, filter) {
@@ -293,11 +398,30 @@ export class OutDriver {
   onAttacked(G, rammed) { this.panic = rammed ? 4 : 10; }
   update(dt, G) {
     const v = this.veh;
+    // roundabouts: at every arm the car may leave (never back into the arm it came from)
+    if (this.rf.road.ring) {
+      const ex = ringExits(this.rf.road), arms = new Set(ex.map((x) => x.road)).size;
+      for (const x of ex) {
+        // back into the arm you came from only where it is the only arm (turning loop at a dead end)
+        if (x.idx !== this.rf.idx || (x.road === this.cameFrom && arms > 1) || this.lastExitIdx === x.idx) continue;
+        this.lastExitIdx = x.idx;
+        if (Math.random() < 0.5) { this.cameFrom = null; this.rf = new RoadFollow(x.road, x.ridx, x.dir); this.lastExitIdx = -1; break; }
+      }
+    }
     if (this.rf.advance(v)) {
       const e = this.rf.endPoint();
       if (inCityArea(e.x, e.z)) { v.driver = new TrafficDriver(v); return; }
+      if (this.rf.road.ring) {
+        // end of the ring: either leave here (if an arm is here) or keep circling
+        const all = ringExits(this.rf.road), arms = new Set(all.map((x) => x.road)).size, L = this.rf.road.samples.length;
+        const here = all.filter((x) => (x.idx >= L - 2 || x.idx <= 1) && (x.road !== this.cameFrom || arms === 1));
+        if (here.length && Math.random() < 0.6) { const x = pick(here); this.rf = new RoadFollow(x.road, x.ridx, x.dir); this.cameFrom = null; }
+        else { this.rf = new RoadFollow(this.rf.road, 0, 1); this.lastExitIdx = -1; }
+        return;
+      }
+      const prev = this.rf.road;
       const opts = junctionsAt(e.x, e.z, this.rf.road).filter((o) => o.road.traffic && o.dirs.length);
-      if (opts.length) { const o = pick(opts); this.rf = new RoadFollow(o.road, o.idx, pick(o.dirs)); }
+      if (opts.length) { const o = pick(opts); this.rf = new RoadFollow(o.road, o.idx, pick(o.dirs)); if (o.road.ring) this.cameFrom = prev; }
       else this.rf.dir = -this.rf.dir;
     }
     const st = this.rf.steerTo(v);
@@ -306,7 +430,7 @@ export class OutDriver {
     want = Math.min(want, lerpN(want, 7, clamp(st.turn / 1.2, 0, 1)));
     const free = want;
     if (this.ignoreT > 0) this.ignoreT -= dt;
-    const ob = obstacleDist(v, G, this.ignoreT > 0 ? 4 : 22);
+    const ob = obstacleDist(v, G, this.ignoreT > 0 ? 4 : 22, true);
     if (this.ignoreT > 0) { if (ob < 1.2) want = 0; else want = Math.min(want, 5); }
     else if (ob < 22) want = Math.min(want, Math.max(0, (ob - 2.5) * 1.1));
     if (free > 2 && want < 1 && Math.abs(v.vF) < 0.6) this.blockT = (this.blockT || 0) + dt;

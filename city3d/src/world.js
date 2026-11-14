@@ -1353,26 +1353,51 @@ export function buildWorld(scene, quality) {
     return false;
   };
   let lampsDropped = 0;
+  // street lamps + bins from Nick's model file: cars can knock them over (lamps tip and flicker out,
+  // bins fly away with lid and rubbish), everything stands again after 90 s. No fixed collision any more.
+  const DCm = globalThis.DildiCars;
+  const props = DCm && DCm.dildiCityProps ? DCm.dildiCityProps(THREE, scene, { respawn: 90, max: lampPos.length + 400 }) : null;
+  world.props = props;
   for (const [x, z, ang, yy] of lampPos) {
     if (onDrive(x, z, yy)) { lampsDropped++; continue; }
     const ax = Math.sin(ang), az = Math.cos(ang); // arm toward road
     const y = yy === undefined ? groundY(x, z) : yy;
-    lampGeo.push(ccyl(0.09, 0.13, 6.7, 6, x, y + 3.35, z, '#2c3238'));
-    lampGeo.push(cbox(0.08, 0.08, 1.6, x + ax * 0.75, y + 6.65, z + az * 0.75, '#2c3238', ang));
-    headGeo.push(cbox(0.55, 0.14, 0.32, x + ax * 1.5, y + 6.55, z + az * 1.5, '#fff1c8', ang));
+    if (props) props.add('lamp', x, y, z, ang);
+    else {
+      lampGeo.push(ccyl(0.09, 0.13, 6.7, 6, x, y + 3.35, z, '#2c3238'));
+      lampGeo.push(cbox(0.08, 0.08, 1.6, x + ax * 0.75, y + 6.65, z + az * 0.75, '#2c3238', ang));
+      headGeo.push(cbox(0.55, 0.14, 0.32, x + ax * 1.5, y + 6.55, z + az * 1.5, '#fff1c8', ang));
+      addCirc(x, z, 0.18, y + 6, y - 1);
+    }
     const pg = new THREE.CircleGeometry(4.2, 16);
     pg.rotateX(-Math.PI / 2);
     const py = yy === undefined ? groundY(x + ax * 1.6, z + az * 1.6) : yy;
     pg.translate(x + ax * 1.6, py + 0.1, z + az * 1.6);
     poolGeo.push(pg);
-    addCirc(x, z, 0.18, y + 6, y - 1);
   }
   world.lampsDropped = lampsDropped;
+  if (props) {
+    // bins at the kerb between the lamps (city blocks), now and then a big wheelie bin
+    for (const blk of world.blocks) {
+      if (blk.type === 'park') continue;
+      for (const edge of [0, 1, 2, 3]) for (const t of [19, 37]) {
+        if (srand() > 0.45) continue;
+        let x, z, ang;
+        if (edge === 0) { x = blk.x0 + t; z = blk.z0 + 0.9; ang = Math.PI; }
+        else if (edge === 1) { x = blk.x0 + t; z = blk.z1 - 0.9; ang = 0; }
+        else if (edge === 2) { x = blk.x0 + 0.9; z = blk.z0 + t; ang = -Math.PI / 2; }
+        else { x = blk.x1 - 0.9; z = blk.z0 + t; ang = Math.PI / 2; }
+        if (onDrive(x, z)) continue;
+        if (srand() < 0.2) props.add('wheelie', x, groundY(x, z), z, ang); else props.add('bin', x, groundY(x, z), z);
+      }
+    }
+    world.lampHeadMat = props.glow; // gets brighter at night (sky.js)
+  }
   const lamps = new THREE.Mesh(merge(lampGeo), metalMat);
   lamps.castShadow = true;
   scene.add(lamps);
   const lampHeadMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
-  world.lampHeadMat = lampHeadMat;
+  world.lampHeadMat = props ? props.glow : lampHeadMat;
   scene.add(new THREE.Mesh(merge(headGeo), lampHeadMat));
   const poolTex = canvasTex(128, 128, (ctx) => {
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);

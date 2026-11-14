@@ -1,5 +1,6 @@
 // Geography: terrain height, road layout and elevated decks (flyover).
 import * as THREE from 'three';
+import './dildi_cars.js'; // Nicks Modelle (liefert u. a. die Straßen des Dildi-Kreuzes) – vor den Straßen laden
 
 export const WALL_OUT = 246; // outer edge of the building wall around the city
 export const COAST_Z = -420; // south land ends here (sea beyond)
@@ -54,7 +55,7 @@ export function rawH(x, z) {
 // kind: road (asphalt), dirt, deck (elevated, own heights)
 // yMode: 'given' uses y from points, 'terrain' follows smoothed terrain, 'pass' climbs from the city over a pass
 export const ROADS = [];
-const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway }; ROADS.push(r); return r; };
+const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway, ring: !!o.ring }; ROADS.push(r); return r; };
 
 // --- mountain passes from the west/east city exits into the two deserts ---
 R('Pass West-Süd', [[-236, -68], [-264, -69], [-294, -80], [-324, -68], [-352, -82], [-372, -94]], { yMode: 'pass', fall: 30, lamps: true, bump: 7, w: 14 });
@@ -77,17 +78,30 @@ R('Gehöft-Weg', [[480, 240], [502, 256], [516, 262], [520, 266]], { kind: 'dirt
 
 // --- south: harbour road + compact flyover "Dildi-Kreuz" ---
 R('Hafenstraße', [[0, -236, 0], [0, -290, 0], [0, -350, 0], [0, -400, 0], [0, -416, 0]], { w: 12, lamps: true });
-R('Dildi-Kreuz', [[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -324, 9], [0, -324, 9], [60, -324, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]], { kind: 'deck', w: 12, lamps: true });
-R('Rampe West', [[-64, -324, 9], [-46, -332, 8.2], [-32, -352, 5.5], [-20, -374, 2.6], [-9, -392, 0.6], [-4, -402, 0]], { kind: 'deck', w: 9 });
-R('Rampe Ost', [[4, -402, 0], [9, -392, 0.6], [20, -374, 2.6], [32, -352, 5.5], [46, -332, 8.2], [64, -324, 9]], { kind: 'deck', w: 9 });
+// Dildi-Kreuz (Nicks Modell, dildi_cars.js): Hochstraße y=9 bei z=-322 + 4 Kleeblatt-Schleifen auf die Hafenstraße.
+// Gezeichnet wird es vom Spiel selbst (Fahrbahn, Schutzwände mit Lücken an den Einmündungen, Pfeiler),
+// die Deko (Schilderbrücken, Rasthof, Motel, Skatepark, Plakate) kommt aus dildiKreuz.decor() in outskirts.js.
+for (const r of globalThis.DildiCars.dildiKreuz.roads()) R(r.name, r.pts, r.opts);
 // island roads (flat)
-R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -560, 0], [0, -610, 0]], { w: 12, lamps: true });
-R('Kaistraße', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [0, -560, 0], [70, -560, 0], [150, -560, 0], [215, -560, 0]], { w: 11, lamps: true });
+// the Brückenstraße × Kaistraße crossing is a roundabout (HAFENKREISEL); the roads end at its arms
+export const HAFENKREISEL = { x: 0, z: -560, r: 17, w: 9 };
+R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -541, 0]], { w: 12, lamps: true });
+R('Brückenstraße Süd', [[0, -579, 0], [0, -595, 0], [0, -610, 0]], { w: 12, lamps: true });
+R('Kaistraße West', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [-19, -560, 0]], { w: 11, lamps: true });
+R('Kaistraße Ost', [[19, -560, 0], [70, -560, 0], [150, -560, 0], [191, -560, 0]], { w: 11, lamps: true });
+// ring order (right-hand traffic, right turn in first like the other roundabouts): north → east → south → west → north
+R('Hafenkreisel', Array.from({ length: 21 }, (_, k) => { const t = (k / 20) * Math.PI * 2; return [HAFENKREISEL.x + HAFENKREISEL.r * Math.sin(t), HAFENKREISEL.z + HAFENKREISEL.r * Math.cos(t), 0]; }), { w: HAFENKREISEL.w, oneway: true, ring: true });
 R('Dockring', [[-60, -560, 0], [-66, -610, 0], [-110, -645, 0], [-170, -640, 0], [-210, -600, 0], [-215, -560, 0]], { w: 10 });
 // roundabout at the end of the Brückenstraße (was a dead end where cars tried to turn on the spot).
 // One-way ring, counter-clockwise from above (right-hand traffic): start at the top, east, south, west, back to the top.
 export const KREISEL = { x: 0, z: -632, r: 20, w: 10 };
-R('Kreisverkehr', Array.from({ length: 17 }, (_, k) => { const t = (k / 16) * Math.PI * 2; return [KREISEL.x + Math.sin(t) * KREISEL.r, KREISEL.z + Math.cos(t) * KREISEL.r, 0]; }), { w: KREISEL.w, oneway: true });
+// turning loop at the airport end of the Kaistraße (one-way, right turn in first like the roundabout)
+export const WENDE = { x: 205, z: -560, r: 14, w: 9 };
+R('Wendeschleife Flughafen', Array.from({ length: 15 }, (_, k) => { const t = (k / 14) * Math.PI * 2; return [WENDE.x - Math.cos(t) * WENDE.r, WENDE.z + Math.sin(t) * WENDE.r, 0]; }), { w: WENDE.w, oneway: true, ring: true });
+// bus stop in front of the airport terminal (east-bound lane of the Kaistraße) and the loading spot at the cranes
+export const BUS_STOP = { x: 110, z: -557 };
+export const TRUCK_STOP = { x: -110, z: -645 };
+R('Kreisverkehr', Array.from({ length: 17 }, (_, k) => { const t = (k / 16) * Math.PI * 2; return [KREISEL.x + Math.sin(t) * KREISEL.r, KREISEL.z + Math.cos(t) * KREISEL.r, 0]; }), { w: KREISEL.w, oneway: true, ring: true });
 
 // ---------------- sampling ----------------
 export function sampleRoad(r) {
@@ -240,7 +254,7 @@ function buildDeckIndex() {
     const S = r.samples;
     for (let i = 0; i < S.length - 1; i++) {
       const a = S[i], b = S[i + 1];
-      const seg = { a, b, w: r.w };
+      const seg = { a, b, w: r.w, r };
       const x0 = Math.min(a.x, b.x) - r.w, x1 = Math.max(a.x, b.x) + r.w, z0 = Math.min(a.z, b.z) - r.w, z1 = Math.max(a.z, b.z) + r.w;
       for (let cx = Math.floor(x0 / DCELL); cx <= Math.floor(x1 / DCELL); cx++)
         for (let cz = Math.floor(z0 / DCELL); cz <= Math.floor(z1 / DCELL); cz++) {
@@ -255,18 +269,22 @@ function buildDeckIndex() {
 export function deckAt(x, z, refY, step = 1.1) {
   const l = deckIdx.get(dkey(Math.floor(x / DCELL), Math.floor(z / DCELL)));
   if (!l) return -1e9;
-  let best = -1e9;
+  // per deck road only its nearest segment counts (clamped to the segment ends, so there is no gap on the
+  // outer side of curves where cars used to drop through); between different decks the highest usable wins
+  const near = new Map();
   for (const s of l) {
     const abx = s.b.x - s.a.x, abz = s.b.z - s.a.z;
     const L2 = abx * abx + abz * abz;
-    let t = ((x - s.a.x) * abx + (z - s.a.z) * abz) / (L2 + 1e-9);
-    if (t < -0.02 || t > 1.02) continue;
-    t = Math.min(1, Math.max(0, t));
-    const px = s.a.x + abx * t, pz = s.a.z + abz * t;
-    if (Math.hypot(x - px, z - pz) > s.w / 2 + 0.4) continue;
+    const t = Math.min(1, Math.max(0, ((x - s.a.x) * abx + (z - s.a.z) * abz) / (L2 + 1e-9)));
+    const d = Math.hypot(x - (s.a.x + abx * t), z - (s.a.z + abz * t));
+    if (d > s.w / 2 + 0.4) continue;
     const y = s.a.y + (s.b.y - s.a.y) * t;
-    if (y <= refY + step && y > best) best = y;
+    if (y > refY + step) continue;
+    const o = near.get(s.r);
+    if (!o || d < o.d - 1e-6) near.set(s.r, { d, y });
   }
+  let best = -1e9;
+  for (const o of near.values()) if (o.y > best) best = o.y;
   return best;
 }
 
