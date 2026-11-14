@@ -1119,7 +1119,7 @@ export class Missions {
     // the Radj-Insel is only drawn when you are on its way (saves a lot of GPU time in the city)
     if (this.isl) {
       const pp = this.api.playerPos(), f = this.G.flight;
-      const vis = pp.z < -620 || (f && f.pos.z < -380);
+      const vis = pp.z < -620 || !!(f && f.pos.z < -380); // must be a real true/false (three.js only hides on === false)
       if (this.isl.root.visible !== vis) this.isl.root.visible = vis;
     }
     const busy = this.busy();

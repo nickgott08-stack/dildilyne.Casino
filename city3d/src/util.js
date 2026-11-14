@@ -90,6 +90,27 @@ export function merge(geos, keepUV = false) {
   return out;
 }
 
+// merges geometries per map tile (instead of one mesh across the whole map), so the camera
+// only draws tiles that are on screen and not hidden in the fog; returns the meshes
+export function tiledMeshes(scene, geos, mat, tile = 250, keepUV = false, setup = null) {
+  const buckets = new Map();
+  for (const g of geos) {
+    if (!g) continue;
+    g.computeBoundingSphere();
+    const c = g.boundingSphere.center, k = Math.floor(c.x / tile) + ',' + Math.floor(c.z / tile);
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(g);
+  }
+  const out = [];
+  for (const list of buckets.values()) {
+    const m = new THREE.Mesh(merge(list, keepUV), mat);
+    if (setup) setup(m);
+    scene.add(m);
+    out.push(m);
+  }
+  return out;
+}
+
 export function canvasTex(w, h, draw, repeat = true) {
   const c = document.createElement('canvas');
   c.width = w;

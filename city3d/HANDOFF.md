@@ -98,3 +98,9 @@ Dildi City (Quellcode):
   Einsätze, Kippen, Coup-Wartezeit (`hkh()`), Minispiel-Werte, Rangliste, Dildi-City-Kurs/Preise (`P10`)/Bezahlung/Raub-Regeln.
   D$ werden je nach Zustand umgerechnet (`dc3d_eco2` = '1' neuer Maßstab, '0' alter); das Sparschwein liest das Flag.
   Patch-Skripte: `tools/patch_season1.py`, `tools/patch_season1_gate.py`, `tools/patch_season1_gate2.py`.
+
+## Flüssiger / nicht mehr pixelig (14.11.2026)
+- Bug: die Radj-Insel wurde immer gezeichnet (`visible = null` statt `false` in missions.js) – ~150k Dreiecke gespart.
+- Außenbereich (Straßen, Wüsten-Deko, Horizont-Berge) in Kacheln (`tiledMeshes` in util.js); Gelände-Kacheln + diese
+  werden hinter der Nebelgrenze ausgeblendet (`distCull` in main.js). Wegweiser-Strahl bleibt sichtbar.
+- Automatik: bei <30 FPS (2× hintereinander) zuerst Grafikstufe runter, dann Auflösung, aber nie unter Pixel-Ratio 1.0.
