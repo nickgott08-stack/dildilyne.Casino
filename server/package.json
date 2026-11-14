@@ -1,0 +1,11 @@
+{
+  "name": "dildi-city-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mehrspieler-Server für Dildi City 3D (bis zu 10 Spieler pro Raum)",
+  "main": "server.js",
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "8.18.0" }
+}

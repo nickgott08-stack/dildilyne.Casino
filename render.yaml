@@ -1,0 +1,9 @@
+# Render-Blueprint: Dildi City 3D + Mehrspieler-Server (bis zu 10 Spieler pro Raum)
+services:
+  - type: web
+    name: dildi-city
+    runtime: node
+    plan: free
+    buildCommand: cd city3d && npm ci && node build.mjs && cd ../server && npm ci
+    startCommand: node server/server.js
+    healthCheckPath: /status
