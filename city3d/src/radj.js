@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { RADJ, RADJ_CELLAR, RADJ_STRIP, RADJ_ESTATE, radjGround, radjE } from './geo.js';
 import { addBox, addCirc, world } from './world.js';
-import { cbox, ccyl, merge, neonSign, srand, srange } from './util.js';
+import { cbox, ccyl, merge, neonSign, srand, srange, canvasTex, colorize } from './util.js';
 
 const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
 const H = (x, z) => radjGround(x, z);
@@ -43,6 +43,111 @@ function ribbon(pts, w, col, lift = 0.07) {
   return { mesh: m, samples: S };
 }
 const nearPts = (S, x, z, r) => S.some((p) => Math.hypot(p.x - x, p.z - z) < r);
+
+// gravel road: textured strip with soft grass verges and darker wheel ruts, following the ground
+let _gravel = null;
+function gravelTex() {
+  if (_gravel) return _gravel;
+  _gravel = canvasTex(128, 512, (ctx, w, h) => {
+    // across (u): grass verge -> gravel -> rut -> gravel -> rut -> gravel -> verge
+    const g = ctx.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, '#3f6b2e'); g.addColorStop(0.08, '#5d6b3c'); g.addColorStop(0.15, '#9d8e6e');
+    g.addColorStop(0.27, '#a89a7b'); g.addColorStop(0.33, '#83765c'); g.addColorStop(0.4, '#a89a7b');
+    g.addColorStop(0.6, '#ab9d7e'); g.addColorStop(0.67, '#83765c'); g.addColorStop(0.73, '#a89a7b');
+    g.addColorStop(0.85, '#9d8e6e'); g.addColorStop(0.92, '#5d6b3c'); g.addColorStop(1, '#3f6b2e');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // pebbles + grain
+    for (let i = 0; i < 5200; i++) {
+      const x = Math.random() * w, y = Math.random() * h, edge = Math.min(x, w - x) / w;
+      if (edge < 0.1 && Math.random() < 0.7) continue;
+      const l = 45 + Math.random() * 40;
+      ctx.fillStyle = `hsla(${32 + Math.random() * 14},${10 + Math.random() * 14}%,${l}%,${0.35 + Math.random() * 0.4})`;
+      const r = Math.random() < 0.08 ? 1.6 + Math.random() * 1.4 : 0.6 + Math.random() * 0.9;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    }
+    // grass tufts growing into the edges
+    for (let i = 0; i < 900; i++) {
+      const side = Math.random() < 0.5, x = side ? Math.random() * w * 0.2 : w - Math.random() * w * 0.2, y = Math.random() * h;
+      ctx.strokeStyle = `hsla(${88 + Math.random() * 20},40%,${22 + Math.random() * 14}%,0.8)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 3, y - 2 - Math.random() * 4); ctx.stroke();
+    }
+  });
+  _gravel.wrapS = THREE.ClampToEdgeWrapping;
+  return _gravel;
+}
+function gravelRoad(pts, w) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'catmullrom', 0.4);
+  const n = Math.ceil(curve.getLength() / 2);
+  const S = curve.getSpacedPoints(n);
+  const W = w + 3; // incl. verges
+  const cols = [-0.5, -0.25, 0, 0.25, 0.5];
+  const pos = [], uv = [], idx = [];
+  let dist = 0;
+  S.forEach((p, i) => {
+    const q = S[Math.min(S.length - 1, i + 1)], o = S[Math.max(0, i - 1)];
+    const dx = q.x - o.x, dz = q.z - o.z, L = Math.hypot(dx, dz) || 1;
+    const nx = -dz / L, nz = dx / L;
+    if (i) dist += Math.hypot(p.x - S[i - 1].x, p.z - S[i - 1].z);
+    for (const c of cols) {
+      const x = p.x + nx * c * W, z = p.z + nz * c * W;
+      pos.push(x, H(x, z) + 0.07 - Math.abs(c) * 0.06, z);
+      uv.push(c + 0.5, dist / 9);
+    }
+    if (i) {
+      const a = (i - 1) * cols.length, b = i * cols.length;
+      for (let k = 0; k < cols.length - 1; k++) idx.push(a + k, a + k + 1, b + k, a + k + 1, b + k + 1, b + k);
+    }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: gravelTex(), roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.receiveShadow = true;
+  return { mesh: m, samples: S };
+}
+
+// triangles with outward-facing normals (for roofs / gables), vertex-coloured, mergeable with cbox()
+function solid(tris, center) {
+  const pos = [], c = new THREE.Vector3(...center), a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3(), n = new THREE.Vector3(), m = new THREE.Vector3();
+  const cols = [];
+  for (const [p0, p1, p2, col] of tris) {
+    a.set(...p0); b.set(...p1); d.set(...p2);
+    n.subVectors(b, a).cross(m.subVectors(d, a));
+    m.copy(a).add(b).add(d).multiplyScalar(1 / 3).sub(c);
+    const flip = n.dot(m) < 0;
+    for (const p of flip ? [p0, p2, p1] : [p0, p1, p2]) pos.push(...p);
+    const k = new THREE.Color(col);
+    for (let i = 0; i < 3; i++) cols.push(k.r, k.g, k.b);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  g.computeVertexNormals();
+  return g;
+}
+// hip roof over a rectangle (with overhang); ridge runs along the longer side
+function hipRoof(x0, x1, z0, z1, y, h, col, ov = 0.9) {
+  x0 -= ov; x1 += ov; z0 -= ov; z1 += ov;
+  const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, t = y + h;
+  const A = [x0, y, z0], B = [x1, y, z0], C = [x1, y, z1], D = [x0, y, z1];
+  let R1, R2;
+  if (w >= d) { R1 = [x0 + d / 2, t, cz]; R2 = [x1 - d / 2, t, cz]; } else { R1 = [cx, t, z0 + w / 2]; R2 = [cx, t, z1 - w / 2]; }
+  const ctr = [cx, y + h * 0.3, cz];
+  const tris = w >= d
+    ? [[A, B, R2, col], [A, R2, R1, col], [D, C, R2, col], [D, R2, R1, col], [A, D, R1, col], [B, C, R2, col]]
+    : [[A, D, R2, col], [A, R2, R1, col], [B, C, R2, col], [B, R2, R1, col], [A, B, R1, col], [D, C, R2, col]];
+  return solid(tris, ctr);
+}
+// triangular gable (pediment) facing +z: front/back triangles in wallCol, sloped top in roofCol
+function gable(x0, x1, z0, z1, y, h, wallCol, roofCol) {
+  const cx = (x0 + x1) / 2, t = y + h;
+  const fL = [x0, y, z1], fR = [x1, y, z1], fT = [cx, t, z1], bL = [x0, y, z0], bR = [x1, y, z0], bT = [cx, t, z0];
+  return solid([[fL, fR, fT, wallCol], [bL, bR, bT, wallCol], [fL, fT, bT, roofCol], [fL, bT, bL, roofCol], [fR, fT, bT, roofCol], [fR, bT, bR, roofCol]], [cx, y + h * 0.3, (z0 + z1) / 2]);
+}
 
 export function buildRadjIsland(sceneRoot) {
   const scene = new THREE.Group();
@@ -88,9 +193,9 @@ export function buildRadjIsland(sceneRoot) {
   }
   // ---- the forest road: gravel, kerb stones, lanterns, signposts, a creek with a wooden bridge ----
   const glow = [];
-  const road = ribbon(ISL.road, 8, '#a39579');
+  const road = gravelRoad(ISL.road, 8);
   scene.add(road.mesh);
-  const hel = ribbon(ISL.helRoad, 7, '#a39579');
+  const hel = gravelRoad(ISL.helRoad, 7);
   scene.add(hel.mesh);
   out.roadSamples = road.samples;
   {
@@ -100,14 +205,20 @@ export function buildRadjIsland(sceneRoot) {
       const dx = q.x - o.x, dz = q.z - o.z, L = Math.hypot(dx, dz) || 1;
       return { x: p.x - dz / L * off, z: p.z + dx / L * off, h: Math.atan2(dx, dz) };
     };
-    // wheel tracks (darker) + kerb stones on both sides
-    for (const off of [-1.7, 1.7]) {
-      const tr = ribbon(S.filter((_, i) => i % 2 === 0).map((p, i, a) => { const k = i * 2; const sd = side(Math.min(k, S.length - 1), off); return [sd.x, sd.z]; }), 0.9, '#8a7d63', 0.085);
-      scene.add(tr.mesh);
-    }
-    for (let i = 0; i < S.length; i += 1) for (const off of [-4.2, 4.2]) {
-      const sd = side(i, off);
-      plain.push(cbox(0.35, 0.22, 1.5, sd.x, H(sd.x, sd.z) + 0.1, sd.z, i % 2 ? '#b9b3a6' : '#cfc9bb', sd.h));
+    // natural field stones scattered along the verges (no more white kerbs)
+    const stoneCols = ['#8c877c', '#9a948a', '#7a766d', '#a39d90'];
+    for (const SS of [S, hel.samples]) {
+      for (let i = 0; i < SS.length; i++) for (const sgn of [-1, 1]) {
+        if (srand() < 0.45) continue;
+        const p = SS[i], q = SS[Math.min(SS.length - 1, i + 1)], o = SS[Math.max(0, i - 1)];
+        const dx = q.x - o.x, dz = q.z - o.z, L = Math.hypot(dx, dz) || 1, off = sgn * srange(5.1, 6.3);
+        const x = p.x - dz / L * off + srange(-0.6, 0.6), z = p.z + dx / L * off + srange(-0.6, 0.6), r = srange(0.18, 0.5);
+        const g = new THREE.IcosahedronGeometry(r, 0);
+        g.scale(srange(0.9, 1.5), srange(0.45, 0.75), srange(0.9, 1.3));
+        g.rotateY(srange(0, 6.28));
+        g.translate(x, H(x, z) + r * 0.15, z);
+        plain.push(colorize(g, stoneCols[(srand() * 4) | 0]));
+      }
     }
     // lanterns every ~20 m, alternating sides
     for (let i = 4, k = 0; i < S.length - 2; i += 10, k++) {
@@ -154,8 +265,9 @@ export function buildRadjIsland(sceneRoot) {
     plain.push(cbox(2.4, 0.12, 0.6, lc.x, ly + 0.6, lc.z, '#7a5634', lc.h), cbox(2.4, 0.5, 0.1, lc.x + Math.cos(lc.h) * 0.3, ly + 0.9, lc.z - Math.sin(lc.h) * 0.3, '#7a5634', lc.h));
     plain.push(ccyl(0.9, 1.0, 0.3, 10, lc.x + 3, ly + 0.15, lc.z + 2, '#6b6b6b'), ccyl(0.5, 0.6, 0.25, 8, lc.x + 3, ly + 0.35, lc.z + 2, '#3a2a1a'));
   }
+  // ---- forest: layered pines, leafy trees and bushes (instanced, flat-shaded like the city trees) ----
   {
-    const trunks = [], crowns = [];
+    const pines = [], leafy = [], bushes = [];
     const E = ISL.estate;
     for (let k = 0; k < 2600; k++) {
       const x = srange(-230, 230), z = srange(-1430, -1030);
@@ -163,28 +275,63 @@ export function buildRadjIsland(sceneRoot) {
       if (e > 0.78) continue;
       if (x > ISL.strip.x0 - 10 && x < ISL.strip.x1 + 14 && z > ISL.strip.z0 - 12 && z < ISL.strip.z1 + 22) continue;
       if (x > E.x0 - 6 && x < E.x1 + 6 && z > E.z0 - 6 && z < E.z1 + 9) continue;
-      if (nearPts(road.samples, x, z, 7) || nearPts(hel.samples, x, z, 6.5)) continue;
+      if (nearPts(road.samples, x, z, 7.5) || nearPts(hel.samples, x, z, 7)) continue;
       if (out.creek && nearPts(out.creek, x, z, 4)) continue;
       if (Math.hypot(x - out.clearing.x, z - out.clearing.z) < out.clearing.r) continue;
       if (Math.hypot(x - ISL.helipad.x, z - ISL.helipad.z) < 20) continue;
       const dense = nearPts(road.samples, x, z, 26);
       if (!dense && srand() < 0.55) continue;
-      const y = H(x, z), s = srange(0.8, 1.35);
-      trunks.push(ccyl(0.25 * s, 0.35 * s, 3 * s, 6, x, y + 1.5 * s, z, '#4a3523'));
-      const c = new THREE.ConeGeometry(2.2 * s, 6 * s, 7);
-      c.translate(x, y + 5.5 * s, z);
-      const col = new THREE.Color(srand() < 0.5 ? '#1f4d26' : '#2a5e2c');
-      const n = c.attributes.position.count, ca = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) { ca[i * 3] = col.r; ca[i * 3 + 1] = col.g; ca[i * 3 + 2] = col.b; }
-      c.setAttribute('color', new THREE.BufferAttribute(ca, 3));
-      c.deleteAttribute('uv');
-      crowns.push(c);
+      const y = H(x, z), s = srange(0.8, 1.4);
+      // near the beach and in clearings more leafy trees, deeper in the forest mostly pines
+      (srand() < (e > 0.5 ? 0.3 : 0.14) ? leafy : pines).push([x, y, z, s]);
       addCirc(x, z, 0.9 * s, y + 6, y - 1);
+      if (srand() < 0.35) { const a = srange(0, 6.28), r = srange(2, 3.5); const bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r; if (!nearPts(road.samples, bx, bz, 5.5)) bushes.push([bx, H(bx, bz), bz, srange(0.6, 1.2)]); }
     }
-    const tm = new THREE.Mesh(merge(trunks), vmat);
-    const cm = new THREE.Mesh(merge(crowns), vmat);
-    tm.castShadow = cm.castShadow = true;
-    scene.add(tm, cm);
+    // bushes along the road verges
+    for (let i = 2; i < road.samples.length - 2; i += 2) for (const sgn of [-1, 1]) {
+      if (srand() < 0.5) continue;
+      const p = road.samples[i], q = road.samples[i + 1], dx = q.x - p.x, dz = q.z - p.z, L = Math.hypot(dx, dz) || 1, off = sgn * srange(6.8, 8.5);
+      const x = p.x - dz / L * off, z = p.z + dx / L * off;
+      if (x > E.x0 - 4 && x < E.x1 + 4 && z > E.z0 - 4 && z < E.z1 + 6) continue;
+      bushes.push([x, H(x, z), z, srange(0.6, 1.1)]);
+    }
+    const shade = (g, bottom, top, y0, y1) => {
+      const P = g.attributes.position, c = new Float32Array(P.count * 3), A = new THREE.Color(bottom), B = new THREE.Color(top), t = new THREE.Color();
+      for (let i = 0; i < P.count; i++) { t.copy(A).lerp(B, Math.min(1, Math.max(0, (P.getY(i) - y0) / (y1 - y0)))); c.set([t.r, t.g, t.b], i * 3); }
+      g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      if (g.attributes.uv) g.deleteAttribute('uv');
+      return g;
+    };
+    // pine = three stacked cones, each darker at its rim
+    const tier = (r, h, y) => shade(new THREE.ConeGeometry(r, h, 8).translate(0, y, 0), '#163a1f', '#3c7a3a', y - h / 2, y + h / 2);
+    const pineG = merge([tier(2.5, 3.6, 3.4), tier(1.95, 3.2, 5.2), tier(1.3, 2.8, 7.0)]);
+    const leafG = merge([
+      shade(new THREE.IcosahedronGeometry(2.1, 1).translate(0, 4.6, 0), '#21401b', '#456f2f', 2.5, 6.7),
+      shade(new THREE.IcosahedronGeometry(1.5, 1).translate(1.3, 4.0, 0.6), '#21401b', '#456f2f', 2.5, 5.5),
+      shade(new THREE.IcosahedronGeometry(1.4, 1).translate(-1.1, 4.3, -0.8), '#21401b', '#456f2f', 2.9, 5.7),
+    ]);
+    const trunkG = new THREE.CylinderGeometry(0.2, 0.34, 3.4, 6).translate(0, 1.7, 0);
+    const bushG = shade(new THREE.IcosahedronGeometry(0.9, 1).scale(1.2, 0.75, 1.1).translate(0, 0.45, 0), '#23471f', '#4f8a35', 0, 1.2);
+    const foliage = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
+    const bark = new THREE.MeshStandardMaterial({ color: '#4d3522', roughness: 1 });
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), tc = new THREE.Color();
+    const inst = (geo, mat, list, tint, shadow, boost = 1.6) => {
+      const m = new THREE.InstancedMesh(geo, mat, list.length);
+      list.forEach(([x, y, z, s], i) => {
+        q.setFromAxisAngle(up, srange(0, 6.28));
+        sc.set(s * srange(0.9, 1.1), s * srange(0.9, 1.25), s * srange(0.9, 1.1));
+        m4.compose(ps.set(x, y - 0.1, z), q, sc);
+        m.setMatrixAt(i, m4);
+        if (tint) { tc.setHSL(srange(0.24, 0.34), srange(0.25, 0.5), srange(0.42, 0.62)); m.setColorAt(i, tc.multiplyScalar(boost)); }
+      });
+      m.castShadow = shadow; m.receiveShadow = true;
+      scene.add(m);
+      return m;
+    };
+    inst(trunkG, bark, pines.concat(leafy), false, true);
+    inst(pineG, foliage, pines, true, true);
+    inst(leafG, foliage, leafy, true, true, 1.3);
+    inst(bushG, foliage, bushes, true, false);
   }
   // ---- the estate ----
   {
@@ -296,43 +443,81 @@ export function buildRadjIsland(sceneRoot) {
       scene.add(piv);
       out.towers.push(piv);
     }
-    // the mansion: main house + two wings, balconies, lit windows, chimneys, roof terrace, grand stairs
+    // the mansion: cream stucco on a stone plinth, terracotta hip roofs, a central gable,
+    // white window frames with dark glass that lights up at night, two wings with balconies
     const mh = 13;
     const wingH = 9;
-    plain.push(cbox(M.x1 - M.x0, mh, M.z1 - M.z0, (M.x0 + M.x1) / 2, y + mh / 2, (M.z0 + M.z1) / 2, '#fbf6ec'));
-    plain.push(cbox(M.x1 - M.x0 + 1.2, 0.8, M.z1 - M.z0 + 1.2, (M.x0 + M.x1) / 2, y + mh + 0.4, (M.z0 + M.z1) / 2, '#3a3a3a'));
-    plain.push(cbox(M.x1 - M.x0 + 0.6, 0.35, M.z1 - M.z0 + 0.6, (M.x0 + M.x1) / 2, y + 6.6, (M.z0 + M.z1) / 2, '#e2d8c4'));
+    const WALL = '#f3ead8', TRIM = '#e4d6b8', STONE = '#c9b993', ROOF = '#a4502f', FRAME = '#fbfaf6', GOLD = '#c9a227';
+    const wins = [];
+    const winMat = new THREE.MeshStandardMaterial({ color: '#2a3946', roughness: 0.12, metalness: 0.6, emissive: '#ffbe6a', emissiveIntensity: 0 });
+    world.windowMats.push(winMat);
+    // window on a wall facing +z (dir 1) or -z (dir -1) or ±x (axis 'x')
+    const win = (x, yc, z, w, h, dir, axis = 'z') => {
+      const o = 0.06 * dir;
+      if (axis === 'z') {
+        plain.push(cbox(w + 0.5, h + 0.5, 0.14, x, yc, z + o, FRAME), cbox(w + 0.9, 0.22, 0.4, x, yc - h / 2 - 0.3, z + o * 3, TRIM), cbox(w + 0.8, 0.3, 0.25, x, yc + h / 2 + 0.45, z + o * 2, TRIM));
+        wins.push(cbox(w, h, 0.08, x, yc, z + o * 2.2, '#ffffff'));
+        plain.push(cbox(0.1, h, 0.1, x, yc, z + o * 3, FRAME), cbox(w, 0.1, 0.1, x, yc + h * 0.15, z + o * 3, FRAME));
+      } else {
+        plain.push(cbox(0.14, h + 0.5, w + 0.5, x + o, yc, z, FRAME), cbox(0.4, 0.22, w + 0.9, x + o * 3, yc - h / 2 - 0.3, z, TRIM));
+        wins.push(cbox(0.08, h, w, x + o * 2.2, yc, z, '#ffffff'));
+        plain.push(cbox(0.1, h, 0.1, x + o * 3, yc, z, FRAME));
+      }
+    };
+    const cx = (M.x0 + M.x1) / 2, cz = (M.z0 + M.z1) / 2;
+    // main house body, plinth, floor cornice, eaves cornice
+    plain.push(cbox(M.x1 - M.x0, mh, M.z1 - M.z0, cx, y + mh / 2, cz, WALL));
+    plain.push(cbox(M.x1 - M.x0 + 0.5, 1.1, M.z1 - M.z0 + 0.5, cx, y + 0.55, cz, STONE));
+    plain.push(cbox(M.x1 - M.x0 + 0.6, 0.35, M.z1 - M.z0 + 0.6, cx, y + 6.6, cz, TRIM));
+    plain.push(cbox(M.x1 - M.x0 + 1.0, 0.6, M.z1 - M.z0 + 1.0, cx, y + mh - 0.1, cz, TRIM));
+    plain.push(hipRoof(M.x0, M.x1, M.z0, M.z1, y + mh + 0.2, 7, ROOF, 1.2));
+    // corner quoins
+    for (const [qx, qz] of [[M.x0, M.z0], [M.x1, M.z0], [M.x0, M.z1], [M.x1, M.z1]]) for (let k = 0; k < 6; k++) plain.push(cbox(1.1 + (k % 2) * 0.5, 0.9, 1.1 + ((k + 1) % 2) * 0.5, qx, y + 1.6 + k * 1.9, qz, TRIM));
+    // central gable on the front with a gold oculus
+    plain.push(gable(cx - 13, cx + 13, M.z1 - 3, M.z1 + 0.7, y + mh + 0.2, 5.2, WALL, ROOF));
+    plain.push(cbox(26.6, 0.4, 0.5, cx, y + mh + 0.35, M.z1 + 0.6, TRIM));
+    plain.push(ccyl(1.0, 1.0, 0.2, 16, cx, y + mh + 2.3, M.z1 + 0.75, GOLD, Math.PI / 2));
+    glow.push(ccyl(0.7, 0.7, 0.1, 16, cx, y + mh + 2.3, M.z1 + 0.86, '#ffd890', Math.PI / 2));
+    // wings
     for (const [wx0, wx1] of [[M.x0 - 14, M.x0], [M.x1, M.x1 + 14]]) {
-      const wz0 = M.z0 + 6, wz1 = M.z1 - 8;
-      plain.push(cbox(wx1 - wx0, wingH, wz1 - wz0, (wx0 + wx1) / 2, y + wingH / 2, (wz0 + wz1) / 2, '#f6efe2'));
-      plain.push(cbox(wx1 - wx0 + 0.8, 0.6, wz1 - wz0 + 0.8, (wx0 + wx1) / 2, y + wingH + 0.3, (wz0 + wz1) / 2, '#3a3a3a'));
+      const wz0 = M.z0 + 6, wz1 = M.z1 - 8, wcx = (wx0 + wx1) / 2, wcz = (wz0 + wz1) / 2;
+      plain.push(cbox(wx1 - wx0, wingH, wz1 - wz0, wcx, y + wingH / 2, wcz, WALL));
+      plain.push(cbox(wx1 - wx0 + 0.5, 1.0, wz1 - wz0 + 0.5, wcx, y + 0.5, wcz, STONE));
+      plain.push(cbox(wx1 - wx0 + 0.9, 0.5, wz1 - wz0 + 0.9, wcx, y + wingH - 0.1, wcz, TRIM));
+      plain.push(hipRoof(wx0, wx1, wz0, wz1, y + wingH + 0.15, 4.2, ROOF, 1.0));
       addBox(wx0, wx1, wz0, wz1, y + wingH + 1, { y0: y - 1 });
-      // balcony on the wing front
-      plain.push(cbox(wx1 - wx0 - 2, 0.25, 2, (wx0 + wx1) / 2, y + 4.6, wz1 + 1, '#e8e0cf'));
-      for (let x = wx0 + 1.5; x <= wx1 - 1.5; x += 0.6) plain.push(cbox(0.08, 0.9, 0.08, x, y + 5.2, wz1 + 1.9, '#ffffff'));
-      plain.push(cbox(wx1 - wx0 - 2, 0.1, 0.12, (wx0 + wx1) / 2, y + 5.65, wz1 + 1.9, '#ffffff'));
-      for (let x = wx0 + 2.5; x < wx1 - 1; x += 3.5) for (const fy of [2.4, 6.6]) { glow.push(cbox(1.6, 2.0, 0.08, x, y + fy, wz1 + 0.05, '#ffcf7a')); plain.push(cbox(2.0, 2.4, 0.06, x, y + fy, wz1 + 0.02, '#c9a227')); }
+      // balcony on the wing front (stone slab, white balustrade)
+      plain.push(cbox(wx1 - wx0 - 2, 0.3, 2, wcx, y + 4.6, wz1 + 1, TRIM));
+      for (let x = wx0 + 1.5; x <= wx1 - 1.5; x += 0.55) plain.push(ccyl(0.07, 0.11, 0.85, 6, x, y + 5.2, wz1 + 1.85, FRAME));
+      plain.push(cbox(wx1 - wx0 - 2, 0.14, 0.22, wcx, y + 5.68, wz1 + 1.85, FRAME));
+      for (let x = wx0 + 2.5; x < wx1 - 1; x += 3.5) for (const fy of [2.4, 6.6]) win(x, y + fy, wz1, 1.5, 2.1, 1);
+      for (let x = wx0 + 2.5; x < wx1 - 1; x += 3.5) for (const fy of [2.4, 6.6]) win(x, y + fy, wz0, 1.5, 2.1, -1);
+      const sx = wx0 < M.x0 ? wx0 : wx1, sd = wx0 < M.x0 ? -1 : 1;
+      for (let z = wz0 + 3; z < wz1 - 1; z += 4) for (const fy of [2.4, 6.6]) win(sx, y + fy, z, 1.5, 2.1, sd, 'x');
     }
+    // front: colonnade, windows between the columns
     for (let k = 0; k < 7; k++) {
       const x = M.x0 + 4 + k * ((M.x1 - M.x0 - 8) / 6);
       if (Math.abs(x - ISL.lift.x) < 2.5) continue; // keep the lift door free
-      plain.push(ccyl(0.6, 0.7, 9, 12, x, y + 4.5, M.z1 + 2.4, '#ffffff'), cbox(1.6, 0.4, 1.6, x, y + 9.2, M.z1 + 2.4, '#c9a227'));
+      plain.push(ccyl(0.55, 0.65, 9, 14, x, y + 4.5, M.z1 + 2.4, '#ffffff'), cbox(1.5, 0.45, 1.5, x, y + 9.2, M.z1 + 2.4, GOLD), cbox(1.5, 0.4, 1.5, x, y + 0.2, M.z1 + 2.4, TRIM));
       addCirc(x, M.z1 + 2.4, 0.7, y + 9);
       for (const fy of [3, 8, 11.3]) {
         if (fy === 3 && Math.abs(x - ISL.lift.x) < 3) continue;
-        glow.push(cbox(1.8, fy > 10 ? 1.3 : 2.2, 0.08, x, y + fy, M.z1 + 0.05, '#ffcf7a'));
-        plain.push(cbox(2.2, fy > 10 ? 1.6 : 2.6, 0.06, x, y + fy, M.z1 + 0.02, '#c9a227'));
+        win(x, y + fy, M.z1, 1.8, fy > 10 ? 1.3 : 2.2, 1);
       }
     }
-    for (const fy of [3, 8, 11.3]) for (let x = M.x0 + 4; x < M.x1 - 2; x += 6) glow.push(cbox(1.6, fy > 10 ? 1.2 : 2.0, 0.08, x, y + fy, M.z0 - 0.05, '#ffcf7a'));
-    plain.push(cbox(M.x1 - M.x0 + 2, 0.6, 5, (M.x0 + M.x1) / 2, y + 9.4, M.z1 + 2.4, '#e8e0cf'));
-    for (let x = M.x0; x <= M.x1; x += 0.6) plain.push(cbox(0.08, 0.9, 0.08, x, y + 10.15, M.z1 + 4.8, '#ffffff'));
-    plain.push(cbox(M.x1 - M.x0 + 2, 0.1, 0.12, (M.x0 + M.x1) / 2, y + 10.6, M.z1 + 4.8, '#ffffff'));
-    // roof terrace with railings, chimneys, a tiny helicopter-style beacon
-    plain.push(cbox(20, 4, M.z1 - M.z0 - 10, (M.x0 + M.x1) / 2, y + mh + 2.4, (M.z0 + M.z1) / 2, '#fbf6ec'));
-    for (const cx2 of [M.x0 + 5, M.x1 - 5]) plain.push(cbox(1.6, 3.4, 1.6, cx2, y + mh + 2.1, M.z0 + 6, '#b9a98e'), cbox(2.0, 0.3, 2.0, cx2, y + mh + 3.9, M.z0 + 6, '#3a3a3a'));
-    for (let x = M.x0 + 1; x <= M.x1 - 1; x += 0.8) for (const zz of [M.z0 + 1, M.z1 - 1]) plain.push(cbox(0.08, 0.9, 0.08, x, y + mh + 1.25, zz, '#ffffff'));
-    glow.push(cbox(0.4, 0.4, 0.4, (M.x0 + M.x1) / 2, y + mh + 4.8, (M.z0 + M.z1) / 2, '#ff2020'));
+    // back + side windows
+    for (const fy of [3, 8, 11.3]) for (let x = M.x0 + 4; x < M.x1 - 2; x += 6) win(x, y + fy, M.z0, 1.6, fy > 10 ? 1.2 : 2.0, -1);
+    for (const [sx, sd] of [[M.x0, -1], [M.x1, 1]]) for (let z = M.z0 + 4; z < M.z1 - 2; z += 6) for (const fy of [8, 11.3]) win(sx, y + fy, z, 1.6, fy > 10 ? 1.2 : 2.0, sd, 'x');
+    // balcony over the colonnade with a white balustrade
+    plain.push(cbox(M.x1 - M.x0 + 2, 0.6, 5, cx, y + 9.4, M.z1 + 2.4, TRIM));
+    for (let x = M.x0; x <= M.x1; x += 0.55) plain.push(ccyl(0.07, 0.11, 0.85, 6, x, y + 10.15, M.z1 + 4.8, FRAME));
+    plain.push(cbox(M.x1 - M.x0 + 2, 0.14, 0.24, cx, y + 10.65, M.z1 + 4.8, FRAME));
+    // chimneys through the roof + red beacon on the ridge
+    for (const cx2 of [M.x0 + 9, M.x1 - 9]) plain.push(cbox(1.7, 6.5, 1.7, cx2, y + mh + 3.6, M.z0 + 8, '#b9a98e'), cbox(2.1, 0.35, 2.1, cx2, y + mh + 6.9, M.z0 + 8, '#6b5d4a'));
+    glow.push(cbox(0.4, 0.4, 0.4, cx, y + mh + 7.6, cz, '#ff2020'));
+    const winMesh = new THREE.Mesh(merge(wins), winMat);
+    scene.add(winMesh);
     // grand stairs (low steps, walkable)
     for (let k = 0; k < 3; k++) plain.push(cbox(26 - k * 3, 0.2 * (k + 1), 2.2, (M.x0 + M.x1) / 2, y + 0.1 * (k + 1), M.z1 + 5.6 - k * 1.1, '#e8e0cf'));
     plain.push(cbox(M.x1 - M.x0 + 2, 0.3, 6, (M.x0 + M.x1) / 2, y + 0.15, M.z1 + 2.6, '#d8cfbb'));

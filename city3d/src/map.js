@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { world, BOUND, NB, roadC, RW, H } from './world.js';
 import { DOCKS, AIRPORT } from './outskirts.js';
-import { LAKE, RUNWAY, ISLAND, COAST_Z, WORLD, WALL_OUT, ROADS, DESERTS, terrainH, slopeAt } from './geo.js';
+import { LAKE, RUNWAY, ISLAND, COAST_Z, WORLD, WALL_OUT, ROADS, DESERTS, terrainH, slopeAt, RADJ, radjE } from './geo.js';
+import { ISL } from './radj.js';
 import { clamp, angleWrap, canvasTex } from './util.js';
 
 // map orientation: north (+z, desert) is up. Because the world is "right = -x", +x is drawn to the left.
-const XMAX = WORLD.x1, XMIN = WORLD.x0, ZMAX = WORLD.z1, ZMIN = WORLD.z0;
+// the map reaches south far enough to include Radj's island
+const XMAX = WORLD.x1, XMIN = WORLD.x0, ZMAX = WORLD.z1, ZMIN = Math.min(WORLD.z0, RADJ.z - RADJ.rz * 1.15 - 30);
 const S = 1.15; // map pixels per meter
 const W = Math.ceil((XMAX - XMIN) * S), Hh = Math.ceil((ZMAX - ZMIN) * S);
 export const toMap = (x, z) => [(XMAX - x) * S, (ZMAX - z) * S];
@@ -96,6 +98,7 @@ export function buildMapCanvas() {
     if (c.t !== 'b' || c.inv || c.h <= 3 || c.x1 - c.x0 < 2 || c.z1 - c.z0 < 2) continue;
     rect(c.x0, c.x1, c.z0, c.z1, c.h > 40 ? '#77746f' : '#8f8c85');
   }
+  drawRadjIsland(ctx, rect);
   // area labels
   ctx.font = `900 ${Math.round(22 * S)}px Arial Black, Impact, sans-serif`;
   ctx.textAlign = 'center';
@@ -104,7 +107,54 @@ export function buildMapCanvas() {
   for (const D of DESERTS) label(D.name.toUpperCase(), D.x, D.z - 200);
   label('DOCKS', -120, -480);
   label('FLUGHAFEN', 120, -480);
+  label('RADJ-INSEL', RADJ.x - 150, RADJ.z + 150);
   return mapCanvas;
+}
+
+// Radj's island (far south, reached by plane): beach, forest, airstrip, roads, estate
+function drawRadjIsland(ctx, rect) {
+  const step = 3;
+  const sand = [217, 196, 142], grass = [74, 120, 58], forest = [46, 88, 42];
+  for (let z = RADJ.z - RADJ.rz * 1.15; z < RADJ.z + RADJ.rz * 1.15; z += step)
+    for (let x = RADJ.x - RADJ.rx * 1.15; x < RADJ.x + RADJ.rx * 1.15; x += step) {
+      const e = radjE(x + step / 2, z + step / 2);
+      if (e > 1.0) continue;
+      const tb = Math.min(1, Math.max(0, (e - 0.62) / 0.2)); // beach blend like the 3D ground
+      // dense forest pattern (cheap hash noise) away from the beach
+      const n = Math.sin(x * 0.11 + Math.sin(z * 0.07) * 2) * Math.cos(z * 0.09 - x * 0.03);
+      const base = e < 0.7 && n > -0.2 ? forest : grass;
+      const c = base.map((v, i) => Math.round(v + (sand[i] - v) * tb));
+      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      const [px, py] = toMap(x + step, z + step);
+      ctx.fillRect(px, py, step * S + 0.6, step * S + 0.6);
+    }
+  // roads (same curve as the 3D gravel ribbon)
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [pts, w] of [[ISL.road, 8], [ISL.helRoad, 7]]) {
+    const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'catmullrom', 0.4);
+    ctx.strokeStyle = '#b8a77f';
+    ctx.lineWidth = w * S;
+    ctx.beginPath();
+    curve.getSpacedPoints(80).forEach((p, i) => { const [x, y] = toMap(p.x, p.z); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    ctx.stroke();
+  }
+  const St = ISL.strip, E = ISL.estate, M = ISL.mansion, g = ISL.gate, wg = ISL.westGate;
+  rect(St.x0, St.x1, St.z0, St.z1, '#3a3c40');
+  // estate: wall, lawn, drive, mansion + wings, pool, garage, helipad
+  rect(E.x0 - 1, E.x1 + 1, E.z0 - 1, E.z1 + 1, '#e8dfcc');
+  rect(E.x0 + 1, E.x1 - 1, E.z0 + 1, E.z1 - 1, '#5fa34c');
+  rect(g.x - 4, g.x + 4, M.z1, E.z1, '#d3c6a4');
+  rect(E.x0 + 2, E.x1 - 2, wg.z - 3, wg.z + 3, '#d3c6a4');
+  rect(M.x0 - 14, M.x1 + 14, M.z0 + 6, M.z1 - 8, '#a65a3c');
+  rect(M.x0, M.x1, M.z0, M.z1, '#b5623f');
+  rect(82, 108, -1302, -1288, '#2fb6d8');
+  rect(-36, -14, -1302, -1284, '#5a5d62');
+  const [hx, hy] = toMap(ISL.helipad.x, ISL.helipad.z);
+  ctx.fillStyle = '#3a3c40';
+  ctx.beginPath();
+  ctx.arc(hx, hy, 9 * S, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // ---------- waypoint (marker + light beam) ----------
@@ -203,6 +253,30 @@ export function drawMinimap(mctx, S2, G, cam, pp, heading, zoomM) {
   const t = G.time;
   for (const v of G.vehicles) if (v.type === 'police' && !v.dead) dot(v.pos.x, v.pos.z, S2 * 0.022, Math.sin(t * 10) > 0 ? '#ff2a2a' : '#2a6bff');
   for (const p of G.peds) if (p.role === 'cop' && !p.dead) dot(p.pos.x, p.pos.z, S2 * 0.014, '#2a6bff');
+  // Radj-Coup: flashlight cones of the guards (yellow, red after the alarm)
+  const job = G.missions && G.missions.job;
+  if (job && job.sentries) {
+    const alarm = !!job.alarm, R = G.player.inVehicle ? 24 : 14;
+    for (const s of job.sentries) {
+      if (!s.cone || s.dead || s.removed) continue;
+      const seen = Math.min(1, s.seen || 0);
+      mctx.fillStyle = alarm ? 'rgba(255,48,48,0.55)' : `rgba(255,236,120,${(0.6 + seen * 0.4).toFixed(2)})`;
+      mctx.strokeStyle = alarm ? 'rgba(120,0,0,0.8)' : 'rgba(90,70,0,0.7)';
+      mctx.lineWidth = 1.2 / sc;
+      mctx.beginPath();
+      const [ax, ay] = toMap(s.pos.x, s.pos.z);
+      mctx.moveTo(ax - px, ay - py);
+      for (let k = 0; k <= 8; k++) {
+        const a = s.yaw - 0.5 + k / 8;
+        const [qx, qy] = toMap(s.pos.x + Math.sin(a) * R, s.pos.z + Math.cos(a) * R);
+        mctx.lineTo(qx - px, qy - py);
+      }
+      mctx.closePath();
+      mctx.fill();
+      mctx.stroke();
+      dot(s.pos.x, s.pos.z, S2 * 0.016, alarm ? '#ff3030' : '#ffffff');
+    }
+  }
   // andere Online-Spieler
   if (G.friends) for (const f of G.friends) { dot(f.x, f.z, S2 * 0.034, '#fff'); dot(f.x, f.z, S2 * 0.025, f.c); }
   mctx.restore();
