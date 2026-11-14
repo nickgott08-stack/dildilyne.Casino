@@ -711,6 +711,7 @@ export function buildOutskirts(scene, K) {
     { x: POI.camp.x, z: POI.camp.z, r: 16, n: 3 },
   ];
   if (world.marketHotspot) world.hotspots.push(world.marketHotspot);
+  if (world.extraHotspots) world.hotspots.push(...world.extraHotspots);
   if (world.bankHotspot) world.hotspots.push(world.bankHotspot);
 }
 

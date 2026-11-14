@@ -5,6 +5,7 @@ import { Vehicle, MODELS } from './vehicles.js';
 import { Ped } from './ai.js';
 import { setMask } from './human.js';
 import { installHeist, installFinale, installCutter } from './heist.js';
+import { installCoop } from './coop.js';
 import { POI, ROADS } from './geo.js';
 import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD, P10, season } from './util.js';
 
@@ -911,6 +912,7 @@ export class Missions {
     this.setJobHUD(null);
   }
   abort() {
+    if (this.job && this.job.kind === 'coup' && this.job.coop && !this.job.coop.off) { this.cx({ k: 'down' }); this.coopLeave(false); }
     if (this.job && this.job.kind === 'coup') return this.failCoup('Mission abgebrochen');
     if (this.job) this.endJob('Auftrag abgebrochen');
     if (this.bank.state !== 'idle') this.failBank('Überfall abgebrochen');
@@ -1110,6 +1112,7 @@ export class Missions {
     $('custClose').addEventListener('click', () => this.closeCustoms());
     $('coupClose').addEventListener('click', () => this.closeBoard());
     $('coupGo').addEventListener('click', () => this.startCoup());
+    $('coupCoop').addEventListener('click', () => this.openLobby());
     $('hackExit').addEventListener('click', () => this.closeHack());
     $('cutExit').addEventListener('click', () => this.closeCutter(false));
     $('winOk').addEventListener('click', () => { $('win').classList.remove('show'); this.G.paused = false; });
@@ -1169,7 +1172,14 @@ export class Missions {
     this.marker.update(G.time);
   }
   onPlayerDeath() {
-    if (this.job && this.job.kind === 'coup') return this.failCoup('Du bist gestorben');
+    const j = this.job;
+    if (j && j.kind === 'coup' && j.coop && !j.coop.off) {
+      // crew finale: you are out, but if your crew escapes you still get your share
+      this.coopOut = { role: j.coop.role };
+      this.cx({ k: 'down' });
+      return this.failCoup('Du bist raus – wenn deine Crew entkommt, bekommst du trotzdem deinen Anteil');
+    }
+    if (j && j.kind === 'coup') return this.failCoup('Du bist gestorben');
     if (this.job) this.endJob('🍾 Tour abgebrochen');
     if (this.bank.state !== 'idle') this.failBank('Überfall gescheitert');
   }
@@ -1178,3 +1188,4 @@ export class Missions {
 installHeist(Missions);
 installFinale(Missions);
 installCutter(Missions);
+installCoop(Missions);

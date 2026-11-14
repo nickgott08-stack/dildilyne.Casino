@@ -133,3 +133,25 @@ Dildi City (Quellcode):
 - Alle Straßenlaternen (Stadt + außen) sind `DildiCars.dildiCityProps`-Laternen (ohne feste Kollision), dazu Mülleimer/Tonnen an
   den Bordsteinen. `world.props.update(dt, G.vehicles)` in simStep; Treffer bremsen das Auto (Laterne ×0.8, Eimer ×0.95),
   beim Spieler-Auto Rumms + Kamerawackeln. Nach 90 s steht alles wieder. Leuchtköpfe = `world.lampHeadMat` (nachts heller).
+
+## Flüge → Ladebildschirm, Laternen-Ausblendung, mehr Leben, Koop-Coup (15.11.2026)
+- **Flüge**: Mission 4 und der Finale-Flug sind kein selbst geflogener Flug mehr. Ins Flugzeug steigen → Ladebildschirm
+  (`flyTo` in heist.js, Overlay `#travel` in template.html, ~6 s) → Ankunft (`landRunway` / `arriveIsland`). Freies Fliegen gab es
+  ohnehin nur in diesen Missionen; `enterPlane`/`plane.js` bleiben im Code, werden aber nicht mehr benutzt.
+- **Leistung**: Laternen/Mülleimer (`dildiCityProps`) werden nur noch im Umkreis von 170 m gezeichnet (`cull()` in dildi_cars.js
+  sortiert die Instanzen um, aufgerufen aus `distCull` in main.js, wenn sich die Kamera >15 m bewegt hat). Vorher immer alle 464
+  Laternen (~90k Dreiecke + Schattenpass). Deko-/Metallteile der Stadt (`plain`/`metal` in world.js) sind jetzt Kacheln in
+  `world.cullList`. Gemessen (Docks/Wüste): 330–450k → 75–120k Dreiecke pro Bild.
+  Hinweis Tests: im Headless-Browser läuft die Bildschleife nicht – `G.distCull()` ist zum Testen offen.
+- **Mehr Leben**: Verkehr hoch/mittel/niedrig 26/21/15, Passanten 48/40/26; Bus, LKW, Jeep fahren im normalen Verkehr mit;
+  Leute im Stadtpark und vor dem Casino (`world.extraHotspots`).
+- **Koop-Coup** (`src/coop.js`, Server `server/server.js`):
+  - Planungsbrett → „👥 Koop-Finale“ → Lobby (nur online, gleicher Raum): Crew gründen / beitreten (max. 4), jeder „Bereit“,
+    Anführer startet (mind. 2). Nur der Anführer braucht die Missionen 1–4 und darf das Finale diese Woche noch nicht gemacht haben; Helfer können sofort mitmachen (Knopf immer am Planungsbrett).
+  - Server: `t:'crew'` (create/join/leave/done/ready/start) → `crews`-Liste an alle im Raum, `crewgo` (mit `seed`) an die Crew;
+    `t:'cev'` wird an die anderen der Crew weitergeleitet. Anführer weg → Crew aufgelöst (`crewx`).
+  - Ereignisse (`cx()`): `fly` (wer zuerst einsteigt, nimmt alle mit), `kill` (Wachen-Index), `card`, `gate`, `alarm`, `glass`,
+    `prize` (andere: Flucht beginnt), `win` (alle gewinnen), `down` (Spieler raus). Welche Wache die Aufzugkarte trägt: `seeded(seed)`.
+  - Beute: Anführer 100.000 (zählt als sein Wochen-Finale `dc3d_coupWeek`), Helfer je 37.500 (1× pro Woche, `dc3d_coupHelpWeek`),
+    alleine weiter 150.000. Wer im Finale stirbt, ist raus, bekommt aber seinen Anteil, wenn die Crew entkommt (`coopOut`).
+  - Wachen/KI laufen auf jedem Gerät für sich; nur die Ereignisse oben werden abgeglichen.
