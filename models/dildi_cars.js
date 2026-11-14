@@ -57,8 +57,11 @@
  *       vn("Dildi-Kreuz",...), vn("Rampe West",...), vn("Rampe Ost",...)
  *       und stattdessen eintragen:
  *         for (const r of DildiCars.dildiKreuz.roads()) vn(r.name, r.pts, r.opts);
- *       (pts im Format [x, z, y] wie bisher, kind "deck" -> das Spiel baut Fahrbahn, Pfeiler, Lampen
- *       und macht alles befahrbar wie vorher). Anschluesse an Stadt und Hafenstrasse bleiben gleich.
+ *       (pts im Format [x, z, y], kind "deck" -> macht alles befahrbar wie vorher).
+ *       WICHTIG: Die Optik (Fahrbahn, Schutzwaende, Markierung, Pfeiler, Laternen) liefert decor().
+ *       Fuer diese 5 Strassen bitte das spieleigene Fahrbahn-Mesh NICHT zeichnen (nur Physik/Hoehe nutzen),
+ *       sonst liegen zwei Fahrbahnen uebereinander. Die Hafenstrasse x=0 (z -236..-416) zeichnet decor()
+ *       ebenfalls - dort genauso nur die Physik behalten. Anschluesse an Stadt und Hafenstrasse bleiben gleich.
  *       Neu: 4 Kleeblatt-Schleifen statt 2 Rampen - von jeder Richtung auf die Hafenstrasse und zurueck.
  *    b) Deko (Schilderbruecken, Skatepark unter der Hochstrasse, Rasthof-Diner + Tanke, Motel mit Pool,
  *       2 Leucht-Plakatwaende):
@@ -1065,6 +1068,7 @@
       // Pfeiler
       if (elevated && i % 3 === 0 && p.y > 2) {
         const off = road.w > 10 ? [-hw * 0.55, hw * 0.55] : [0];
+        strut(mb, 'Concrete', [p.x + nx * (hw - 0.5), p.y - th - 0.5, p.z + nz * (hw - 0.5)], [p.x - nx * (hw - 0.5), p.y - th - 0.5, p.z - nz * (hw - 0.5)], 1.0);
         for (const o of off) {
           const px = p.x + nx * o, pz = p.z + nz * o;
           mb.prism('Concrete', hexagon(px, pz, 0, 0.8, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, 0, b]), [0, p.y - th, 0]);
@@ -1220,19 +1224,34 @@
   // Neu: Kleeblatt mit 4 Schleifenrampen zwischen Hochstrasse (y=9, z=-320)
   // und Hafenstrasse statt der 2 alten Rampen.
   // ======================================================================
+  // Catmull-Rom-Glaettung: dichte, runde Punktfolge (alle ~3 m)
+  function smoothPts(P, step) {
+    const out = [];
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+      const n = Math.max(1, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+      for (let k = 0; k < n; k++) {
+        const t = k / n, t2 = t * t, t3 = t2 * t;
+        out.push([0, 1, 2].map((j) => +(0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)).toFixed(2)));
+      }
+    }
+    out.push(P[P.length - 1].slice());
+    return out;
+  }
+
   function kreuzRoads() {
     const R = [];
-    R.push({ name: 'Dildi-Kreuz', opts: { kind: 'deck', w: 14, lamps: true }, pts: [[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -322, 9], [0, -322, 9], [60, -322, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]] });
+    R.push({ name: 'Dildi-Kreuz', opts: { kind: 'deck', w: 14, lamps: true }, pts: smoothPts([[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -322, 9], [0, -322, 9], [60, -322, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]], 3) });
     const r = 33;
     for (const sx of SIDES) for (const sz of SIDES) {
       const ccx = sx * 40, ccz = -322 + sz * 40;
-      const a0 = Math.atan2(-sz, 0) , a1 = sx > 0 ? Math.PI : 0;   // Start an der Hochstrasse, Ende an der Hafenstrasse
+      const a0 = Math.atan2(-sz, 0), a1 = sx > 0 ? Math.PI : 0;
       let sweep = a1 - a0;
       for (let k = -2; k <= 2; k++) if (Math.abs(Math.abs(a1 - a0 + 2 * Math.PI * k) - 1.5 * Math.PI) < 0.01) sweep = a1 - a0 + 2 * Math.PI * k;
-      const pts = [];
-      for (let i = 0; i <= 18; i++) {
-        const t = i / 18, a = a0 + sweep * t;
-        pts.push([+(ccx + r * Math.cos(a)).toFixed(2), +(ccz + r * Math.sin(a)).toFixed(2), +(9 * (1 - t)).toFixed(2)]);
+      const pts = [], N = 52;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N, a = a0 + sweep * t, e = t * t * (3 - 2 * t);
+        pts.push([+(ccx + r * Math.cos(a)).toFixed(2), +(ccz + r * Math.sin(a)).toFixed(2), +(9 * (1 - e)).toFixed(2)]);
       }
       R.push({ name: 'Kleeblatt ' + (sz > 0 ? 'Nord' : 'Sued') + (sx > 0 ? 'ost' : 'west'), opts: { kind: 'deck', w: 9 }, pts });
     }
@@ -1243,6 +1262,16 @@
     Object.assign(BPAL, { Asphalt: [0.20, 0.21, 0.22], LaneWhite: [0.92, 0.92, 0.88], SignBlue: [0.08, 0.25, 0.65] });
     const mb = new MB(), g = new MB();
     let col = [];
+    if (!opts || opts.decks !== false) {
+      const all = kreuzRoads().map((r) => ({ w: r.opts.w, samples: r.pts.map(([x, z, y]) => ({ x, y: y + 0.3, z })) }));
+      all.push({ w: 12, samples: Array.from({ length: 46 }, (_, i) => ({ x: 0, y: 0.3, z: -236 - i * 4 })) });
+      for (const r of all) deckParts(mb, r);
+      // Strassenlaternen auf der Mittel-Leitwand der Hochstrasse
+      for (let x = -56; x <= 56; x += 16) {
+        mb.box('Steel', [x - 0.1, 9.3, -322.1], [x + 0.1, 16, -321.9]);
+        for (const s of SIDES) { mb.box('Steel', [x - 0.08, 15.9, -322 + (s > 0 ? 0 : -2.2)], [x + 0.08, 16.05, -322 + (s > 0 ? 2.2 : 0)]); g.box('GlowWarm', [x - 0.25, 15.75, -322 + s * 2.2 - 0.4], [x + 0.25, 15.9, -322 + s * 2.2 + 0.4]); }
+      }
+    }
     signGantry(mb, 0, -252, 'z', 0.2);
     signGantry(mb, 0, -404, 'z', 0.2);
     col = col.concat(
