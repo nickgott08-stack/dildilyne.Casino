@@ -8,7 +8,8 @@ import { findRoute } from './route.js';
 import { isLand, inCity, areaName } from './outskirts.js';
 import { makeHuman, animateHuman, nickLook, humanMat } from './human.js';
 import { Vehicle, collideVehicles, MODELS } from './vehicles.js';
-import { TrafficDriver, PoliceDriver, OutDriver, Ped, randomSidewalkPoint, randomRoadSpawn, randomOutRoadSpawn } from './ai.js';
+import { TrafficDriver, PoliceDriver, OutDriver, Ped, randomSidewalkPoint, randomRoadSpawn, randomOutRoadSpawn, LoopDriver, buildRoute } from './ai.js';
+import { BUS_STOP, TRUCK_STOP } from './geo.js';
 import { FX } from './fx.js';
 import { Online } from './online.js';
 import { Audio } from './audio.js';
@@ -201,6 +202,84 @@ function spawnOutTraffic(initial) {
   v.vel.set(Math.sin(p.h) * 10, Math.cos(p.h) * 10);
   G.vehicles.push(v);
 }
+// ---------- service vehicles: airport shuttle (collects the guests waiting at the terminal) + docks truck ----------
+const service = { bus: null, truck: null, t: 0, boarded: 0 };
+function serviceRoutes() {
+  if (service.routes) return service.routes;
+  const bus = buildRoute([
+    ['Kaistraße Ost', null, null],                   // east to the airport
+    ['Wendeschleife Flughafen', null, null],         // turn
+    ['Kaistraße Ost', [191, -560], [19, -560]],      // back west
+    ['Hafenkreisel', [17, -560], [0, -577]],         // east arm → south arm
+    ['Brückenstraße Süd', null, null],               // south to the roundabout at the end
+    ['Kreisverkehr', null, null],
+    ['Brückenstraße Süd', [0, -610], [0, -579]],     // back north
+    ['Hafenkreisel', [0, -577], [17, -560]],         // south arm → east arm (once round)
+  ]);
+  const truck = buildRoute([
+    ['Kaistraße West', [-60, -560], [-215, -560]],   // west along the quay
+    ['Dockring', [-215, -560], [-60, -560]],         // round the container yard back to the quay
+  ]);
+  const near = (R, p) => { let bi = 0, bd = 1e9; R.forEach((q, i) => { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd) { bd = d; bi = i; } }); return bi; };
+  service.routes = {
+    bus: { R: bus, stops: [{ i: near(bus, BUS_STOP), t: 18, name: 'airport' }] },
+    truck: { R: truck, stops: [{ i: near(truck, TRUCK_STOP), t: 10, name: 'cranes' }] },
+  };
+  return service.routes;
+}
+function keepService(key, type, color, speed) {
+  const cur = service[key];
+  if (cur && !cur.removed && !cur.dead && cur.driver instanceof LoopDriver) return;
+  if (cur && cur.driver === 'player') cur.keep = false; // hijacked: becomes a normal car
+  const rt = serviceRoutes()[key];
+  if (!rt.R.length) return;
+  // (re)spawn somewhere on the route that is out of sight
+  const pp = G.focusPos();
+  for (let k = 0; k < 20; k++) {
+    const i = Math.floor(Math.random() * rt.R.length), p = rt.R[i], q = rt.R[(i + 1) % rt.R.length];
+    if (cur && Math.hypot(p.x - pp.x, p.z - pp.z) < 60) continue;
+    if (cur && isVisible(p.x, 1, p.z, 6)) continue;
+    if (G.vehicles.some((o) => !o.removed && Math.hypot(o.pos.x - p.x, o.pos.z - p.z) < 14)) continue;
+    const v = new Vehicle(scene, type, p.x, p.z, Math.atan2(q.x - p.x, q.z - p.z), color);
+    v.keep = true; v.service = key;
+    v.driver = new LoopDriver(v, rt.R, rt.stops, speed);
+    G.vehicles.push(v);
+    service[key] = v;
+    return;
+  }
+}
+function updateService(dt) {
+  service.t -= dt;
+  if (service.t <= 0) {
+    service.t = 3;
+    const pp = G.focusPos();
+    // only while the player is anywhere near the harbour / airport island
+    if (pp.z < -380) { keepService('bus', 'bus', '#d81e2a', 9); keepService('truck', 'truck', '#1f5fa8', 9.5); }
+  }
+  // guests at the terminal walk to the waiting bus and get in
+  const bus = service.bus, hs = (world.hotspots || [])[1];
+  const drv = bus && !bus.removed && bus.driver instanceof LoopDriver ? bus.driver : null;
+  const waiting = drv && drv.atStop && drv.atStop.name === 'airport';
+  for (const p of G.peds) {
+    if (p.removed || p.dead || !p.board) continue;
+    if (!waiting || p.board !== bus) { p.board = null; continue; }
+    const f = bus.fwd, rx = -f.z, rz = f.x; // door: front right of the bus
+    const tx = bus.pos.x + rx * (bus.M.wid / 2 + 0.4) + f.x * (bus.M.len / 2 - 1.6), tz = bus.pos.z + rz * (bus.M.wid / 2 + 0.4) + f.z * (bus.M.len / 2 - 1.6);
+    const dx = tx - p.pos.x, dz = tz - p.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.8) { p.remove(); service.boarded++; continue; }
+    const st = Math.min(d, 1.9 * dt);
+    p.pos.x += (dx / d) * st; p.pos.z += (dz / d) * st;
+    p.pos.y = groundAt(p.pos.x, p.pos.z, p.pos.y + 0.6);
+    p.yaw = Math.atan2(dx, dz); p.speed = 1.9;
+    p.h.root.position.copy(p.pos); p.h.root.rotation.y = p.yaw;
+  }
+  if (waiting && hs) for (const p of G.peds) {
+    if (p.removed || p.dead || p.board || p.home !== hs) continue;
+    if (Math.hypot(p.pos.x - bus.pos.x, p.pos.z - bus.pos.z) < 60) { p.board = bus; p.fleeT = 0; }
+  }
+}
+G.service = service;
+
 function spawnHotspotPeds() {
   const pp = G.focusPos ? G.focusPos() : player.pos;
   for (const hs of world.hotspots || []) {
@@ -1522,6 +1601,7 @@ function simStep(dt) {
     }
     collideVehicles(G.vehicles, G);
     for (const p of G.peds) if (!p.removed) p.update(dt, G);
+    updateService(dt);
     updateWanted(dt);
     updatePickups(dt);
     checkWater(dt);

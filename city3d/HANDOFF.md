@@ -119,3 +119,12 @@ Dildi City (Quellcode):
   gezeichnet vom Spiel (Schutzwand-Lücken an Einmündungen), Deko aus `dildiKreuz.decor(THREE, {decks:false})`
   (Schilderbrücken, Skatepark, Rasthof/Tanke, Motel, Plakate) mit Kollision. Laternen werden nicht in Einmündungen gesetzt.
 - `deckAt`: pro Hochstraße zählt nur das nächste Segment (geklemmt) – vorher fielen Autos auf der Kurven-Außenseite durch Spalten.
+
+## Shuttle-Bus, Docks-LKW, Hafenkreisel (14.11.2026)
+- Fahrzeuge `bus`/`truck` (Werte aus Nicks Datei) in MODELS. `LoopDriver` (ai.js) fährt feste Rundkurse (`buildRoute`) mit Haltestellen,
+  hupt bei Blockade (Fußgänger gehen zur Seite) und schiebt sich vorbei. In main.js `updateService`: Bus + LKW werden gehalten,
+  sobald der Spieler südlich von z=-380 ist; am Halt „airport“ laufen die Flughafen-Gäste (Hotspot) zur Bustür und steigen ein.
+- Kreuzung Brückenstraße × Kaistraße ist jetzt der `HAFENKREISEL` (Straßen geteilt: Brückenstraße/Brückenstraße Süd,
+  Kaistraße West/Ost), Wendeschleife am Flughafen-Ende der Kaistraße (`WENDE`). Ringe haben `ring: true`:
+  OutDriver kann an jedem Arm ausfahren (`ringExits`), bei nur einem Arm auch zurück.
+- Außerhalb der Stadt ignorieren Fahrer entgegenkommende Autos (außer direkt vor der Stoßstange) – vorher Stau an Einmündungen.

@@ -55,7 +55,7 @@ export function rawH(x, z) {
 // kind: road (asphalt), dirt, deck (elevated, own heights)
 // yMode: 'given' uses y from points, 'terrain' follows smoothed terrain, 'pass' climbs from the city over a pass
 export const ROADS = [];
-const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway }; ROADS.push(r); return r; };
+const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway, ring: !!o.ring }; ROADS.push(r); return r; };
 
 // --- mountain passes from the west/east city exits into the two deserts ---
 R('Pass West-Süd', [[-236, -68], [-264, -69], [-294, -80], [-324, -68], [-352, -82], [-372, -94]], { yMode: 'pass', fall: 30, lamps: true, bump: 7, w: 14 });
@@ -83,13 +83,25 @@ R('Hafenstraße', [[0, -236, 0], [0, -290, 0], [0, -350, 0], [0, -400, 0], [0, -
 // die Deko (Schilderbrücken, Rasthof, Motel, Skatepark, Plakate) kommt aus dildiKreuz.decor() in outskirts.js.
 for (const r of globalThis.DildiCars.dildiKreuz.roads()) R(r.name, r.pts, r.opts);
 // island roads (flat)
-R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -560, 0], [0, -610, 0]], { w: 12, lamps: true });
-R('Kaistraße', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [0, -560, 0], [70, -560, 0], [150, -560, 0], [215, -560, 0]], { w: 11, lamps: true });
+// the Brückenstraße × Kaistraße crossing is a roundabout (HAFENKREISEL); the roads end at its arms
+export const HAFENKREISEL = { x: 0, z: -560, r: 17, w: 9 };
+R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -541, 0]], { w: 12, lamps: true });
+R('Brückenstraße Süd', [[0, -579, 0], [0, -595, 0], [0, -610, 0]], { w: 12, lamps: true });
+R('Kaistraße West', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [-19, -560, 0]], { w: 11, lamps: true });
+R('Kaistraße Ost', [[19, -560, 0], [70, -560, 0], [150, -560, 0], [191, -560, 0]], { w: 11, lamps: true });
+// ring order (right-hand traffic, right turn in first like the other roundabouts): north → east → south → west → north
+R('Hafenkreisel', Array.from({ length: 21 }, (_, k) => { const t = (k / 20) * Math.PI * 2; return [HAFENKREISEL.x + HAFENKREISEL.r * Math.sin(t), HAFENKREISEL.z + HAFENKREISEL.r * Math.cos(t), 0]; }), { w: HAFENKREISEL.w, oneway: true, ring: true });
 R('Dockring', [[-60, -560, 0], [-66, -610, 0], [-110, -645, 0], [-170, -640, 0], [-210, -600, 0], [-215, -560, 0]], { w: 10 });
 // roundabout at the end of the Brückenstraße (was a dead end where cars tried to turn on the spot).
 // One-way ring, counter-clockwise from above (right-hand traffic): start at the top, east, south, west, back to the top.
 export const KREISEL = { x: 0, z: -632, r: 20, w: 10 };
-R('Kreisverkehr', Array.from({ length: 17 }, (_, k) => { const t = (k / 16) * Math.PI * 2; return [KREISEL.x + Math.sin(t) * KREISEL.r, KREISEL.z + Math.cos(t) * KREISEL.r, 0]; }), { w: KREISEL.w, oneway: true });
+// turning loop at the airport end of the Kaistraße (one-way, right turn in first like the roundabout)
+export const WENDE = { x: 205, z: -560, r: 14, w: 9 };
+R('Wendeschleife Flughafen', Array.from({ length: 15 }, (_, k) => { const t = (k / 14) * Math.PI * 2; return [WENDE.x - Math.cos(t) * WENDE.r, WENDE.z + Math.sin(t) * WENDE.r, 0]; }), { w: WENDE.w, oneway: true, ring: true });
+// bus stop in front of the airport terminal (east-bound lane of the Kaistraße) and the loading spot at the cranes
+export const BUS_STOP = { x: 110, z: -557 };
+export const TRUCK_STOP = { x: -110, z: -645 };
+R('Kreisverkehr', Array.from({ length: 17 }, (_, k) => { const t = (k / 16) * Math.PI * 2; return [KREISEL.x + Math.sin(t) * KREISEL.r, KREISEL.z + Math.cos(t) * KREISEL.r, 0]; }), { w: KREISEL.w, oneway: true, ring: true });
 
 // ---------------- sampling ----------------
 export function sampleRoad(r) {

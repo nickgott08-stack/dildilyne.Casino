@@ -17,6 +17,8 @@ export const MODELS = {
   ferrari: { name: 'Ferrari', len: 4.6, wid: 1.98, maxSpeed: 60, accel: 18, brake: 30, grip: 9.5, turn: 2.0, mass: 1.4, colors: ['#d40000', '#ffd700', '#111111'] },
   roller: { name: 'Pizza-Roller', len: 1.8, wid: 0.7, maxSpeed: 9.8, accel: 4, brake: 14, grip: 8.5, turn: 1.7, mass: 0.3, colors: ['#c0392b'], bike: true },
   police: { name: 'Polizei-Skoda', len: 4.7, wid: 1.82, maxSpeed: 36, accel: 11, brake: 24, grip: 8.5, turn: 2.2, mass: 1.5, colors: ['#e8eef5'], police: true },
+  bus: { name: 'Dildi Bus', len: 10.5, wid: 2.5, maxSpeed: 16, accel: 4, brake: 14, grip: 6, turn: 1.3, mass: 3.5, colors: ['#d81e2a', '#f4c20d', '#1f5fa8'] },
+  truck: { name: 'LKW', len: 7.3, wid: 2.45, maxSpeed: 19, accel: 4.5, brake: 14, grip: 6, turn: 1.4, mass: 3, colors: ['#1f5fa8', '#c0392b', '#f5f5f5'] },
   jeep: { name: 'Schmuggler-Jeep', len: 4.3, wid: 1.9, maxSpeed: 23, accel: 8, brake: 20, grip: 8, turn: 2.0, mass: 1.7, colors: ['#5b6b3a'] },
   taxi: { name: 'Dildi Taxi', len: 4.7, wid: 1.82, maxSpeed: 17.5, accel: 7, brake: 20, grip: 7.5, turn: 2.0, mass: 1.3, colors: ['#f4c20d'], taxi: true },
 };
