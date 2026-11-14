@@ -334,18 +334,35 @@ export class Missions {
   startBottles() {
     const G = this.G, d = world.depot;
     const v = new Vehicle(this.scene, 'van', d.spawn.x, d.spawn.z, d.spawn.h, '#f5f5f5');
-    // Flaschenpost livery: white van, purple band + lettering
-    const tex = neonSign('FLASCHENPOST', '#ffffff', { size: 120, bg: '#6a1fb5', border: false });
+    // Flaschenpost livery: white van, purple band + lettering – placed right on the body side
+    // (the real side of the model at that height, was a fixed width → the sign stood off the van)
+    const sideAt = (y0, y1) => {
+      let mx = 0;
+      const inv = new THREE.Matrix4().copy(v.tilt.matrixWorld).invert(), m = new THREE.Matrix4(), p = new THREE.Vector3();
+      v.tilt.updateWorldMatrix(true, true);
+      inv.copy(v.tilt.matrixWorld).invert();
+      v.tilt.traverse((o) => {
+        if (!o.isMesh || !o.geometry.attributes.position) return;
+        m.multiplyMatrices(inv, o.matrixWorld);
+        const P = o.geometry.attributes.position;
+        for (let i = 0; i < P.count; i++) { p.fromBufferAttribute(P, i).applyMatrix4(m); if (p.y > y0 && p.y < y1 && Math.abs(p.z) < v.M.len * 0.3) mx = Math.max(mx, Math.abs(p.x)); }
+      });
+      return mx || v.M.wid / 2;
+    };
+    const tex = canvasTex(1024, 180, (ctx) => {
+      ctx.fillStyle = '#6a1fb5'; ctx.fillRect(0, 0, 1024, 180);
+      ctx.fillStyle = '#ffffff'; ctx.font = '900 120px Arial Black, Impact, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('FLASCHENPOST', 512, 96, 960);
+    }, false);
     const band = new THREE.MeshStandardMaterial({ color: '#6a1fb5', roughness: 0.5 });
+    const xb = sideAt(1.0, 1.25) + 0.015, xs = sideAt(1.45, 1.85) + 0.015;
     for (const s of [-1, 1]) {
-      const b = new THREE.Mesh(new THREE.PlaneGeometry(v.M.len - 0.5, 0.32), band);
-      b.position.set(s * (v.M.wid / 2 + 0.035), 1.12, 0);
+      const b = new THREE.Mesh(new THREE.PlaneGeometry(v.M.len - 0.6, 0.3), band);
+      b.position.set(s * xb, 1.12, 0);
       b.rotation.y = s * Math.PI / 2;
       v.tilt.add(b);
-    }
-    for (const s of [-1, 1]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.6), new THREE.MeshBasicMaterial({ map: tex }));
-      p.position.set(s * (v.M.wid / 2 + 0.04), 1.75, -0.4);
+      p.position.set(s * xs, 1.65, -0.4);
       p.rotation.y = s * Math.PI / 2;
       v.tilt.add(p);
     }

@@ -8,7 +8,7 @@ import { Ped, OutDriver } from './ai.js';
 import { Plane } from './plane.js';
 import { buildRadjIsland, ISL } from './radj.js';
 import { RADJ_CELLAR, radjE } from './geo.js';
-import { neonSign, rand, store } from './util.js';
+import { neonSign, rand, store, season } from './util.js';
 import { seeded } from './coop.js';
 
 const $ = (id) => document.getElementById(id);
@@ -124,7 +124,8 @@ export function installHeist(Missions) {
     this.G.planeProp = this.plane;
     this.isl = buildRadjIsland(scene);
   };
-  P.finaleDone = function () { return store.get('dc3d_coupWeek') === weekId(); };
+  // weekly limit only from the season start (before: play the finale as often as you like)
+  P.finaleDone = function () { return season.on && store.get('dc3d_coupWeek') === weekId(); };
 
   // ---------- planning board ----------
   P.openBoard = function () {

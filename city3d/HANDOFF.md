@@ -155,3 +155,14 @@ Dildi City (Quellcode):
   - Beute: Anführer 100.000 (zählt als sein Wochen-Finale `dc3d_coupWeek`), Helfer je 37.500 (1× pro Woche, `dc3d_coupHelpWeek`),
     alleine weiter 150.000. Wer im Finale stirbt, ist raus, bekommt aber seinen Anteil, wenn die Crew entkommt (`coopOut`).
   - Wachen/KI laufen auf jedem Gerät für sich; nur die Ereignisse oben werden abgeglichen.
+
+## Nicks Fotos vom 14.11. abends
+- Wochen-Limit fürs Finale (Anführer + Helfer) gilt erst ab Saisonstart (`season.on` in `finaleDone`/`helperPaid`).
+- iPad: Spiel-iframe im Casino `inset:0; 100%` statt `100vw/100vh` (unten war ein weißer Streifen über der Auto-Leiste);
+  Lenkrad `min(42vh, max(170px, 21vw))`, Joystick auf Tablets größer (Radius aus `#joyBase`).
+- Dildi-Kreuz als **Raute**: Kleeblatt-Schleifen ersetzt durch 4 gerade Rampen („Rampe Nordwest“ …, `kreuzRoads` in dildi_cars.js),
+  sie zweigen bündig von der Hochstraße ab und münden rechtwinklig in die Hafenstraße (z = −274 / −370).
+  OutDriver biegt jetzt auch mitten auf einer Straße in Seitenstraßen ab (`branchesOf` in ai.js) und fädelt in Fahrtrichtung ein.
+- Stadtmauer: 1–3 m breite Reststücke neben den Ausfahrten waren 60–80 m hohe „Scheiben“ → jetzt niedrige Anbauten (11 m).
+  Zufallszahlen werden wie vorher gezogen, der Rest der Stadt bleibt gleich.
+- Dildi-Customs-Halle heller (war fast schwarz); Flaschenpost-Transporter: Schild sitzt auf der Karosserie, klare Schrift.
