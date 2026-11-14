@@ -26,9 +26,9 @@ const QUALITY = {
   // shadowR: half size of the shadow area (m), shadowEvery: redraw shadows every n-th frame,
   // fxLights: point lights for muzzle flash / explosions, headLight: car headlight at night.
   // Every extra light is computed for every pixel, even at intensity 0 – so they are dropped on weaker settings.
-  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, traffic: 22, peds: 26, lod: 70 },
-  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 35, traffic: 17, peds: 20, lod: 50 },
-  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, traffic: 13, peds: 14, lod: 35 },
+  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, traffic: 22, peds: 42, lod: 70 },
+  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 35, traffic: 17, peds: 34, lod: 50 },
+  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, traffic: 13, peds: 22, lod: 35 },
 };
 let qName = store.get('dc3d_q') || 'hoch';
 let Q = QUALITY[qName];
@@ -41,7 +41,7 @@ renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 2200);
+const camera = new THREE.PerspectiveCamera(68, 1, 0.3, 2200);
 
 const G = {
   scene, camera, time: 0, vehicles: [], peds: [], pickups: [], shake: 0,
@@ -239,7 +239,7 @@ function spawnTraffic(initial) {
 
 function spawnPed(initial) {
   const pp = player.inVehicle ? player.inVehicle.pos : player.pos;
-  const p = randomSidewalkPoint(initial ? 6 : 60, initial ? 140 : 120, pp);
+  const p = randomSidewalkPoint(initial ? 6 : 35, initial ? 120 : 105, pp);
   if (!p) return;
   if (!initial && isVisible(p[0], 1, p[1], 1.5)) return;
   G.peds.push(new Ped(scene, null, p[0], p[1]));
@@ -1601,7 +1601,7 @@ function render(dt) {
   // cull far humans; only nearby passers-by cast shadows (saves many draw calls in the shadow pass)
   for (const p of G.peds) {
     const d = Math.hypot(p.pos.x - camera.position.x, p.pos.z - camera.position.z);
-    p.h.root.visible = d < 130;
+    p.h.root.visible = p.h.root.visible ? d < 140 : d < 125; // hysteresis: no blinking at the edge
     pedShadow(p.h, d < Q.pedShadow);
   }
   // weaker settings: redraw the shadow map only every n-th frame (the sun barely moves)

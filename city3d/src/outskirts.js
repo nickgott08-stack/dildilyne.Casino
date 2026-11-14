@@ -211,12 +211,21 @@ export function buildOutskirts(scene, K) {
     if (r.kind === 'dirt') { dirtGeos.push(drapedRibbon(S, r.w, 0.12)); continue; }
     asphaltGeos.push(r.kind === 'deck' ? ribbonGeo(S.map((p) => ({ ...p, y: Math.max(p.y, 0.05) })), r.w, 0.06) : flatGround ? ribbonGeo(S, r.w, 0.06) : drapedRibbon(S, r.w, 0.1));
     // centre dashes
-    for (let i = 2; i < S.length - 2; i += 3) {
-      const p = S[i];
-      const d = new THREE.PlaneGeometry(0.22, 3);
-      d.rotateX(-Math.PI / 2);
-      d.rotateY(p.h);
-      d.translate(p.x, (r.kind === 'deck' || flatGround ? p.y : terrainH(p.x, p.z)) + (r.kind === 'deck' ? 0.05 : 0.13), p.z);
+    // each dash spans exactly from one road sample to the next, with the right height at both ends,
+    // so it lies on the road on slopes, ramps and curves (instead of a flat plank floating in the air)
+    const dy = (p) => (r.kind === 'deck' || flatGround ? p.y : terrainH(p.x, p.z)) + (r.kind === 'deck' ? 0.07 : 0.14);
+    for (let i = 2; i < S.length - 3; i += 2) {
+      const a = S[i], b = S[i + 1], hw = 0.11;
+      const pos = [];
+      for (const p of [a, b]) {
+        const rx = -Math.cos(p.h) * hw, rz = Math.sin(p.h) * hw, y = dy(p);
+        pos.push(p.x + rx, y, p.z + rz, p.x - rx, y, p.z - rz);
+      }
+      const d = new THREE.BufferGeometry();
+      d.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      d.setIndex([0, 2, 1, 1, 2, 3]);
+      d.computeVertexNormals();
+      if (d.attributes.normal.getY(0) < 0) d.setIndex([0, 1, 2, 1, 3, 2]), d.computeVertexNormals();
       colorize(d, r.w >= 12 ? '#f2c94c' : '#e8e8e2');
       mark.push(d);
     }

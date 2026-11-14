@@ -633,7 +633,7 @@ export class Ped {
     const bj = clamp(Math.floor((this.pos.z + H) / P), 0, NB - 1);
     this.blk = world.blocks[bi * NB + bj];
     this.dirSign = Math.random() < 0.5 ? 1 : -1;
-    this.inset = rand(1.4, 2.8);
+    this.inset = rand(2.9, 3.4); // house side of the 4 m sidewalk – street trees stand at 2.2 m
     this.t = this.project();
     this.cross = null;
   }
@@ -889,7 +889,7 @@ export class Ped {
 export function randomSidewalkPoint(minD, maxD, from) {
   for (let k = 0; k < 30; k++) {
     const b = pick(world.blocks);
-    const s = rand(1.5, 2.6);
+    const s = rand(2.9, 3.4);
     const side = randi(0, 3);
     const t = rand(0, 1);
     let x, z;
