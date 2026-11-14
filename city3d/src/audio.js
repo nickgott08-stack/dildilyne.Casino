@@ -40,13 +40,13 @@ export class Audio {
     this.eng.gain.value = 0;
     const ef = ctx.createBiquadFilter();
     ef.type = 'lowpass';
-    ef.frequency.value = 900;
-    ef.Q.value = 2;
+    ef.frequency.value = 700;
+    ef.Q.value = 1;
     this.engF = ef;
     this.o1 = ctx.createOscillator();
     this.o1.type = 'sawtooth';
     this.o2 = ctx.createOscillator();
-    this.o2.type = 'square';
+    this.o2.type = 'triangle';
     const g2 = ctx.createGain();
     g2.gain.value = 0.35;
     this.o1.connect(ef);
@@ -154,14 +154,15 @@ export class Audio {
     if (!this.ctx) return;
     this.hornG.gain.setTargetAtTime(on ? 0.22 : 0, this.ctx.currentTime, 0.02);
   }
-  engine(on, rpm, thr) {
+  // rpm 0..~1, thr 0..1, cruise 0..1 (flat out for a while -> engine fades back so it doesn't drone)
+  engine(on, rpm, thr, cruise = 0) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    this.eng.gain.setTargetAtTime(on ? 0.06 + thr * 0.08 : 0, t, 0.08);
-    const f = 38 + rpm * 120;
-    this.o1.frequency.setTargetAtTime(f, t, 0.05);
-    this.o2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
-    this.engF.frequency.setTargetAtTime(400 + rpm * 1400 + thr * 500, t, 0.05);
+    this.eng.gain.setTargetAtTime(on ? (0.05 + thr * 0.05) * (1 - cruise * 0.55) : 0, t, on ? 0.12 : 0.08);
+    const f = 34 + rpm * 95;
+    this.o1.frequency.setTargetAtTime(f, t, 0.06);
+    this.o2.frequency.setTargetAtTime(f * 0.5, t, 0.06);
+    this.engF.frequency.setTargetAtTime(280 + rpm * 800 + thr * 260 - cruise * 150, t, 0.08);
   }
   siren(v, time) {
     if (!this.ctx) return;
