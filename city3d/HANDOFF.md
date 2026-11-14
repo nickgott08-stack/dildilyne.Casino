@@ -128,3 +128,8 @@ Dildi City (Quellcode):
   Kaistraße West/Ost), Wendeschleife am Flughafen-Ende der Kaistraße (`WENDE`). Ringe haben `ring: true`:
   OutDriver kann an jedem Arm ausfahren (`ringExits`), bei nur einem Arm auch zurück.
 - Außerhalb der Stadt ignorieren Fahrer entgegenkommende Autos (außer direkt vor der Stoßstange) – vorher Stau an Einmündungen.
+
+## Umfahrbare Laternen & Mülleimer (dildi_cars.js v4)
+- Alle Straßenlaternen (Stadt + außen) sind `DildiCars.dildiCityProps`-Laternen (ohne feste Kollision), dazu Mülleimer/Tonnen an
+  den Bordsteinen. `world.props.update(dt, G.vehicles)` in simStep; Treffer bremsen das Auto (Laterne ×0.8, Eimer ×0.95),
+  beim Spieler-Auto Rumms + Kamerawackeln. Nach 90 s steht alles wieder. Leuchtköpfe = `world.lampHeadMat` (nachts heller).

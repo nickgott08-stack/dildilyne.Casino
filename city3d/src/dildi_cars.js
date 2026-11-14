@@ -71,6 +71,20 @@
  *    (dildiCityInterchange ist die grosse freistehende Variante, fuer Dildi City nicht noetig.)
  *    Jeep: Typ 'jeep' ersetzt den Schmuggler-Jeep (Fahrzeug-Abschnitt 1).
  *
+ * 6) UMFAHRBARE LATERNEN & MUELLEIMER (neu)
+ *      const props = DildiCars.dildiCityProps(THREE, scene, { respawn: 90 });
+ *      props.add('lamp', x, y, z, drehungY);      // Laterne, Ausleger zeigt in Blickrichtung (+Z lokal)
+ *      props.add('bin', x, y, z);                 // runder Strassen-Muelleimer
+ *      props.add('wheelie', x, y, z, drehungY);   // grosse gruene Muelltonne
+ *      props.scatterAlong('lamp', x0,z0, x1,z1, 18, 6.5);   // alle 18 m, 6.5 m neben der Linie
+ *    Pro Frame:  const hits = props.update(dt, J.vehicles);
+ *      -> Fahrzeuge (pos, vel, h, M.len/M.wid) stossen Objekte um: Laternen kippen (Licht flackert aus),
+ *         Muelleimer fliegen mit Deckel und Muell weg. Nach 'respawn' Sekunden steht alles wieder.
+ *      hits = [{car, kind, speed, x, z}] -> z. B. Geraeusch abspielen, Auto leicht abbremsen:
+ *         for (const h of hits) h.car.vel.multiplyScalar(h.kind === 'lamp' ? 0.8 : 0.95);
+ *    Die alten, festen Laternen (und ihre Kollision) dort entfernen, wo die neuen stehen.
+ *    Leuchtkoepfe nachts: W.signMats.push(props.glow).
+ *
  * 4) DOCKS & FLUGHAFEN  -  liefern fertige Geometrien mit Vertex-Farben fuer die gemergten Deko-Listen:
  *    - Container:  statt k(2.45,2.6,6.1, x,y,z, farbe)  ->  DildiCars.dildiCityDocks.container(THREE, x, y, z, farbe)
  *    - Kraene:     die Kran-Boxen (Fundament, 4 Beine, Kabine, Ausleger, Seil) an (x,z) entfernen und
@@ -1293,6 +1307,188 @@
   }
   const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor };
 
+
+  // ======================================================================
+  // UMFAHRBARE STADTMOEBEL: Laternen, Mulleimer, Muelltonnen
+  // Eigenstaendiges System: stehende Objekte als InstancedMesh (schnell),
+  // beim Umfahren wird ein bewegliches Einzelteil erzeugt (kippt/fliegt).
+  // ======================================================================
+  function lampPoleParts(mb, g) {           // Pivot am Boden (y=0), Mast steht auf 0.35 m Sockel
+    const oct = (r, y) => hexagon(0, 0, 0, r, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, y, b]);
+    const band = (m, r0, y0, r1, y1) => { const A = oct(r0, y0), B = oct(r1, y1); mb.convex(m, [A, B].concat(A.map((p, i) => [p, A[(i + 1) % 8], B[(i + 1) % 8], B[i]]))); };
+    band('DarkSteel', 0.11, 0.35, 0.07, 7.2);
+    mb.box('Steel', [-0.07, 0.9, 0.105], [0.07, 1.25, 0.12]);          // Wartungsklappe
+    // Ausleger: geknickt
+    strut(mb, 'DarkSteel', [0, 7.0, 0], [0, 7.6, 0.6], 0.09);
+    strut(mb, 'DarkSteel', [0, 7.6, 0.6], [0, 7.7, 1.9], 0.08);
+    mb.box('DarkSteel', [-0.22, 7.55, 1.6], [0.22, 7.75, 2.5]);        // Leuchtenkopf
+    g.box('GlowWarm', [-0.17, 7.52, 1.68], [0.17, 7.56, 2.42]);
+  }
+  function lampStubParts(mb) {
+    mb.prism('Concrete', hexagon(0, 0, 0, 0.32, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, 0, b]), [0, 0.12, 0]);
+    mb.prism('DarkSteel', hexagon(0, 0, 0, 0.17, 8, Math.PI / 8, 1, 1).map(([a, b]) => [a, 0.12, b]), [0, 0.23, 0]);
+    for (const [a, b] of [[0.2, 0.2], [-0.2, 0.2], [0.2, -0.2], [-0.2, -0.2]]) mb.box('Steel', [a - 0.03, 0.12, b - 0.03], [a + 0.03, 0.17, b + 0.03]);
+  }
+  function binParts(mb) {                   // runder Strassen-Mulleimer (orange), Pivot unten Mitte
+    const ring = (r, y, n = 12) => hexagon(0, 0, 0, r, n, 0, 1, 1).map(([a, b]) => [a, y, b]);
+    mb.prism('Orange', ring(0.3, 0.05), [0, 0.8, 0]);
+    mb.prism('DarkSteel', ring(0.32, 0.0), [0, 0.06, 0]);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; mb.box('DarkSteel', [Math.cos(a) * 0.3 - 0.02, 0.1, Math.sin(a) * 0.3 - 0.02], [Math.cos(a) * 0.3 + 0.02, 0.85, Math.sin(a) * 0.3 + 0.02]); }
+    mb.box('LaneWhite', [-0.12, 0.45, 0.29], [0.12, 0.6, 0.31]);
+  }
+  function binLidParts(mb) {
+    const ring = (r, y, n = 12) => hexagon(0, 0, 0, r, n, 0, 1, 1).map(([a, b]) => [a, y, b]);
+    mb.prism('DarkSteel', ring(0.33, 0), [0, 0.07, 0]);
+    mb.prism('Black', ring(0.1, -0.01), [0, 0.09, 0]);
+  }
+  function wheelieParts(mb) {               // grosse Muelltonne (240 l), Pivot unten Mitte
+    mb.hexa('BottleGreen', [[-0.29, 0.06, -0.36], [0.29, 0.06, -0.36], [0.31, 1.0, -0.4], [-0.31, 1.0, -0.4], [-0.29, 0.06, 0.32], [0.29, 0.06, 0.32], [0.31, 1.0, 0.36], [-0.31, 1.0, 0.36]]);
+    mb.box('BottleGreen', [-0.33, 0.97, -0.42], [0.33, 1.05, 0.44]);  // Deckel
+    mb.box('BottleGreen', [-0.3, 0.9, 0.36], [0.3, 0.98, 0.48]);       // Griff
+    for (const s of SIDES) mb.prism('Rubber', hexagon(0.09, 0.1, 0, 0.1, 8, 0, 1, 1).map(([a, b]) => [s * 0.25, b, a + 0.24]), [s * 0.06, 0, 0]);
+  }
+  function trashParts(mb, rnd) {            // ein paar Muellteile zum Verstreuen
+    const cols = ['LaneWhite', 'ChipRed', 'Hazard', 'ChipBlue', 'Concrete'];
+    const s = 0.06 + rnd() * 0.08;
+    mb.box(cols[Math.floor(rnd() * cols.length)], [-s, 0, -s * 0.7], [s, s * 0.6, s * 0.7]);
+  }
+
+  function dildiCityProps(THREE, scene, opts) {
+    const o = Object.assign({ respawn: 90, max: 800, minSpeed: 2.5, material: null }, opts || {});
+    Object.assign(BPAL, { LaneWhite: [0.92, 0.92, 0.88] });
+    const cache = {};
+    const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    const geo = (fn) => { const mb = new MB(), g = new MB(); fn(mb, g); return [vcGeometry(THREE, mb, () => true, colorOf), g.t && Object.keys(g.t).length ? vcGeometry(THREE, g, () => true, colorOf) : null]; };
+    const mat = o.material || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 });
+    const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    const r = rng(11);
+    const KINDS = {
+      lamp: { parts: geo(lampPoleParts), stub: geo(lampStubParts)[0], radius: 0.25, height: 7.7, fall: 'tip' },
+      bin: { parts: geo(binParts), lid: geo(binLidParts)[0], radius: 0.35, height: 0.9, fall: 'fly', mass: 1 },
+      wheelie: { parts: geo(wheelieParts), radius: 0.42, height: 1.05, fall: 'fly', mass: 1.6 },
+    };
+    const trashGeos = Array.from({ length: 4 }, () => geo((mb) => trashParts(mb, r))[0]);
+    const root = new THREE.Group();
+    root.name = 'Stadtmoebel';
+    scene.add(root);
+    const items = [], grid = new Map(), cell = 8;
+    const key = (x, z) => Math.floor(x / cell) + ',' + Math.floor(z / cell);
+    const inst = {};
+    const dummy = new THREE.Object3D();
+    const makeInst = (k) => {
+      const K = KINDS[k], I = { body: new THREE.InstancedMesh(K.parts[0], mat, o.max), list: [] };
+      I.body.castShadow = true; I.body.count = 0; root.add(I.body);
+      if (K.parts[1]) { I.glow = new THREE.InstancedMesh(K.parts[1], glowMat, o.max); I.glow.count = 0; root.add(I.glow); }
+      if (K.stub) { I.stub = new THREE.InstancedMesh(K.stub, mat, o.max); I.stub.count = 0; I.stub.castShadow = true; root.add(I.stub); }
+      if (K.lid) { I.lid = new THREE.InstancedMesh(K.lid, mat, o.max); I.lid.count = 0; root.add(I.lid); }
+      return I;
+    };
+    const setMat = (it, visible) => {
+      const I = inst[it.kind];
+      dummy.position.set(it.x, it.y, it.z); dummy.rotation.set(0, it.ry, 0); dummy.scale.setScalar(visible ? 1 : 0); dummy.updateMatrix();
+      I.body.setMatrixAt(it.idx, dummy.matrix); I.body.instanceMatrix.needsUpdate = true;
+      if (I.glow) { I.glow.setMatrixAt(it.idx, dummy.matrix); I.glow.instanceMatrix.needsUpdate = true; }
+      if (I.lid) { dummy.position.y = it.y + 0.86; dummy.updateMatrix(); I.lid.setMatrixAt(it.idx, dummy.matrix); I.lid.instanceMatrix.needsUpdate = true; }
+    };
+    const loose = [];
+
+    function add(kind, x, y, z, ry = 0) {
+      const K = KINDS[kind];
+      if (!K) throw new Error('DildiCars props: unbekannt ' + kind);
+      const I = inst[kind] || (inst[kind] = makeInst(kind));
+      const it = { kind, x, y, z, ry, idx: I.body.count, down: false, t: 0 };
+      I.body.count++; if (I.glow) I.glow.count++; if (I.lid) I.lid.count++;
+      if (I.stub) { dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); I.stub.setMatrixAt(I.stub.count++, dummy.matrix); I.stub.instanceMatrix.needsUpdate = true; }
+      setMat(it, true);
+      items.push(it);
+      const kk = key(x, z); if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(it);
+      return it;
+    }
+
+    function knock(it, vx, vz, speed) {
+      it.down = true; it.t = o.respawn;
+      setMat(it, false);
+      const K = KINDS[it.kind], dir = Math.atan2(vx, vz);
+      const piece = (g, m) => { const ms = new THREE.Mesh(g, m); ms.castShadow = true; root.add(ms); return ms; };
+      if (K.fall === 'tip') {
+        const pv = new THREE.Group(); pv.position.set(it.x, it.y + 0.35, it.z); root.add(pv);
+        const yaw = new THREE.Group(); yaw.rotation.y = dir; pv.add(yaw);
+        const tilt = new THREE.Group(); yaw.add(tilt);
+        const inner = new THREE.Group(); inner.rotation.y = it.ry - dir; inner.position.y = -0.35; tilt.add(inner);
+        inner.add(piece(K.parts[0], mat)); const gl = piece(K.parts[1], glowMat); inner.add(gl);
+        loose.push({ type: 'tip', obj: pv, tilt, ang: 0, w: Math.min(2.5, speed * 0.08), it, glow: gl, life: o.respawn, flick: 1.2 });
+      } else {
+        const fly = (g, m, h0, boost) => {
+          const ms = piece(g, m); ms.position.set(it.x, it.y + h0, it.z); ms.rotation.y = it.ry;
+          const sp = speed * (0.6 + r() * 0.5) * boost / (K.mass || 1);
+          loose.push({ type: 'fly', obj: ms, vx: Math.sin(dir + (r() - 0.5) * 0.6) * sp, vz: Math.cos(dir + (r() - 0.5) * 0.6) * sp,
+            vy: 2 + speed * 0.12 * boost + r() * 2, sx: (r() - 0.5) * 12, sz: (r() - 0.5) * 12, ground: it.y, it, life: o.respawn });
+        };
+        fly(K.parts[0], mat, 0, 1);
+        if (K.lid) fly(K.lid, mat, 0.86, 1.4);
+        for (let i = 0; i < 6; i++) fly(trashGeos[i % 4], mat, 0.5, 0.9 + r());
+      }
+    }
+
+    // cars: Array von Fahrzeugen mit pos {x,y,z} und vel {x,y} (y = z-Richtung) oder vel {x,z}; Radius aus M.len/M.wid
+    function update(dt, cars) {
+      const hits = [];
+      for (const c of cars || []) {
+        if (!c || c.removed || c.dead || !c.pos) continue;
+        const vx = c.vel ? c.vel.x : 0, vz = c.vel ? (c.vel.z !== undefined ? c.vel.z : c.vel.y) : 0, sp = Math.hypot(vx, vz);
+        if (sp < o.minSpeed) continue;
+        const rad = c.M ? Math.max(c.M.wid / 2, c.M.len / 2 * 0.85) : 2.2, cx = Math.floor(c.pos.x / cell), cz = Math.floor(c.pos.z / cell);
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+          const L = grid.get((cx + a) + ',' + (cz + b)); if (!L) continue;
+          for (const it of L) {
+            if (it.down || Math.abs(c.pos.y - it.y) > 3) continue;
+            // grobe Box-Pruefung entlang Fahrzeugachse
+            const h = c.h !== undefined ? c.h : Math.atan2(vx, vz), fx = Math.sin(h), fz = Math.cos(h);
+            const dx = it.x - c.pos.x, dz = it.z - c.pos.z, along = dx * fx + dz * fz, side = -dx * fz + dz * fx;
+            const L2 = c.M ? c.M.len / 2 : 2.3, W2 = c.M ? c.M.wid / 2 : 1;
+            if (Math.abs(along) < L2 + KINDS[it.kind].radius && Math.abs(side) < W2 + KINDS[it.kind].radius) {
+              knock(it, vx, vz, sp); hits.push({ car: c, kind: it.kind, speed: sp, x: it.x, z: it.z });
+            }
+          }
+        }
+        void rad;
+      }
+      // bewegliche Teile
+      for (let i = loose.length - 1; i >= 0; i--) {
+        const L = loose[i];
+        L.life -= dt;
+        if (L.type === 'tip') {
+          if (L.ang < Math.PI / 2 - 0.02) { L.w += 2.2 * Math.sin(L.ang + 0.15) * dt * 3; L.ang = Math.min(Math.PI / 2 - 0.02, L.ang + L.w * dt); if (L.ang >= Math.PI / 2 - 0.02) L.w = 0; }
+          L.tilt.rotation.x = L.ang;
+          if (L.flick > 0) { L.flick -= dt; L.glow.visible = L.flick > 0 && Math.random() > 0.4; }
+        } else if (!L.rest) {
+          L.vy -= 9.81 * dt;
+          L.obj.position.x += L.vx * dt; L.obj.position.y += L.vy * dt; L.obj.position.z += L.vz * dt;
+          L.obj.rotation.x += L.sx * dt; L.obj.rotation.z += L.sz * dt;
+          if (L.obj.position.y < L.ground + 0.05) {
+            L.obj.position.y = L.ground + 0.05;
+            if (Math.abs(L.vy) < 1.5) { L.vy = 0; L.vx *= 0.9; L.vz *= 0.9; L.sx *= 0.9; L.sz *= 0.9; } else { L.vy = -L.vy * 0.35; L.vx *= 0.7; L.vz *= 0.7; }
+            if (Math.hypot(L.vx, L.vz) < 0.2 && L.vy === 0) {
+              L.rest = true;
+              const e = new THREE.Euler().setFromQuaternion(L.obj.quaternion);   // liegend ablegen
+              L.obj.rotation.set(Math.round(e.x / (Math.PI / 2)) * Math.PI / 2 || Math.PI / 2, e.y, Math.round(e.z / (Math.PI / 2)) * Math.PI / 2);
+            }
+          }
+        }
+        if (L.life <= 0) { root.remove(L.obj); loose.splice(i, 1); }
+      }
+      for (const it of items) if (it.down) { it.t -= dt; if (it.t <= 0) { it.down = false; setMat(it, true); } }
+      return hits;
+    }
+
+    // Komfort: Laternen/Mulleimer entlang einer Strecke verteilen
+    function scatterAlong(kind, x0, z0, x1, z1, step, offset, y = 0.2) {
+      const L = Math.hypot(x1 - x0, z1 - z0), nx = -(z1 - z0) / L, nz = (x1 - x0) / L;
+      for (let d = step / 2; d < L; d += step) add(kind, x0 + (x1 - x0) * d / L + nx * offset, y, z0 + (z1 - z0) * d / L + nz * offset, Math.atan2(-nx, -nz));
+    }
+    return { group: root, add, update, scatterAlong, items, glow: glowMat };
+  }
+
   // ======================================================================
   // three.js-Aufbau
   // ======================================================================
@@ -2136,7 +2332,7 @@
     return car;
   }
 
-  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, dildiCityInterchange, dildiKreuz, types: Object.keys(VEHICLES) };
+  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, dildiCityInterchange, dildiKreuz, dildiCityProps, types: Object.keys(VEHICLES) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);

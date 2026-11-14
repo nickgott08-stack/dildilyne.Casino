@@ -1602,6 +1602,11 @@ function simStep(dt) {
     collideVehicles(G.vehicles, G);
     for (const p of G.peds) if (!p.removed) p.update(dt, G);
     updateService(dt);
+    // knockable street lamps + bins: a crash slows the car a little (lamps more than bins)
+    if (world.props) for (const h of world.props.update(dt, G.vehicles)) {
+      h.car.vel.multiplyScalar(h.kind === 'lamp' ? 0.8 : 0.95);
+      if (h.car === player.inVehicle) { G.shake = Math.max(G.shake || 0, h.kind === 'lamp' ? 0.35 : 0.12); audio.crash(h.kind === 'lamp' ? 0.5 : 0.2); }
+    }
     updateWanted(dt);
     updatePickups(dt);
     checkWater(dt);
