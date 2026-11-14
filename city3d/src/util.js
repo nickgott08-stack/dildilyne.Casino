@@ -164,6 +164,16 @@ if (SV && (!SV.d3 || typeof SV.d3 !== 'object')) {
   // carry over the cash from the old 2D Dildi City once
   if (SV.cash > 0) SV.d3.dc3d_dollar = String(Math.round(SV.cash));
 }
+// Wirtschaft ab Saison 1: 1 D$ = 1 Bit. Alle alten Job-Beträge werden durch 10 geteilt und
+// mit dem Wochen-Faktor der Saison multipliziert (Woche 1 ×1, 2 ×1,25, 3 ×1,5, 4 ×1,75, ab Tag 29 ×2).
+const WKM = [1, 1.25, 1.5, 1.75, 2];
+export const season = {
+  wk: GCFG ? Math.max(0, Math.min(4, +GCFG.wk || 0)) : 0,
+  day: GCFG ? Math.max(0, +GCFG.sd || 0) : 0,
+  on: !!(GCFG && GCFG.son),
+};
+export const ecoPay = (n) => Math.max(1, Math.round(n * 0.1 * WKM[season.wk]));
+export const fmtD = (n) => Math.round(n).toLocaleString('de-DE');
 let saveT = null;
 function postSave() {
   if (!GCFG) return;

@@ -6,10 +6,21 @@ import { Ped } from './ai.js';
 import { setMask } from './human.js';
 import { installHeist, installFinale, installCutter } from './heist.js';
 import { POI, ROADS } from './geo.js';
-import { neonSign, canvasTex, clamp, rand, pick, store } from './util.js';
+import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+// Bankraub / Docks-Coup: frühestens alle 30 Minuten, höchstens 10× pro Tag
+const ROB_CD = 30 * 60000, ROB_MAX = 10;
+function robState(k) { let s = null; try { s = JSON.parse(store.get('dc3d_rob_' + k) || 'null'); } catch (e) {} if (!s || s.d !== today()) s = { d: today(), n: 0, t: (s && s.t) || 0 }; return s; }
+function robCheck(k) {
+  const s = robState(k);
+  if (s.n >= ROB_MAX) return `Heute schon ${ROB_MAX}× – morgen wieder`;
+  const left = s.t + ROB_CD - Date.now();
+  if (left > 0) return `Wieder möglich in ${Math.ceil(left / 60000)} Min.`;
+  return null;
+}
+function robDone(k) { const s = robState(k); s.n++; s.t = Date.now(); store.set('dc3d_rob_' + k, JSON.stringify(s)); }
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
 const loadTune = () => { try { return JSON.parse(store.get('dc3d_tune') || '{}'); } catch (e) { return {}; } };
 const saveTune = (t) => store.set('dc3d_tune', JSON.stringify(t));
@@ -55,9 +66,9 @@ class Marker {
 // ---------------- garages ----------------
 const GARAGE_CARS = [
   { type: 'skoda', color: '#2e7d32', icon: '🚗', info: 'Starter-Auto', price: 0 },
-  { type: 'van', color: '#f5f5f5', icon: '🚐', info: 'Für den Docks-Coup', price: 30000 },
-  { type: 'rs6', color: '#8e9397', icon: '🚙', info: 'Schneller Kombi', price: 120000 },
-  { type: 'ferrari', color: '#d40000', icon: '🏎️', info: 'Supersportwagen', price: 300000 },
+  { type: 'van', color: '#f5f5f5', icon: '🚐', info: 'Für den Docks-Coup', price: 3000 },
+  { type: 'rs6', color: '#8e9397', icon: '🚙', info: 'Schneller Kombi', price: 12000 },
+  { type: 'ferrari', color: '#d40000', icon: '🏎️', info: 'Supersportwagen', price: 30000 },
 ];
 const loadOwned = () => { try { return { skoda: 1, ...JSON.parse(store.get('dc3d_owned') || '{}') }; } catch (e) { return { skoda: 1 }; } };
 
@@ -246,8 +257,8 @@ export class Missions {
     const dc = world.docksCargo;
     if (v && dc && free && Math.hypot(pp.x - dc.x, pp.z - dc.z) < 8) {
       if (v.type !== 'van' || !v.mine) return { text: '📦 Nur mit deinem eigenen VW Transporter', run: () => this.api.toast('📦 Der Docks-Coup geht nur mit deinem eigenen VW Transporter (Garage)') };
-      const cd = (+store.get('dc3d_docksCD') || 0) - Date.now();
-      if (cd > 0) return { text: `📦 Neue Fracht in ${Math.ceil(cd / 60000)} Min.`, run: () => this.api.toast(`📦 Keine Fracht da – neue Lieferung in ${Math.ceil(cd / 60000)} Min.`) };
+      const rc = robCheck('docks');
+      if (rc) return { text: `📦 ${rc}`, run: () => this.api.toast(`📦 Keine Fracht da – ${rc}`) };
       if (G.wanted.stars > 0) return { text: '📦 Erst die Polizei abhängen', run: () => this.api.toast('🚨 Erst die Polizei abhängen!') };
       return { text: '📦 Fracht laden', run: () => this.startDocks(v) };
     }
@@ -364,6 +375,7 @@ export class Missions {
         let pay = want * 50;
         if (late) pay *= 0.5;
         else pay += Math.min(400, j.t * 8);
+        pay = ecoPay(pay);
         j.bottles -= want;
         j.earn += pay;
         this.api.addMoney(Math.round(pay));
@@ -372,10 +384,10 @@ export class Missions {
         j.k++;
         if (j.k >= 5 || j.bottles <= 0) {
           let bonus = 0;
-          if (j.k >= 5 && j.broken <= 6) bonus = 1500;
+          if (j.k >= 5 && j.broken <= 6) bonus = ecoPay(1500);
           if (bonus) this.api.addMoney(bonus);
           this.endJob(null);
-          this.api.banner('🍾 TOUR GESCHAFFT', `Verdient: ${fmt(j.earn + bonus)} D$${bonus ? ' (inkl. 1.500 D$ Bonus für saubere Fahrt)' : ''}`);
+          this.api.banner('🍾 TOUR GESCHAFFT', `Verdient: ${fmt(j.earn + bonus)} D$${bonus ? ' (inkl. ${fmtD(bonus)} D$ Bonus für saubere Fahrt)' : ''}`);
           return;
         }
         this.nextStop();
@@ -400,8 +412,8 @@ export class Missions {
     const el = $('custBody');
     const btn = (label, price, owned, act, extra = '') => `<button class="cb${owned ? ' own' : ''}" data-act="${act}" ${extra}>${label}<small>${owned ? '✓ eingebaut' : fmt(price) + ' D$'}</small></button>`;
     let h = `<div class="cmoney">D$ ${fmt(G.money)} · ${v.M.name}</div>`;
-    h += `<div class="crow"><b>Lack</b> <span class="cpr">500 D$</span><div class="sw">${COLORS.map((c) => `<button class="swb${(t.col || v.color) === c ? ' sel' : ''}" style="background:${c}" data-act="col:${c}"></button>`).join('')}</div></div>`;
-    h += `<div class="crow"><b>Neon-Unterboden</b> <span class="cpr">3.000 D$</span><div class="sw">${NEONS.map((c) => `<button class="swb neon${t.neon === c ? ' sel' : ''}" style="background:${c};box-shadow:0 0 10px ${c}" data-act="neon:${c}"></button>`).join('')}<button class="swb${!t.neon ? ' sel' : ''}" data-act="neon:" style="background:#222">✕</button></div></div>`;
+    h += `<div class="crow"><b>Lack</b> <span class="cpr">50 D$</span><div class="sw">${COLORS.map((c) => `<button class="swb${(t.col || v.color) === c ? ' sel' : ''}" style="background:${c}" data-act="col:${c}"></button>`).join('')}</div></div>`;
+    h += `<div class="crow"><b>Neon-Unterboden</b> <span class="cpr">300 D$</span><div class="sw">${NEONS.map((c) => `<button class="swb neon${t.neon === c ? ' sel' : ''}" style="background:${c};box-shadow:0 0 10px ${c}" data-act="neon:${c}"></button>`).join('')}<button class="swb${!t.neon ? ' sel' : ''}" data-act="neon:" style="background:#222">✕</button></div></div>`;
     h += `<div class="crow"><b>Fahrwerk</b><div class="cbs">${btn('⬇ Tieferlegen', 2000, t.low, 'low')}</div></div>`;
     h += `<div class="crow"><b>Heckspoiler</b> <small>mehr Tempo & Grip</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k} (+${k * 7}%)`, [0, 5000, 10000, 20000][k], (t.spoiler || 0) >= k, 'spoiler:' + k)).join('')}</div></div>`;
     h += `<div class="crow"><b>Panzerung</b> <small>+40 % Leben pro Stufe</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k}`, [0, 10000, 25000, 50000][k], (t.armor || 0) >= k, 'armor:' + k)).join('')}</div></div>`;
@@ -414,11 +426,11 @@ export class Missions {
     const t = { ...(all[v.type] || {}) };
     const [k, val] = act.split(':');
     let price = 0;
-    if (k === 'col') { if (t.col === val) return; price = 500; t.col = val; }
-    else if (k === 'neon') { if ((t.neon || '') === val) return; price = val ? 3000 : 0; t.neon = val || null; }
-    else if (k === 'low') { if (t.low) return; price = 2000; t.low = true; }
-    else if (k === 'spoiler') { const n = +val; if ((t.spoiler || 0) >= n) return; price = [0, 5000, 10000, 20000][n]; t.spoiler = n; }
-    else if (k === 'armor') { const n = +val; if ((t.armor || 0) >= n) return; price = [0, 10000, 25000, 50000][n]; t.armor = n; }
+    if (k === 'col') { if (t.col === val) return; price = 50; t.col = val; }
+    else if (k === 'neon') { if ((t.neon || '') === val) return; price = val ? 300 : 0; t.neon = val || null; }
+    else if (k === 'low') { if (t.low) return; price = 200; t.low = true; }
+    else if (k === 'spoiler') { const n = +val; if ((t.spoiler || 0) >= n) return; price = [0, 500, 1000, 2000][n]; t.spoiler = n; }
+    else if (k === 'armor') { const n = +val; if ((t.armor || 0) >= n) return; price = [0, 1000, 2500, 5000][n]; t.armor = n; }
     if (price > G.money) { this.api.toast(`💸 Zu wenig Geld (${fmt(price)} D$)`); return; }
     if (price) this.api.addMoney(-price);
     all[v.type] = t;
@@ -533,9 +545,9 @@ export class Missions {
   }
   offerText(k) {
     return {
-      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', 'bis 4.000 D$'],
-      hit: ['🎯 Attentat', '„Ein Typ in Gold schuldet meinem Boss Geld. Er läuft mit zwei Bodyguards durch die Stadt. Erledige ihn.“', '3.500 D$'],
-      radj: ['📦 Radjs Lieferung', '„Radj hier. In der Wüste wartet eine Lieferung für mich – keine Fragen. Hol sie ab und bring sie in meine Lagerhalle an den Docks. Und lass dir keine Bullen anhängen.“', '4.000–5.500 D$'],
+      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `bis ${fmtD(ecoPay(4000))} D$`],
+      hit: ['🎯 Attentat', '„Ein Typ in Gold schuldet meinem Boss Geld. Er läuft mit zwei Bodyguards durch die Stadt. Erledige ihn.“', `${fmtD(ecoPay(3500))} D$`],
+      radj: ['📦 Radjs Lieferung', '„Radj hier. In der Wüste wartet eine Lieferung für mich – keine Fragen. Hol sie ab und bring sie in meine Lagerhalle an den Docks. Und lass dir keine Bullen anhängen.“', `${fmtD(ecoPay(4000))}–${fmtD(ecoPay(6500))} D$`],
     }[k];
   }
   // answer on the popup: accept → route to the booth
@@ -628,7 +640,7 @@ export class Missions {
       } else G.audio.tone(0.2, 900, 1400, 0.1, 'triangle');
       j.k++;
       if (j.k >= j.pts.length) {
-        const pay = Math.round(Math.min(4000, 1200 + j.t * 70));
+        const pay = ecoPay(Math.min(4000, 1200 + j.t * 70));
         this.api.addMoney(pay);
         this.endJob(null);
         this.api.banner('🏁 GESCHAFFT!', `${Math.round(j.t)} s übrig · +${fmt(pay)} D$`);
@@ -677,10 +689,10 @@ export class Missions {
     this.G.missionTarget = { x: v.pos.x, z: v.pos.z, color: '#ff4040' };
     const pp = this.api.playerPos();
     if (v.dead) {
-      this.api.addMoney(3500);
+      this.api.addMoney(ecoPay(3500));
       this.api.setStars(Math.max(2, this.G.wanted.stars), 'Mord an einem VIP gemeldet');
       this.endJob(null);
-      this.api.banner('🎯 ZIEL AUSGESCHALTET', '+3.500 D$ · Häng die Polizei ab');
+      this.api.banner('🎯 ZIEL AUSGESCHALTET', `+${fmtD(ecoPay(3500))} D$ · Häng die Polizei ab`);
       for (const gd of j.guards) gd.follow = null;
       return;
     }
@@ -739,10 +751,10 @@ export class Missions {
     if (d < 12) {
       if (G.wanted.stars > 0) { this.setJobHUD('📦 RADJS LIEFERUNG', 'Radj nimmt nichts mit Bullen im Nacken!', 'Häng erst die Polizei ab', true); return; }
       if (v !== j.veh) { this.setJobHUD('📦 RADJS LIEFERUNG', 'Die Ware ist im Fahrzeug', 'Bring das Fahrzeug mit der Ware hierher', true); return; }
-      const pay = Math.round(rand(4000, 5500) + (j.clean ? 1000 : 0));
+      const pay = ecoPay(rand(4000, 5500) + (j.clean ? 1000 : 0));
       this.api.addMoney(pay);
       this.endJob(null);
-      this.api.banner('📦 GELIEFERT', `+${fmt(pay)} D$${j.clean ? ' (inkl. 1.000 D$ Sauber-Bonus)' : ''}`);
+      this.api.banner('📦 GELIEFERT', `+${fmt(pay)} D$${j.clean ? ' (inkl. ${fmtD(ecoPay(1000))} D$ Sauber-Bonus)' : ''}`);
       return;
     }
     this.setJobHUD('📦 RADJS LIEFERUNG', 'Bring die Ware zu Radjs Lagerhalle', `📍 ${Math.round(d)} m${G.wanted.stars ? ' · ⭐ erst abhängen' : ''}`, false);
@@ -767,7 +779,7 @@ export class Missions {
       this.setJobHUD('📦 DOCKS-COUP', 'Fracht wird geladen…', `${Math.max(0, j.t).toFixed(1)} s`, false);
       if (j.t <= 0) {
         j.stage = 'run';
-        store.set('dc3d_docksCD', String(Date.now() + 15 * 60000));
+        robDone('docks');
         this.api.setStars(4, 'Diebstahl an den Docks gemeldet!');
         G.wanted.lock = 4; // like in 2D: the stars stay until the cargo is at the hideout
         const h = world.hideout;
@@ -782,11 +794,11 @@ export class Missions {
     const d = Math.hypot(pp.x - h.x, pp.z - h.z);
     if (d < 12) {
       if (v !== j.veh) { this.setJobHUD('📦 DOCKS-COUP', 'Die Fracht ist im Transporter!', 'Hol den Transporter hierher', true); return; }
-      this.api.addMoney(20000);
+      this.api.addMoney(ecoPay(20000));
       G.wanted.lock = 0;
       this.api.setStars(0);
       this.endJob(null);
-      this.api.banner('📦 FRACHT VERKAUFT', '+20.000 D$');
+      this.api.banner('📦 FRACHT VERKAUFT', `+${fmtD(ecoPay(20000))} D$`);
       return;
     }
     this.setJobHUD('📦 DOCKS-COUP', 'Bring die Fracht zum Versteck', `📍 ${Math.round(d)} m${v !== j.veh ? ' · 🚐 Transporter zurückholen!' : ''}`, false);
@@ -832,7 +844,7 @@ export class Missions {
       if (j.stage === 'deliver') {
         const hot = j.heat;
         j.streak = hot > 40 ? j.streak + 1 : 0;
-        const pay = Math.round(120 + hot * 5 + Math.min(600, j.streak * 60));
+        const pay = ecoPay(120 + hot * 5 + Math.min(600, j.streak * 60));
         j.earn += pay;
         j.done++;
         j.pizzas--;
@@ -866,7 +878,7 @@ export class Missions {
 
   // ---------- bank robbery ----------
   bankAvailable() {
-    if (store.get('dc3d_bankDay') === today()) return '🏦 Die Bank wurde heute schon ausgeraubt – morgen wieder';
+    { const r = robCheck('bank'); if (r) return '🏦 ' + r; }
     const retry = +store.get('dc3d_bankRetry') || 0;
     if (Date.now() < retry) return `🏦 Zu viel Polizei – in ${Math.ceil((retry - Date.now()) / 60000)} Min. wieder`;
     if (this.job) return '🏦 Erst den Auftrag beenden';
@@ -940,18 +952,18 @@ export class Missions {
         const h = world.hideout;
         this.marker.set(h.x, h.z);
         G.missionTarget = { x: h.x, z: h.z, color: '#39ff88' };
-        this.api.banner('🚨 ABHAUEN!', 'Bring die Beute (25.000 D$) ins Versteck');
+        this.api.banner('🚨 ABHAUEN!', `Bring die Beute (${fmtD(ecoPay(25000))} D$) ins Versteck`);
       }
     } else if (st.state === 'escape') {
       const pp = this.api.playerPos();
       const h = world.hideout;
       const d = Math.hypot(pp.x - h.x, pp.z - h.z);
-      this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 25.000 D$ · 📍 ${Math.round(d)} m`, false);
+      this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 ${fmtD(ecoPay(25000))} D$ · 📍 ${Math.round(d)} m`, false);
       if (d < 9) {
-        store.set('dc3d_bankDay', today());
-        this.api.addMoney(25000);
+        robDone('bank');
+        this.api.addMoney(ecoPay(25000));
         this.api.setStars(0);
-        this.api.banner('💰 ÜBERFALL GESCHAFFT', '+25.000 D$ · Die Bank öffnet morgen wieder');
+        this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(ecoPay(25000))} D$ · Nächster Überfall in 30 Min.`);
         this.resetBank();
       }
     }
