@@ -52,14 +52,20 @@
  *    - 'casino'  { x0, x1, z0, z1, h: 22 }    = Casino-Hauptgebaeude (z0 = Front mit Schild/Teppich).
  *    - 'tower'   { cx, cz }                   = Mitte des Radj Towers (Sockel 26x26x120, Aufsatz 18x18 bis 140).
  *
- * 5) AUTOBAHNKREUZ (neu)  -  const k = DildiCars.dildiCityInterchange(THREE, { cx, cz }); scene.add(k);
- *    Freie Flaeche ca. 440 x 440 m noetig (z. B. in einer Wueste). Enthaelt Bruecke, 4 Kleeblatt-Rampen,
- *    Schilderbruecken und Gebaeude (Rasthof-Diner + Tankstelle, Motel mit Pool, Logistikzentrum,
- *    Skatepark mit Graffiti unter der Bruecke, Leucht-Plakatwand).
- *    BEFAHRBAR MACHEN: k.userData.roads = [{ name, w, samples:[{x,y,z}] }] - als Strassen/Bruecken
- *    (Deck-Strassen mit Hoehe y) im Strassensystem des Spiels anmelden. k.userData.colliders =
- *    [{x0,x1,z0,z1,h}] fuer die Gebaeude als Kollision eintragen (wie bei den anderen Gebaeuden).
- *    Leuchtteile: W.signMats.push(k.userData.glow).
+ * 5) DILDI-KREUZ ERSETZEN (zwischen Innenstadt und Bruecke zu Docks/Flughafen)
+ *    a) In der Strassenliste die drei alten Eintraege entfernen:
+ *       vn("Dildi-Kreuz",...), vn("Rampe West",...), vn("Rampe Ost",...)
+ *       und stattdessen eintragen:
+ *         for (const r of DildiCars.dildiKreuz.roads()) vn(r.name, r.pts, r.opts);
+ *       (pts im Format [x, z, y] wie bisher, kind "deck" -> das Spiel baut Fahrbahn, Pfeiler, Lampen
+ *       und macht alles befahrbar wie vorher). Anschluesse an Stadt und Hafenstrasse bleiben gleich.
+ *       Neu: 4 Kleeblatt-Schleifen statt 2 Rampen - von jeder Richtung auf die Hafenstrasse und zurueck.
+ *    b) Deko (Schilderbruecken, Skatepark unter der Hochstrasse, Rasthof-Diner + Tanke, Motel mit Pool,
+ *       2 Leucht-Plakatwaende):
+ *         const deko = DildiCars.dildiKreuz.decor(THREE); scene.add(deko);
+ *         for (const c of deko.userData.colliders) Oe(c.x0, c.x1, c.z0, c.z1, c.h);   // Kollision
+ *         W.signMats.push(deko.userData.glow);
+ *    (dildiCityInterchange ist die grosse freistehende Variante, fuer Dildi City nicht noetig.)
  *    Jeep: Typ 'jeep' ersetzt den Schmuggler-Jeep (Fahrzeug-Abschnitt 1).
  *
  * 4) DOCKS & FLUGHAFEN  -  liefern fertige Geometrien mit Vertex-Farben fuer die gemergten Deko-Listen:
@@ -1206,6 +1212,58 @@
     return group;
   }
 
+
+  // ======================================================================
+  // DILDI-KREUZ (Ersatz fuer das alte Kreuz zwischen Innenstadt und Bruecke)
+  // Gleiche Anschluesse wie bisher: Stadtausfahrten (-136/-236) und (136/-236),
+  // Hafenstrasse x=0 von z=-236 bis -416 (zur Bruecke -> Docks/Flughafen).
+  // Neu: Kleeblatt mit 4 Schleifenrampen zwischen Hochstrasse (y=9, z=-320)
+  // und Hafenstrasse statt der 2 alten Rampen.
+  // ======================================================================
+  function kreuzRoads() {
+    const R = [];
+    R.push({ name: 'Dildi-Kreuz', opts: { kind: 'deck', w: 14, lamps: true }, pts: [[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -322, 9], [0, -322, 9], [60, -322, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]] });
+    const r = 33;
+    for (const sx of SIDES) for (const sz of SIDES) {
+      const ccx = sx * 40, ccz = -322 + sz * 40;
+      const a0 = Math.atan2(-sz, 0) , a1 = sx > 0 ? Math.PI : 0;   // Start an der Hochstrasse, Ende an der Hafenstrasse
+      let sweep = a1 - a0;
+      for (let k = -2; k <= 2; k++) if (Math.abs(Math.abs(a1 - a0 + 2 * Math.PI * k) - 1.5 * Math.PI) < 0.01) sweep = a1 - a0 + 2 * Math.PI * k;
+      const pts = [];
+      for (let i = 0; i <= 18; i++) {
+        const t = i / 18, a = a0 + sweep * t;
+        pts.push([+(ccx + r * Math.cos(a)).toFixed(2), +(ccz + r * Math.sin(a)).toFixed(2), +(9 * (1 - t)).toFixed(2)]);
+      }
+      R.push({ name: 'Kleeblatt ' + (sz > 0 ? 'Nord' : 'Sued') + (sx > 0 ? 'ost' : 'west'), opts: { kind: 'deck', w: 9 }, pts });
+    }
+    return R;
+  }
+
+  function kreuzDecor(THREE, opts) {
+    Object.assign(BPAL, { Asphalt: [0.20, 0.21, 0.22], LaneWhite: [0.92, 0.92, 0.88], SignBlue: [0.08, 0.25, 0.65] });
+    const mb = new MB(), g = new MB();
+    let col = [];
+    signGantry(mb, 0, -252, 'z', 0.2);
+    signGantry(mb, 0, -404, 'z', 0.2);
+    col = col.concat(
+      underBridge(mb, g, 110, -350),            // Skatepark unter der Hochstrasse (Ost)
+      diner(mb, g, -105, -385),                 // Rasthof-Diner + Tankstelle (Suedwest, am Wasser)
+      motel(mb, g, 105, -398),                  // Motel mit Pool (Suedost)
+      billboard(mb, g, -96, -262, 0.5),         // Leucht-Plakatwand (Nordwest)
+      billboard(mb, g, 96, -262, -0.5));
+    const cache = {};
+    const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
+    const group = new THREE.Group();
+    const m = new THREE.Mesh(vcGeometry(THREE, mb, () => true, colorOf), (opts && opts.material) || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }));
+    m.castShadow = m.receiveShadow = true;
+    const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    group.add(m, new THREE.Mesh(vcGeometry(THREE, g, () => true, colorOf), glowMat));
+    group.name = 'Dildi-Kreuz-Deko';
+    group.userData = { colliders: col, glow: glowMat };
+    return group;
+  }
+  const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor };
+
   // ======================================================================
   // three.js-Aufbau
   // ======================================================================
@@ -2049,7 +2107,7 @@
     return car;
   }
 
-  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, dildiCityInterchange, types: Object.keys(VEHICLES) };
+  const api = { createRS6, createFerrari, createVehicle, dildiCityVehicle, dildiCityPlane, dildiCityBuilding, dildiCityDocks, dildiCityAirport, dildiCityInterchange, dildiKreuz, types: Object.keys(VEHICLES) };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DildiCars = api;
 })(typeof window !== 'undefined' ? window : globalThis);
