@@ -111,3 +111,4 @@ Dildi City (Quellcode):
 - Zeitrennen: Schild über dem Checkpoint zeigt die nächste Richtung (`Marker.arrow`, berechnet in `raceMark`).
 - Mittelstreifen außerhalb: von Straßenpunkt zu Straßenpunkt mit Höhe an beiden Enden (kein Schweben an Hängen/Rampen).
 - Kamera near 0.3 statt 0.1 (bessere Tiefengenauigkeit, weniger Flackern); Bank-Seitenwände überlappen die Rückwand nicht mehr.
+- Kreisverkehr am Ende der Brückenstraße (`KREISEL` in geo.js): Einbahn-Ring (`oneway`), Mittelinsel mit Kollision, auf der Karte.
