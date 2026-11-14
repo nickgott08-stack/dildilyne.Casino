@@ -170,9 +170,12 @@ const WKM = [1, 1.25, 1.5, 1.75, 2];
 export const season = {
   wk: GCFG ? Math.max(0, Math.min(4, +GCFG.wk || 0)) : 0,
   day: GCFG ? Math.max(0, +GCFG.sd || 0) : 0,
-  on: !!(GCFG && GCFG.son),
+  // im Casino entscheidet das Casino (Saisonstart Mo 16.11.), sonst das Datum
+  on: GCFG ? !!GCFG.son : Date.now() >= new Date(2026, 10, 16).getTime(),
 };
-export const ecoPay = (n) => Math.max(1, Math.round(n * 0.1 * WKM[season.wk]));
+// vor Saisonstart alles wie früher (Kurs 10:1, alte Beträge), danach neue Wirtschaft
+export const ecoPay = (n) => (season.on ? Math.max(1, Math.round(n * 0.1 * WKM[season.wk])) : Math.round(n));
+export const P10 = (n) => (season.on ? n : n * 10); // Preise sind im neuen Maßstab angegeben
 export const fmtD = (n) => Math.round(n).toLocaleString('de-DE');
 let saveT = null;
 function postSave() {
