@@ -54,3 +54,11 @@ Im Casino wird der Casino-Name als Online-Name vorgeschlagen; Online-Server = `D
   (wenn vom Server ausgeliefert), sonst `DEFAULT_SERVER` in `online.js`.
 - Deployment: Render-Webservice https://dildilyne-casino-1.onrender.com (Free Tier, schläft nach ~15 Min ohne Besucher ein; Auto-Deploy von `main`). `render.yaml` im Repo-Root.
 - Lokal testen: `cd city3d && node build.mjs && cd .. && node server/server.js` → http://localhost:8080
+
+## Performance (14.11.2026)
+- Messung: Spiellogik ~1–2 ms/Frame, ~380 Draw-Calls, ~380k Dreiecke inkl. Schattenpass – Engpass am Handy ist die Pixelberechnung.
+- Unsichtbare Lichter kosten pro Pixel trotzdem: Mündungsfeuer-/Explosions-Punktlichter nur auf „Hoch“, Scheinwerfer auf „Hoch“+„Mittel“
+  (`QUALITY.fxLights/headLight`, umgeschaltet in `applyQuality`, dort werden die Shader neu gebaut).
+- „Mittel“: Schattenbereich ±62 m statt ±90 m (schärfer bei 1024er-Map), Schatten nur jedes 2. Bild neu (`shadowEvery`).
+- Passanten werfen nur in der Nähe Schatten (`pedShadow`-Meter, `pedShadow()` in main.js) – spart viele Draw-Calls im Schattenpass.
+- Pausenmenü: „📊 FPS-Anzeige“ (FPS, Stufe, Auflösungsfaktor) zum Testen am Handy.

@@ -23,9 +23,12 @@ const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 // ---------- quality ----------
 const QUALITY = {
-  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, traffic: 22, peds: 26, lod: 70 },
-  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, traffic: 17, peds: 20, lod: 50 },
-  niedrig: { pr: 1, shadow: 512, shadows: false, traffic: 13, peds: 14, lod: 35 },
+  // shadowR: half size of the shadow area (m), shadowEvery: redraw shadows every n-th frame,
+  // fxLights: point lights for muzzle flash / explosions, headLight: car headlight at night.
+  // Every extra light is computed for every pixel, even at intensity 0 – so they are dropped on weaker settings.
+  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, traffic: 22, peds: 26, lod: 70 },
+  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 35, traffic: 17, peds: 20, lod: 50 },
+  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, traffic: 13, peds: 14, lod: 35 },
 };
 let qName = store.get('dc3d_q') || 'hoch';
 let Q = QUALITY[qName];
@@ -56,6 +59,14 @@ function applyQuality() {
   sky.sun.castShadow = Q.shadows;
   if (sky.sun.shadow.map) { sky.sun.shadow.map.dispose(); sky.sun.shadow.map = null; }
   sky.sun.shadow.mapSize.set(Q.shadow, Q.shadow);
+  const sc = sky.sun.shadow.camera;
+  sc.left = sc.bottom = -Q.shadowR; sc.right = sc.top = Q.shadowR;
+  sc.updateProjectionMatrix();
+  renderer.shadowMap.autoUpdate = Q.shadowEvery <= 1;
+  renderer.shadowMap.needsUpdate = true;
+  // lights that are switched off still cost per pixel -> hide them (changes the shaders, hence needsUpdate below)
+  fx.flash.visible = fx.boom.visible = Q.fxLights;
+  headL.visible = Q.headLight;
   scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => (m.needsUpdate = true)); } });
   resize();
   store.set('dc3d_q', qName);
@@ -98,11 +109,11 @@ function resize() {
   fx.setScale(h * Q.pr);
 }
 window.addEventListener('resize', resize);
-applyQuality();
-
 // headlight for the player's car
 const headL = new THREE.SpotLight('#fff2d0', 0, 60, 0.55, 0.5, 1.2);
 scene.add(headL, headL.target);
+applyQuality();
+
 
 // ---------- player ----------
 const player = {
@@ -1520,14 +1531,44 @@ G.findRoute = findRoute;
 G.renderer = renderer;
 G.camera = camera;
 G.groundAt = groundAt;
+let shadowFrame = 0;
+function pedShadow(h, on) {
+  if (h._sh === on) return;
+  if (!h._casters) { h._casters = []; h.root.traverse((o) => { if (o.isMesh && o.castShadow) h._casters.push(o); }); }
+  for (const m of h._casters) m.castShadow = on;
+  h._sh = on;
+}
+// optional FPS counter (pause menu)
+let fpsOn = store.get('dc3d_fps') === '1', fpsT = 0, fpsFrames = 0;
+function updateFpsBtn() { $('fpsBtn').textContent = '📊 FPS-Anzeige: ' + (fpsOn ? 'an' : 'aus'); $('fps').style.display = fpsOn ? 'block' : 'none'; }
+$('fpsBtn').addEventListener('click', () => { fpsOn = !fpsOn; store.set('dc3d_fps', fpsOn ? '1' : '0'); updateFpsBtn(); });
+updateFpsBtn();
+function tickFps(dt) {
+  if (!fpsOn) return;
+  fpsT += dt; fpsFrames++;
+  if (fpsT >= 0.5) {
+    const f = Math.round(fpsFrames / fpsT);
+    const el = $('fps');
+    el.textContent = `${f} FPS · ${qName.toUpperCase()} · ${renderer.getPixelRatio().toFixed(2)}x`;
+    el.style.color = f >= 50 ? '#3bff6a' : f >= 30 ? '#ffd23b' : '#ff5a5a';
+    fpsT = 0; fpsFrames = 0;
+  }
+}
 function render(dt) {
+  tickFps(dt);
   const focus = player.inVehicle ? player.inVehicle.pos : player.pos;
   updateSky(sky, G.cycle, focus, dt, Q);
   camera.updateMatrixWorld();
   _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   _frustum.setFromProjectionMatrix(_pm);
-  // cull far humans
-  for (const p of G.peds) p.h.root.visible = Math.hypot(p.pos.x - camera.position.x, p.pos.z - camera.position.z) < 130;
+  // cull far humans; only nearby passers-by cast shadows (saves many draw calls in the shadow pass)
+  for (const p of G.peds) {
+    const d = Math.hypot(p.pos.x - camera.position.x, p.pos.z - camera.position.z);
+    p.h.root.visible = d < 130;
+    pedShadow(p.h, d < Q.pedShadow);
+  }
+  // weaker settings: redraw the shadow map only every n-th frame (the sun barely moves)
+  if (Q.shadows && Q.shadowEvery > 1 && ++shadowFrame >= Q.shadowEvery) { shadowFrame = 0; renderer.shadowMap.needsUpdate = true; }
   if (!G.paused) updateHUD(dt);
   mapT -= dt;
   if (mapT <= 0) { mapT = 1 / 30; drawMini(); }
