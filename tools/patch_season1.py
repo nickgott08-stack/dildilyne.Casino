@@ -30,7 +30,7 @@ i = s.index('function ssApply(')
 j = s.index('function ssRun(')
 s = s[:i] + '''function ssApply(s,name){s=s||{};let ob=+s.bits||0,oe=+s.eur||0,tv=0;try{tv=trValue(s.tr)||0}catch(e){}try{tv+=bxValue(s.stk)||0}catch(e){}
  /* Dildi City: D$ (vor dem 1:1-Kurs zählen 10 D$ = 1 Bit) */
- let od=0;try{let d3=((s.gta||{}).d3)||{},dl=+d3.dc3d_dollar||0;od=Math.round(d3.dc3d_eco2?dl:dl/10)}catch(e){}
+ let od=0;try{let d3=((s.gta||{}).d3)||{},dl=+d3.dc3d_dollar||0;od=Math.round(d3.dc3d_eco2==="1"?dl:dl/10)}catch(e){}
  /* doppelte Karten zum Händlerpreis verkaufen (angebotene Karten bleiben) */
  let cards=Object.assign({},s.cards),oc=0,dup=0,DR=[.5,.3,.1,.03,.01],lc={};
  try{(s.lst||[]).forEach((l)=>{if(l&&l.c)lc[l.c]=(lc[l.c]||0)+1})}catch(e){}

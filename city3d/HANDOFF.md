@@ -86,7 +86,7 @@ Casino-Änderungen per `tools/patch_season1.py` (einmalig angewendet, dokumentie
   nur Anzeige (Saison-Ansage + Profil).
 - Rangliste `mkTabs()` = nur Rekord-Kategorien; `mkTabsAll()` = alle (für Saison-0-Archiv/Meisterschaft „Saison 0“).
 - `ssW()` Saisonwoche 0–4, `ssDay()` Tag 0–29, `ssM()` Faktor 1/1,25/1,5/1,75/2 für Minispiele, Erfolge (`ACHB`), Wochenaufgaben (`WK.r`).
-- Hafen-Fang ~500/Runde (Fang-Wert und Deckel ×2, gleiche Fisch-Dichte), Memory und Flugschule halbiert, Kippen alle 5 Min.
+- Hafen-Fang ~500/Runde (Fang-Wert und Deckel ×2, gleiche Fisch-Dichte), Memory und Flugschule halbiert – erst ab Saisonstart (`ssOn()`, `fsEco()`), ebenso die Rekord-Rangliste. Kippen alle 5 Min.
 - Einsätze: kleines Pferderennen + Boxen max. 1.000; großes Pferderennen max 5k/10k/25k (Woche 1/2/3+), 50-%-Knopf, ALL-IN ab Woche 3.
   Der Coup (Roulette) 1 h zwischen Missionen.
 - Dildi City bekommt `sd`/`wk`/`son` in GCFG.
@@ -94,3 +94,7 @@ Dildi City (Quellcode):
 - Kurs 1 D$ = 1 Bit, alte D$ einmalig /10 (`dc3d_eco2`), Preise /10, alle Job-Bezahlungen über `ecoPay()` (alt/10 × Wochen-Faktor),
   Radj-Finale fest 150.000 (1×/Woche). Tauschgrenze D$→Bits pro Tag 10.000 + 5.000 × Saisontag, ab Tag 24 unbegrenzt.
 - Bankraub + Docks-Coup: alle 30 Min, max. 10× pro Tag (`robCheck`/`robDone`).
+- **Alles erst ab Saisonstart** (`ssOn()` im Casino, `season.on` in Dildi City – im Casino über GCFG.son, sonst Datum 16.11.2026):
+  Einsätze, Kippen, Coup-Wartezeit (`hkh()`), Minispiel-Werte, Rangliste, Dildi-City-Kurs/Preise (`P10`)/Bezahlung/Raub-Regeln.
+  D$ werden je nach Zustand umgerechnet (`dc3d_eco2` = '1' neuer Maßstab, '0' alter); das Sparschwein liest das Flag.
+  Patch-Skripte: `tools/patch_season1.py`, `tools/patch_season1_gate.py`, `tools/patch_season1_gate2.py`.

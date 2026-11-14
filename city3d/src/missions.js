@@ -6,17 +6,19 @@ import { Ped } from './ai.js';
 import { setMask } from './human.js';
 import { installHeist, installFinale, installCutter } from './heist.js';
 import { POI, ROADS } from './geo.js';
-import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD } from './util.js';
+import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD, P10, season } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
-// Bankraub / Docks-Coup: frühestens alle 30 Minuten, höchstens 10× pro Tag
-const ROB_CD = 30 * 60000, ROB_MAX = 10;
+// ab Saisonstart: Bankraub / Docks-Coup frühestens alle 30 Minuten, höchstens 10× pro Tag
+// davor wie früher: Bank 1× pro Tag, Docks alle 15 Minuten
+const robCd = (k) => (season.on ? 30 : k === 'docks' ? 15 : 0) * 60000;
+const robMax = (k) => (season.on ? 10 : k === 'bank' ? 1 : Infinity);
 function robState(k) { let s = null; try { s = JSON.parse(store.get('dc3d_rob_' + k) || 'null'); } catch (e) {} if (!s || s.d !== today()) s = { d: today(), n: 0, t: (s && s.t) || 0 }; return s; }
 function robCheck(k) {
   const s = robState(k);
-  if (s.n >= ROB_MAX) return `Heute schon ${ROB_MAX}× – morgen wieder`;
-  const left = s.t + ROB_CD - Date.now();
+  if (s.n >= robMax(k)) return robMax(k) === 1 ? 'Heute schon ausgeraubt – morgen wieder' : `Heute schon ${robMax(k)}× – morgen wieder`;
+  const left = s.t + robCd(k) - Date.now();
   if (left > 0) return `Wieder möglich in ${Math.ceil(left / 60000)} Min.`;
   return null;
 }
@@ -66,9 +68,9 @@ class Marker {
 // ---------------- garages ----------------
 const GARAGE_CARS = [
   { type: 'skoda', color: '#2e7d32', icon: '🚗', info: 'Starter-Auto', price: 0 },
-  { type: 'van', color: '#f5f5f5', icon: '🚐', info: 'Für den Docks-Coup', price: 3000 },
-  { type: 'rs6', color: '#8e9397', icon: '🚙', info: 'Schneller Kombi', price: 12000 },
-  { type: 'ferrari', color: '#d40000', icon: '🏎️', info: 'Supersportwagen', price: 30000 },
+  { type: 'van', color: '#f5f5f5', icon: '🚐', info: 'Für den Docks-Coup', price: P10(3000) },
+  { type: 'rs6', color: '#8e9397', icon: '🚙', info: 'Schneller Kombi', price: P10(12000) },
+  { type: 'ferrari', color: '#d40000', icon: '🏎️', info: 'Supersportwagen', price: P10(30000) },
 ];
 const loadOwned = () => { try { return { skoda: 1, ...JSON.parse(store.get('dc3d_owned') || '{}') }; } catch (e) { return { skoda: 1 }; } };
 
@@ -412,8 +414,8 @@ export class Missions {
     const el = $('custBody');
     const btn = (label, price, owned, act, extra = '') => `<button class="cb${owned ? ' own' : ''}" data-act="${act}" ${extra}>${label}<small>${owned ? '✓ eingebaut' : fmt(price) + ' D$'}</small></button>`;
     let h = `<div class="cmoney">D$ ${fmt(G.money)} · ${v.M.name}</div>`;
-    h += `<div class="crow"><b>Lack</b> <span class="cpr">50 D$</span><div class="sw">${COLORS.map((c) => `<button class="swb${(t.col || v.color) === c ? ' sel' : ''}" style="background:${c}" data-act="col:${c}"></button>`).join('')}</div></div>`;
-    h += `<div class="crow"><b>Neon-Unterboden</b> <span class="cpr">300 D$</span><div class="sw">${NEONS.map((c) => `<button class="swb neon${t.neon === c ? ' sel' : ''}" style="background:${c};box-shadow:0 0 10px ${c}" data-act="neon:${c}"></button>`).join('')}<button class="swb${!t.neon ? ' sel' : ''}" data-act="neon:" style="background:#222">✕</button></div></div>`;
+    h += `<div class="crow"><b>Lack</b> <span class="cpr">${fmtD(P10(50))} D$</span><div class="sw">${COLORS.map((c) => `<button class="swb${(t.col || v.color) === c ? ' sel' : ''}" style="background:${c}" data-act="col:${c}"></button>`).join('')}</div></div>`;
+    h += `<div class="crow"><b>Neon-Unterboden</b> <span class="cpr">${fmtD(P10(300))} D$</span><div class="sw">${NEONS.map((c) => `<button class="swb neon${t.neon === c ? ' sel' : ''}" style="background:${c};box-shadow:0 0 10px ${c}" data-act="neon:${c}"></button>`).join('')}<button class="swb${!t.neon ? ' sel' : ''}" data-act="neon:" style="background:#222">✕</button></div></div>`;
     h += `<div class="crow"><b>Fahrwerk</b><div class="cbs">${btn('⬇ Tieferlegen', 2000, t.low, 'low')}</div></div>`;
     h += `<div class="crow"><b>Heckspoiler</b> <small>mehr Tempo & Grip</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k} (+${k * 7}%)`, [0, 5000, 10000, 20000][k], (t.spoiler || 0) >= k, 'spoiler:' + k)).join('')}</div></div>`;
     h += `<div class="crow"><b>Panzerung</b> <small>+40 % Leben pro Stufe</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k}`, [0, 10000, 25000, 50000][k], (t.armor || 0) >= k, 'armor:' + k)).join('')}</div></div>`;
@@ -426,11 +428,11 @@ export class Missions {
     const t = { ...(all[v.type] || {}) };
     const [k, val] = act.split(':');
     let price = 0;
-    if (k === 'col') { if (t.col === val) return; price = 50; t.col = val; }
-    else if (k === 'neon') { if ((t.neon || '') === val) return; price = val ? 300 : 0; t.neon = val || null; }
-    else if (k === 'low') { if (t.low) return; price = 200; t.low = true; }
-    else if (k === 'spoiler') { const n = +val; if ((t.spoiler || 0) >= n) return; price = [0, 500, 1000, 2000][n]; t.spoiler = n; }
-    else if (k === 'armor') { const n = +val; if ((t.armor || 0) >= n) return; price = [0, 1000, 2500, 5000][n]; t.armor = n; }
+    if (k === 'col') { if (t.col === val) return; price = P10(50); t.col = val; }
+    else if (k === 'neon') { if ((t.neon || '') === val) return; price = val ? P10(300) : 0; t.neon = val || null; }
+    else if (k === 'low') { if (t.low) return; price = P10(200); t.low = true; }
+    else if (k === 'spoiler') { const n = +val; if ((t.spoiler || 0) >= n) return; price = P10([0, 500, 1000, 2000][n]); t.spoiler = n; }
+    else if (k === 'armor') { const n = +val; if ((t.armor || 0) >= n) return; price = P10([0, 1000, 2500, 5000][n]); t.armor = n; }
     if (price > G.money) { this.api.toast(`💸 Zu wenig Geld (${fmt(price)} D$)`); return; }
     if (price) this.api.addMoney(-price);
     all[v.type] = t;
@@ -963,7 +965,7 @@ export class Missions {
         robDone('bank');
         this.api.addMoney(ecoPay(25000));
         this.api.setStars(0);
-        this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(ecoPay(25000))} D$ · Nächster Überfall in 30 Min.`);
+        this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(ecoPay(25000))} D$ · ${season.on ? 'Nächster Überfall in 30 Min.' : 'Die Bank öffnet morgen wieder'}`);
         this.resetBank();
       }
     }
