@@ -166,3 +166,8 @@ Dildi City (Quellcode):
 - Stadtmauer: 1–3 m breite Reststücke neben den Ausfahrten waren 60–80 m hohe „Scheiben“ → jetzt niedrige Anbauten (11 m).
   Zufallszahlen werden wie vorher gezogen, der Rest der Stadt bleibt gleich.
 - Dildi-Customs-Halle heller (war fast schwarz); Flaschenpost-Transporter: Schild sitzt auf der Karosserie, klare Schrift.
+- **dildi_cars.js v5 (Nicks neue Kreuz-Gebäude)**: nur `kreuzExtras` übernommen (Wasserturm, Funkmast, Solarpark, Park mit DILDI-Buchstaben,
+  Drive-in „Dildi Burger“, Waschstraße, Autobahnmeisterei mit Salzkuppel, Kiosk + Bushaltestelle). Die Positionen stehen jetzt in
+  `KREUZ_EXTRAS` (passend zur Raute statt zu den alten Kleeblatt-Schleifen), Kollision über `userData.colliders` wie die übrige Deko.
+  Unsere Änderungen an der Datei (Raute in `kreuzRoads`, `glowMat`/`cull` bei den Laternen) bleiben – bei einer neuen Version von Nick
+  wieder nur die neuen Teile übernehmen.

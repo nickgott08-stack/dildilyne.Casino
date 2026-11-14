@@ -64,7 +64,8 @@
  *       ebenfalls - dort genauso nur die Physik behalten. Anschluesse an Stadt und Hafenstrasse bleiben gleich.
  *       Neu: 4 Kleeblatt-Schleifen statt 2 Rampen - von jeder Richtung auf die Hafenstrasse und zurueck.
  *    b) Deko (Schilderbruecken, Skatepark unter der Hochstrasse, Rasthof-Diner + Tanke, Motel mit Pool,
- *       2 Leucht-Plakatwaende):
+ *       2 Leucht-Plakatwaende, Wasserturm, Funkmast, Solarpark, Park mit DILDI-Buchstaben,
+ *       Drive-in "Dildi Burger", Waschstrasse, Autobahnmeisterei mit Salzkuppel, Kiosk + Bushaltestelle):
  *         const deko = DildiCars.dildiKreuz.decor(THREE); scene.add(deko);
  *         for (const c of deko.userData.colliders) Oe(c.x0, c.x1, c.z0, c.z1, c.h);   // Kollision
  *         W.signMats.push(deko.userData.glow);
@@ -1297,7 +1298,8 @@
       diner(mb, g, -105, -385),                 // Rasthof-Diner + Tankstelle (Suedwest, am Wasser)
       motel(mb, g, 105, -398),                  // Motel mit Pool (Suedost)
       billboard(mb, g, -96, -262, 0.5),         // Leucht-Plakatwand (Nordwest)
-      billboard(mb, g, 96, -262, -0.5));
+      billboard(mb, g, 96, -262, -0.5),
+      opts && opts.extras === false ? [] : kreuzExtras(mb, g, opts && opts.extrasPos));
     const cache = {};
     const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
     const group = new THREE.Group();
@@ -1310,6 +1312,110 @@
     return group;
   }
   const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor };
+
+
+  // --- Weitere Gebaeude rund ums Dildi-Kreuz (sparsam: wenige Flaechen, alles in 1 Mesh) ---
+  // Positionen fuer die Raute (statt Kleeblatt); per decor(THREE, { extrasPos: {...} }) aenderbar.
+  const KREUZ_EXTRAS = {
+    wasserturm: [-72, -270],   // Nordwest, zwischen Hochstrassen-Kurve und Rampe
+    funkmast: [68, -270],      // Nordost
+    solarpark: [-60, -378],    // Suedwest, unter der Rampe Richtung Diner
+    park: [52, -380],          // Suedost, DILDI-Buchstaben mit Blick zur Hafenstrasse
+    burger: [112, -282],       // Drive-in Nordost an der Kurve
+    waschstrasse: [136, -355], // Ost, neben dem Skatepark
+    meisterei: [-125, -350],   // West
+    kiosk: [-14, -406],        // Hafenstrasse Sued, an der Schilderbruecke
+  };
+  function kreuzExtras(d, g, P) {
+    P = Object.assign({}, KREUZ_EXTRAS, P || {});
+    const col = [];
+    const ring = (x, z, r, y, n) => hexagon(x, z, 0, r, n, Math.PI / n, 1, 1).map(([a, b]) => [a, y, b]);
+    const tree = (x, z, h) => { d.box('Wood', [x - 0.15, 0, z - 0.15], [x + 0.15, h * 0.35, z + 0.15]); d.convex('BottleGreen', [ring(x, z, h * 0.3, h * 0.3, 6), [[x, h, z]]].concat(ring(x, z, h * 0.3, h * 0.3, 6).map((p, i, A) => [p, A[(i + 1) % 6], [x, h, z]]))); };
+    // 1) Wasserturm (in der Schleife Nordwest)
+    { const [x, z] = P.wasserturm;
+      for (const [a, b] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) strut(d, 'Steel', [x + a * 1.3, 0, z + b * 1.3], [x + a, 18, z + b], 0.4);
+      strut(d, 'Steel', [x - 3.6, 9, z - 3.6], [x + 3.6, 9, z + 3.6], 0.2); strut(d, 'Steel', [x + 3.6, 9, z - 3.6], [x - 3.6, 9, z + 3.6], 0.2);
+      d.prism('LaneWhite', ring(x, z, 5.5, 18, 10), [0, 6, 0]);
+      d.convex('ChipBlue', [ring(x, z, 5.6, 24, 10), [[x, 26.5, z]]].concat(ring(x, z, 5.6, 24, 10).map((p, i, A) => [p, A[(i + 1) % 10], [x, 26.5, z]])));
+      d.prism('ChipBlue', ring(x, z, 5.56, 20.2, 10), [0, 0.9, 0]);
+      g.box('GlowRed', [x - 0.2, 26.5, z - 0.2], [x + 0.2, 26.9, z + 0.2]);
+      col.push({ x0: x - 5, x1: x + 5, z0: z - 5, z1: z + 5, h: 3 }); }
+    // 2) Funkmast (Schleife Nordost)
+    { const [x, z] = P.funkmast, H = 42;
+      for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) strut(d, 'ChipRed', [x + a * 2.2, 0, z + b * 2.2], [x + a * 0.4, H, z + b * 0.4], 0.25);
+      for (let y = 6; y < H; y += 7) { const w = 2.2 - 1.8 * y / H; strut(d, 'LaneWhite', [x - w, y, z - w], [x + w, y, z + w], 0.12); strut(d, 'LaneWhite', [x + w, y, z - w], [x - w, y, z + w], 0.12); }
+      for (const y of [H - 8, H - 14]) for (const s of SIDES) d.box('LaneWhite', [x + s * 0.6 - 0.3, y, z - 0.3], [x + s * 0.6 + 0.3, y + 1.6, z + 0.3]);
+      g.box('GlowRed', [x - 0.3, H, z - 0.3], [x + 0.3, H + 0.5, z + 0.3]);
+      d.box('Concrete', [x + 5, 0, z - 2], [x + 9, 2.6, z + 2]);
+      col.push({ x0: x - 2.5, x1: x + 2.5, z0: z - 2.5, z1: z + 2.5, h: H }, { x0: x + 5, x1: x + 9, z0: z - 2, z1: z + 2, h: 2.6 }); }
+    // 3) Solarpark (Schleife Suedwest)
+    { const [cx, cz] = P.solarpark;
+      for (let row = -2; row <= 2; row++) for (let k = -2; k <= 2; k++) {
+        const x = cx + k * 7, z = cz + row * 7;
+        if (Math.hypot(x - cx, z - cz) > 22) continue;
+        d.box('Steel', [x - 0.08, 0, z - 0.08], [x + 0.08, 1.2, z + 0.08]);
+        d.hexa('ChipBlue', [[x - 3, 0.8, z - 1.4], [x + 3, 0.8, z - 1.4], [x + 3, 1.9, z + 1.0], [x - 3, 1.9, z + 1.0],
+          [x - 3, 0.72, z - 1.38], [x + 3, 0.72, z - 1.38], [x + 3, 1.82, z + 1.02], [x - 3, 1.82, z + 1.02]]);
+      }
+      d.box('LaneWhite', [cx - 2, 0, cz - 26], [cx + 2, 2.4, cz - 23]); }
+    // 4) Park mit Baeumen + DILDI-Buchstaben (Schleife Suedost)
+    { const [cx, cz] = P.park, r = rng(5);
+      for (let i = 0; i < 14; i++) { const a = r() * Math.PI * 2, dd = 8 + r() * 15; tree(cx + Math.cos(a) * dd, cz + Math.sin(a) * dd, 5 + r() * 4); }
+      // grosse Buchstaben "DILDI" (Block-Schrift aus Quadern), Blick zur Hafenstrasse
+      const L = { D: [[0, 0, 0.6, 4], [0.6, 0, 1.8, 0.6], [0.6, 3.4, 1.8, 4], [1.8, 0.5, 2.4, 3.5]], I: [[0.9, 0, 1.5, 4]], L: [[0, 0, 0.6, 4], [0.6, 0, 2.2, 0.6]] };
+      let ox = cz - 6;
+      for (const ch of 'DILDI') {
+        for (const [a, b, c, e] of L[ch]) d.box('FlagPink', [cx - 14.5, 0.2 + b, ox + a], [cx - 13.5, 0.2 + e, ox + c]);
+        ox += ch === 'I' ? 1.6 : 2.9;
+      }
+      g.box('GlowPink', [cx - 14.6, 0.05, cz - 7], [cx - 14.5, 0.2, ox]);
+      col.push({ x0: cx - 14.6, x1: cx - 13.4, z0: cz - 6, z1: ox, h: 4.2 }); }
+    // 5) Drive-in "Dildi Burger" (Nordost, zwischen Kurve und Schleife)
+    { const [x, z] = P.burger;
+      d.box('Hazard', [x - 9, 0.2, z - 6], [x + 9, 4.2, z + 6]);
+      d.box('ChipRed', [x - 9.5, 4.2, z - 6.5], [x + 9.5, 5.0, z + 6.5]);
+      for (let i = 0; i < 4; i++) g.box('GlowWin', [x - 7.5 + i * 4, 1.2, z - 6.06], [x - 4.8 + i * 4, 3.4, z - 6.01]);
+      d.box('ChipRed', [x + 9, 0.2, z - 2], [x + 11.5, 3.6, z + 2]); g.box('GlowWin', [x + 11.5, 1.5, z - 1], [x + 11.56, 2.8, z + 1]);   // Schalter
+      // Burger-Pylon
+      d.box('Steel', [x - 13.3, 0, z - 9.3], [x - 12.7, 13, z - 8.7]);
+      d.prism('Crust', ring(x - 13, z - 9, 2.4, 13, 10), [0, 0.8, 0]);
+      d.prism('ChipBlack', ring(x - 13, z - 9, 2.5, 13.8, 10), [0, 0.6, 0]);
+      d.prism('BottleGreen', ring(x - 13, z - 9, 2.6, 14.4, 10), [0, 0.2, 0]);
+      d.convex('Crust', [ring(x - 13, z - 9, 2.4, 14.6, 10), ring(x - 13, z - 9, 1.6, 16.0, 10)].concat(ring(x - 13, z - 9, 2.4, 14.6, 10).map((p, i, A) => [p, A[(i + 1) % 10], ring(x - 13, z - 9, 1.6, 16.0, 10)[(i + 1) % 10], ring(x - 13, z - 9, 1.6, 16.0, 10)[i]])));
+      g.box('GlowWarm', [x - 9.5, 4.9, z - 6.6], [x + 9.5, 5.0, z - 6.5]);
+      col.push({ x0: x - 9, x1: x + 11.5, z0: z - 6, z1: z + 6, h: 5 }, { x0: x - 13.3, x1: x - 12.7, z0: z - 9.3, z1: z - 8.7, h: 16 }); }
+    // 6) Waschstrasse (Ost, neben dem Skatepark)
+    { const [x, z] = P.waschstrasse;
+      d.box('LaneWhite', [x - 4.5, 0.2, z - 9], [x + 4.5, 5.2, z + 9]);
+      for (const s of SIDES) { d.box('Black', [x - 3, 0.2, z + s * 9 - (s > 0 ? 0.02 : -0.02)], [x + 3, 4.2, z + s * 9]); }
+      d.box('ChipBlue', [x - 4.6, 4.6, z - 9.1], [x + 4.6, 5.3, z + 9.1]);
+      for (const k of [-1, 1]) { d.prism('ChipBlue', ring(x - 2.6, z + k * 9.3, 0.6, 0.2, 8), [0, 3.6, 0]); d.prism('FlagPink', ring(x + 2.6, z + k * 9.3, 0.6, 0.2, 8), [0, 3.6, 0]); }
+      g.box('GlowCyan', [x - 4.62, 5.0, z - 9.12], [x + 4.62, 5.1, z + 9.12]);
+      col.push({ x0: x - 4.5, x1: x + 4.5, z0: z - 9, z1: z + 9, h: 5.3 }); }
+    // 7) Autobahnmeisterei mit Salzkuppel (West)
+    { const [x, z] = P.meisterei;
+      d.box('Hazard', [x - 10, 0.2, z - 6], [x + 10, 6, z + 6]);
+      d.box('Concrete', [x - 10.3, 6, z - 6.3], [x + 10.3, 6.5, z + 6.3]);
+      for (let i = 0; i < 3; i++) d.box('DarkSteel', [x - 8 + i * 6, 0.2, z - 6.05], [x - 3.5 + i * 6, 4.6, z - 6.0]);
+      const dz = z + 22, dx = x - 4;
+      d.convex('Wood', [ring(dx, dz, 8, 0, 8), ring(dx, dz, 5, 5.5, 8), [[dx, 8, dz]]].concat(
+        ring(dx, dz, 8, 0, 8).map((p, i, A) => [p, A[(i + 1) % 8], ring(dx, dz, 5, 5.5, 8)[(i + 1) % 8], ring(dx, dz, 5, 5.5, 8)[i]]),
+        ring(dx, dz, 5, 5.5, 8).map((p, i, A) => [p, A[(i + 1) % 8], [dx, 8, dz]])));
+      d.box('DarkSteel', [dx - 2, 0, dz - 8.05], [dx + 2, 3.5, dz - 7.6]);
+      g.box('GlowWarm', [x - 0.6, 5, z - 6.3], [x + 0.6, 5.3, z - 6.05]);
+      col.push({ x0: x - 10, x1: x + 10, z0: z - 6, z1: z + 6, h: 6.5 }, { x0: dx - 7, x1: dx + 7, z0: dz - 7, z1: dz + 7, h: 8 }); }
+    // 8) Kiosk + Bushaltestelle an der Hafenstrasse (Sued)
+    { const [x, z] = P.kiosk;
+      d.box('ChipRed', [x - 3, 0.2, z - 2], [x + 3, 3, z + 2]); d.box('LaneWhite', [x - 3.3, 3, z - 2.3], [x + 3.3, 3.3, z + 2.3]);
+      g.box('GlowWin', [x - 2, 1.0, z + 2.0], [x + 2, 2.2, z + 2.05]);
+      const bx = -9;
+      d.box('Steel', [bx - 0.05, 0.2, z - 2.5], [bx + 0.05, 2.8, z - 2.4]); d.box('Steel', [bx - 0.05, 0.2, z + 2.4], [bx + 0.05, 2.8, z + 2.5]);
+      d.box('Glass', [bx - 0.03, 0.4, z - 2.4], [bx + 0.03, 2.6, z + 2.4]); d.box('DarkSteel', [bx - 1.6, 2.8, z - 2.6], [bx + 0.1, 3.0, z + 2.6]);
+      d.box('Hazard', [bx - 0.4, 0.2, z + 3], [bx - 0.3, 3.4, z + 3.1]); d.box('BottleGreen', [bx - 0.6, 3.0, z + 2.8], [bx - 0.1, 3.5, z + 3.3]);
+      col.push({ x0: x - 3, x1: x + 3, z0: z - 2, z1: z + 2, h: 3.3 }); }
+    return col;
+  }
+
 
 
   // ======================================================================
