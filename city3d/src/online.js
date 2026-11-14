@@ -40,7 +40,9 @@ export class Online {
     this.remotes = new Map();
     this.sendT = 0;
     this.wantOnline = false; this.retryT = 0; this.retries = 0;
-    this.name = store.get('dc3d_mpname') || '';
+    // im Casino: Name aus dem Casino-Konto übernehmen
+    const cfg = typeof window !== 'undefined' && window.GCFG;
+    this.name = store.get('dc3d_mpname') || (cfg && typeof cfg.name === 'string' ? cfg.name.slice(0, 16) : '');
     this.room = store.get('dc3d_mproom') || 'dildi';
     this.hoodie = store.get('dc3d_mphood') || HOODIES[(Math.random() * HOODIES.length) | 0];
     G.friends = [];

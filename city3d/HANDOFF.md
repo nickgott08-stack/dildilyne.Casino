@@ -30,7 +30,9 @@ Im Spiel ist `window.G` zum Testen offen (`G.step(n)` simuliert n Frames).
 ## Casino-Anbindung
 Im Casino läuft das Spiel im iframe: das Casino ersetzt `/*GCFG*/null` durch `{bits, sv}` und hört auf
 `postMessage({gta:'bits'|'save'|'exit'})`. Der Spielstand liegt dann in `sv.d3`. Kurs: 10 D$ = 1 Bit.
-**Offen:** Im Casino (`dildilyne_casino_koop.html`) ist noch das alte 2D-Dildi-City eingebaut – austauschen.
+**Erledigt (14.11.2026):** Das 3D-Spiel ersetzt im Casino das alte 2D-Dildi-City. Nach jeder Änderung:
+`cd city3d && node build.mjs && cd .. && node tools/embed_city.mjs` (ersetzt die Zeile `var GTAHTML=…` im Casino).
+Im Casino wird der Casino-Name als Online-Name vorgeschlagen; Online-Server = `DEFAULT_SERVER` in `online.js`.
 
 ## Nicks Wünsche / Arbeitsweise
 - Vor größeren Änderungen kurz den Plan bestätigen lassen; immer ehrlich sagen, was (nicht) klappt.
