@@ -86,7 +86,7 @@ Casino-Änderungen per `tools/patch_season1.py` (einmalig angewendet, dokumentie
   nur Anzeige (Saison-Ansage + Profil).
 - Rangliste `mkTabs()` = nur Rekord-Kategorien; `mkTabsAll()` = alle (für Saison-0-Archiv/Meisterschaft „Saison 0“).
 - `ssW()` Saisonwoche 0–4, `ssDay()` Tag 0–29, `ssM()` Faktor 1/1,25/1,5/1,75/2 für Minispiele, Erfolge (`ACHB`), Wochenaufgaben (`WK.r`).
-- Hafen-Fang ~500/Runde (Fang-Wert und Deckel ×2, gleiche Fisch-Dichte), Memory und Flugschule halbiert, Kippen alle 5 Min.
+- Hafen-Fang ~500/Runde (Fang-Wert und Deckel ×2, gleiche Fisch-Dichte), Memory und Flugschule halbiert – erst ab Saisonstart (`ssOn()`, `fsEco()`), ebenso die Rekord-Rangliste. Kippen alle 5 Min.
 - Einsätze: kleines Pferderennen + Boxen max. 1.000; großes Pferderennen max 5k/10k/25k (Woche 1/2/3+), 50-%-Knopf, ALL-IN ab Woche 3.
   Der Coup (Roulette) 1 h zwischen Missionen.
 - Dildi City bekommt `sd`/`wk`/`son` in GCFG.
