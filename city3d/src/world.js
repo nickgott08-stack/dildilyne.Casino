@@ -1182,7 +1182,7 @@ export function buildWorld(scene, quality) {
     } else if (type === 'customs') {
       // Dildi Customs: tuning workshop, drive in from the west road
       const hx0 = cx - 6, hx1 = lx1 - 1, hz0 = lz0 + 2, hz1 = lz1 - 2;
-      bGeos[3].push(buildingGeo(hx0, hx1, hz0, hz1, 0.2, 11.2, '#2b2b33', '#111', 0));
+      bGeos[3].push(buildingGeo(hx0, hx1, hz0, hz1, 0.2, 11.2, '#6a6a7c', '#2a2a30', 0)); // Customs hall (was almost black)
       addBox(hx0, hx1, hz0, hz1, 11.2);
       plain.push(cbox(lx1 - lx0, 0.03, lz1 - lz0, cx, 0.22, cz, '#3a3a42'));
       for (let k = 0; k < 3; k++) {
@@ -1257,13 +1257,18 @@ export function buildWorld(scene, quality) {
     };
     const wallH = () => Math.round(srange(30, 82) / 3.5) * 3.5 + 0.2;
     const wb = (x0, x1, z0, z1) => {
-      const h = wallH();
-      const st = h > 55 ? spick([0, 0, 3]) : spick([1, 2, 3, 0]);
+      const h0 = wallH();
+      const st = h0 > 55 ? spick([0, 0, 3]) : spick([1, 2, 3, 0]);
+      // leftover slivers next to a gap (1–3 m wide) became 60–80 m high "walls" – now a low annex
+      const narrow = Math.min(x1 - x0, z1 - z0) < 7;
+      const h = narrow ? 11.2 : h0;
       addBuilding(x0 + 0.3, x1 - 0.3, z0, z1, h, st, { shops: true });
-      if (h > 45 && srand() < 0.5) {
-        const h2 = h + Math.round(srange(7, 20) / 3.5) * 3.5;
-        bGeos[st].push(buildingGeo(x0 + 3, x1 - 3, z0 + 3, z1 - 3, h, h2, '#ffffff', '#555', 0.25));
-        addBox(x0 + 3, x1 - 3, z0 + 3, z1 - 3, h2);
+      if (h0 > 45 && srand() < 0.5) {
+        const h2 = h + Math.round(srange(7, 20) / 3.5) * 3.5; // (random numbers drawn as before: the rest of the city stays the same)
+        if (!narrow) {
+          bGeos[st].push(buildingGeo(x0 + 3, x1 - 3, z0 + 3, z1 - 3, h, h2, '#ffffff', '#555', 0.25));
+          addBox(x0 + 3, x1 - 3, z0 + 3, z1 - 3, h2);
+        }
       }
     };
     for (const dir of [-1, 1]) {
@@ -1272,7 +1277,7 @@ export function buildWorld(scene, quality) {
         const h = wallH();
         const st = h > 55 ? 0 : spick([1, 2, 3]);
         const x0 = dir > 0 ? BOUND + 0.5 : -WALL_OUT, x1 = dir > 0 ? WALL_OUT : -BOUND - 0.5;
-        addBuilding(x0, x1, a2 + 0.3, b2 - 0.3, h, st, { shops: true });
+        addBuilding(x0, x1, a2 + 0.3, b2 - 0.3, b2 - a2 < 7 ? 11.2 : h, st, { shops: true }); // thin leftover pieces stay low
       });
     }
     // gate buildings bridging the main exits

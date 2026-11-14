@@ -78,7 +78,7 @@ R('Gehöft-Weg', [[480, 240], [502, 256], [516, 262], [520, 266]], { kind: 'dirt
 
 // --- south: harbour road + compact flyover "Dildi-Kreuz" ---
 R('Hafenstraße', [[0, -236, 0], [0, -290, 0], [0, -350, 0], [0, -400, 0], [0, -416, 0]], { w: 12, lamps: true });
-// Dildi-Kreuz (Nicks Modell, dildi_cars.js): Hochstraße y=9 bei z=-322 + 4 Kleeblatt-Schleifen auf die Hafenstraße.
+// Dildi-Kreuz (Nicks Modell, dildi_cars.js): Hochstraße y=9 bei z=-322 + 4 gerade Rampen (Raute) auf die Hafenstraße.
 // Gezeichnet wird es vom Spiel selbst (Fahrbahn, Schutzwände mit Lücken an den Einmündungen, Pfeiler),
 // die Deko (Schilderbrücken, Rasthof, Motel, Skatepark, Plakate) kommt aus dildiKreuz.decor() in outskirts.js.
 for (const r of globalThis.DildiCars.dildiKreuz.roads()) R(r.name, r.pts, r.opts);

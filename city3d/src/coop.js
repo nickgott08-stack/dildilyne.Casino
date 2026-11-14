@@ -3,7 +3,7 @@
 // Karten, Tor, Alarm, Glas, Beute, Flucht) gehen über den Online-Server an die anderen der Crew.
 // Beute: Anführer 100.000 (zählt als sein Wochen-Finale), jeder Helfer 37.500 (1× pro Woche).
 // Nur der Anführer braucht die Missionen 1–4, Helfer können sofort mitmachen.
-import { store } from './util.js';
+import { store, season } from './util.js';
 import { weekId, fmt } from './heist.js';
 import { ISL } from './radj.js';
 
@@ -36,7 +36,7 @@ export function installCoop(Missions) {
     };
     $('crewL').addEventListener('click', (e) => { const b = e.target.closest('button[data-a]'); if (b && !b.disabled) this.lobbyAction(b.dataset.a); });
   };
-  P.helperPaid = function () { return store.get('dc3d_coupHelpWeek') === weekId(); };
+  P.helperPaid = function () { return season.on && store.get('dc3d_coupHelpWeek') === weekId(); }; // limit from the season start
   P.cx = function (e) { const j = this.job; if (j && j.coop && !j.coop.off) this.online().crewEv(e); };
 
   // ---------- Lobby ----------

@@ -351,6 +351,29 @@ function junctionsAt(x, z, except) {
   return out;
 }
 
+// side roads that start/end somewhere along a road (e.g. the ramps of the Dildi-Kreuz leave the Hochstraße
+// in its middle): sample index -> [{road, idx, dir}] (cached per road)
+function branchesOf(road) {
+  if (road._br) return road._br;
+  const br = new Map(), S = road.samples;
+  for (const r of world.outRoads || []) {
+    if (r === road || !r.traffic || r.ring) continue;
+    const L = r.samples.length;
+    for (const [ei, dir] of [[0, 1], [L - 1, -1]]) {
+      if (dir < 0 && r.oneway) continue;
+      const e = r.samples[ei];
+      let bi = -1, bd = 6;
+      for (let i = 2; i < S.length - 2; i++) { const d = Math.hypot(S[i].x - e.x, S[i].z - e.z); if (d < bd && Math.abs((S[i].y || 0) - (e.y || 0)) < 2.5) { bd = d; bi = i; } }
+      if (bi < 0) continue;
+      if (!br.has(bi)) br.set(bi, []);
+      br.get(bi).push({ road: r, idx: ei, dir });
+    }
+  }
+  road._br = br;
+  return br;
+}
+const headOf = (S, i, dir) => (dir > 0 ? S[i].h : S[i].h + Math.PI);
+
 // follows a sampled road; shared by out-of-town traffic and police
 class RoadFollow {
   constructor(road, idx, dir) { this.road = road; this.idx = idx; this.dir = road.oneway ? 1 : dir; }
@@ -408,6 +431,16 @@ export class OutDriver {
         if (Math.random() < 0.5) { this.cameFrom = null; this.rf = new RoadFollow(x.road, x.ridx, x.dir); this.lastExitIdx = -1; break; }
       }
     }
+    // turn off into a side road that starts here (not back against the direction of travel)
+    if (this.rf.idx !== this.lastIdx) {
+      this.lastIdx = this.rf.idx;
+      const B = branchesOf(this.rf.road).get(this.rf.idx);
+      if (B && Math.random() < 0.45) {
+        const myH = headOf(this.rf.road.samples, this.rf.idx, this.rf.dir);
+        const ok = B.filter((o) => Math.abs(angleWrap(headOf(o.road.samples, o.idx, o.dir) - myH)) < 1.75);
+        if (ok.length) { const o = pick(ok); this.rf = new RoadFollow(o.road, o.idx, o.dir); this.lastIdx = o.idx; }
+      }
+    }
     if (this.rf.advance(v)) {
       const e = this.rf.endPoint();
       if (inCityArea(e.x, e.z)) { v.driver = new TrafficDriver(v); return; }
@@ -421,7 +454,12 @@ export class OutDriver {
       }
       const prev = this.rf.road;
       const opts = junctionsAt(e.x, e.z, this.rf.road).filter((o) => o.road.traffic && o.dirs.length);
-      if (opts.length) { const o = pick(opts); this.rf = new RoadFollow(o.road, o.idx, pick(o.dirs)); if (o.road.ring) this.cameFrom = prev; }
+      if (opts.length) {
+        const o = pick(opts), myH = Math.atan2(v.fwd.x, v.fwd.z);
+        // merging (e.g. a ramp onto the Hochstraße): go with the flow, not against it
+        const dirs = o.dirs.filter((d) => Math.abs(angleWrap(headOf(o.road.samples, o.idx, d) - myH)) < 1.75);
+        this.rf = new RoadFollow(o.road, o.idx, pick(dirs.length ? dirs : o.dirs)); if (o.road.ring) this.cameFrom = prev;
+      }
       else this.rf.dir = -this.rf.dir;
     }
     const st = this.rf.steerTo(v);

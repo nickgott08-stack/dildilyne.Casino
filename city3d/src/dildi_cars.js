@@ -1256,18 +1256,22 @@
   function kreuzRoads() {
     const R = [];
     R.push({ name: 'Dildi-Kreuz', opts: { kind: 'deck', w: 14, lamps: true }, pts: smoothPts([[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -322, 9], [0, -322, 9], [60, -322, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]], 3) });
-    const r = 33;
+    // Raute statt Kleeblatt: 4 gerade Auf-/Abfahrten. Jede zweigt von der Hochstrasse ab (aeusserer Rand buendig
+    // mit dem Rand der Hochstrasse), faehrt schraeg nach unten und muendet rechtwinklig in die Hafenstrasse.
+    const D = R[0].pts;
+    const onDeck = (x) => { let b = D[0], bd = 1e9; for (const p of D) { const d = Math.abs(p[0] - x) + (p[1] < -300 ? 0 : 50); if (d < bd) { bd = d; b = p; } } return b; };
     for (const sx of SIDES) for (const sz of SIDES) {
-      const ccx = sx * 40, ccz = -322 + sz * 40;
-      const a0 = Math.atan2(-sz, 0), a1 = sx > 0 ? Math.PI : 0;
-      let sweep = a1 - a0;
-      for (let k = -2; k <= 2; k++) if (Math.abs(Math.abs(a1 - a0 + 2 * Math.PI * k) - 1.5 * Math.PI) < 0.01) sweep = a1 - a0 + 2 * Math.PI * k;
-      const pts = [], N = 52;
-      for (let i = 0; i <= N; i++) {
-        const t = i / N, a = a0 + sweep * t, e = t * t * (3 - 2 * t);
-        pts.push([+(ccx + r * Math.cos(a)).toFixed(2), +(ccz + r * Math.sin(a)).toFixed(2), +(9 * (1 - e)).toFixed(2)]);
-      }
-      R.push({ name: 'Kleeblatt ' + (sz > 0 ? 'Nord' : 'Sued') + (sx > 0 ? 'ost' : 'west'), opts: { kind: 'deck', w: 9 }, pts });
+      const a = onDeck(sx * 82), b = onDeck(sx * 68);
+      const pts = [
+        [a[0], a[1] + sz * 2.5, a[2]],
+        [b[0], b[1] + sz * 3.6, b[2] - 0.15],
+        [sx * 50, -322 + sz * 14, 7.2],
+        [sx * 34, -322 + sz * 28, 4.2],
+        [sx * 21, -322 + sz * 40, 1.6],
+        [sx * 12, -322 + sz * 46, 0.3],
+        [sx * 4, -322 + sz * 48, 0],
+      ];
+      R.push({ name: 'Rampe ' + (sz > 0 ? 'Nord' : 'Sued') + (sx > 0 ? 'ost' : 'west'), opts: { kind: 'deck', w: 9 }, pts: smoothPts(pts, 3) });
     }
     return R;
   }

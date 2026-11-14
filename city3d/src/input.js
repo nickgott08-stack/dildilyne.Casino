@@ -125,7 +125,7 @@ export class Input {
           this.steer = Math.sign(v) * Math.pow(k, 1.2);
           this.wheelEl.style.transform = `rotate(${this.wheelAngle}rad)`;
         } else if (this.joy && t.identifier === this.joy.id) {
-          const R = 55;
+          const R = Math.max(55, joyBase.offsetWidth * 0.46); // bigger on tablets
           let dx = t.clientX - this.joy.x0, dy = t.clientY - this.joy.y0;
           const d = Math.hypot(dx, dy);
           if (d > R) {
