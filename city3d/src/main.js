@@ -817,8 +817,14 @@ function updatePlayer(dt) {
       player.h.body.rotation.x = 0.35;
       pistolM.visible = akM.visible = false;
     }
-    const rpm = (Math.abs(v.vF) % 18) / 18 * 0.6 + Math.min(1, Math.abs(v.vF) / v.M.maxSpeed) * 0.6 + Math.abs(thr) * 0.15;
-    audio.engine(!v.dead, rpm, Math.abs(thr));
+    // 5-gear engine: revs climb within a gear and drop on each shift; in top gear at full speed it
+    // settles at moderate revs, and when cruising flat out for a while it gets quieter (less droning)
+    const frac = Math.min(1, Math.abs(v.vF) / v.M.maxSpeed);
+    const gear = Math.min(4, Math.floor(frac * 5));
+    const inGear = frac * 5 - gear;
+    const rpm = gear === 4 ? 0.45 + inGear * 0.3 : 0.3 + inGear * 0.55;
+    G.cruiseT = frac > 0.9 && Math.abs(thr) > 0.5 ? (G.cruiseT || 0) + dt : Math.max(0, (G.cruiseT || 0) - dt * 3);
+    audio.engine(!v.dead, rpm + Math.abs(thr) * 0.08, Math.abs(thr), Math.min(1, G.cruiseT / 3));
     if (v.dead) {
       exitVehicleForce();
     }

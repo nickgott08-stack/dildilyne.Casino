@@ -71,3 +71,9 @@ Im Casino wird der Casino-Name als Online-Name vorgeschlagen; Online-Server = `D
 - Waldweg: Schotter-Textur mit Spurrillen und Grasrand (`gravelRoad`), Feldsteine statt weißer Bordsteine.
 - Villa: Sockel, Gesimse, Eckquader, Walmdächer in Terrakotta (`hipRoof`), Mittelgiebel mit goldenem Rundfenster (`gable`),
   weiße Fensterrahmen, Fenster aus dunklem Glas die nachts leuchten (`world.windowMats`), Balustraden. Kollision/Aufzug unverändert.
+
+## Finale & Sound (14.11.2026)
+- Finale: jedes Auto reicht für die Fahrt zur Landebahn (vorher nur der eigene RS6). Bankraub braucht weiterhin den RS6.
+- Anwesen: kein Schleich-Tempo mehr (`G.walkMul = 0`), Gehen/Rennen wie überall.
+- Motorsound: 5-Gang-Drehzahl (fällt beim Schalten), im 5. Gang mittlere Drehzahl; nach ~3 s Vollgas bei Höchsttempo
+  wird der Motor leiser/dumpfer (`cruise` in `audio.engine`), weicherer Klang (Dreieck statt Rechteck, tieferer Filter).

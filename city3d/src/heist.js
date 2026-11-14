@@ -63,9 +63,9 @@ export const COUP = [
     title: 'Das Finale',
     icon: '👑',
     where: 'Radj-Insel',
-    short: 'RS6 zur Landebahn, Flug zur Insel, Anwesen, goldene Bubensahne',
+    short: 'Mit dem Auto zur Landebahn, Flug zur Insel, Anwesen, goldene Bubensahne',
     film: [
-      ['🚙', 'Heute Nacht holen wir sie. Fahr mit deinem RS6 zur Landebahn in der Westwüste.'],
+      ['🚙', 'Heute Nacht holen wir sie. Fahr mit einem Auto deiner Wahl zur Landebahn in der Westwüste.'],
       ['✈️', 'Flieg nach Süden aufs Meer – Radjs Insel liegt hinter den Docks. Lande auf seiner Privatpiste.'],
       ['🌲', 'Ein Schlängelweg durch dichten Wald führt zum Anwesen. Die Torwache hat die Torkarte.'],
       ['🔦', 'Drinnen patrouillieren rund 20 Wachen mit Taschenlampen. Bleib aus den Lichtkegeln. Nur Schalldämpfer, keine Weste.'],
@@ -506,7 +506,7 @@ export function installFinale(Missions) {
     }
     this.job = { kind: 'coup', n: 4, stage: 'rs6', peds: [], vehs: [], sentries: [], t0: G.time, takedowns: 0 };
     this.coupTarget(RUNWAY.x0 + 20, (RUNWAY.z0 + RUNWAY.z1) / 2, '#ffd23b');
-    this.api.banner('👑 DAS FINALE', 'Mit deinem RS6 zur Landebahn (Westwüste)');
+    this.api.banner('👑 DAS FINALE', 'Mit einem Auto zur Landebahn (Westwüste)');
   };
 
   P.spawnIsland = function () {
@@ -691,13 +691,14 @@ export function installFinale(Missions) {
     for (const [k, t] of (I.towers || []).entries()) t.rotation.y = Math.sin(G.time * 0.35 + k * 2) * 1.6 + (k ? Math.PI : 0);
     if (j.stage === 'rs6') {
       const rw = { x: RUNWAY.x0 + 20, z: (RUNWAY.z0 + RUNWAY.z1) / 2 };
-      const ok = v && v === G.myCar && v.type === 'rs6';
+      // any car will do (own, bought or "borrowed")
+      const ok = !!v && !v.dead;
       if (dist(rw) < 30) {
         if (ok) { j.stage = 'plane'; this.coupTarget(this.plane.pos.x, this.plane.pos.z, '#39c6ff'); this.api.toast('✈️ Steig ins Flugzeug'); }
-        else this.setJobHUD(T, 'Nur mit deinem eigenen RS6!', 'Hol deinen RS6 aus der Garage', true);
+        else this.setJobHUD(T, 'Komm mit einem Auto her!', 'Schnapp dir irgendein Auto', true);
         return;
       }
-      this.setJobHUD(T, 'Fahr mit deinem RS6 zur Landebahn', `📍 ${dist(rw)} m${ok ? '' : ' · 🚙 eigener RS6 nötig'}`, !ok);
+      this.setJobHUD(T, 'Fahr mit einem Auto zur Landebahn', `📍 ${dist(rw)} m${ok ? '' : ' · 🚗 Auto nötig'}`, !ok);
       return;
     }
     if (j.stage === 'plane') { this.setJobHUD(T, 'Steig ins Flugzeug', `📍 ${dist(this.plane.pos)} m`, false); return; }
@@ -722,7 +723,7 @@ export function installFinale(Missions) {
     if (G.flight || G.player.dead) return;
     const E = ISL.estate;
     const inEstate = pp.x > E.x0 && pp.x < E.x1 && pp.z > E.z0 && pp.z < E.z1 + 2;
-    G.walkMul = inEstate && j.stage !== 'escape' && !v ? 0.62 : 0;
+    G.walkMul = 0; // normal walking/running speed in the estate too
     // sentries: patrol, flashlight cones, detection
     let watched = 0;
     for (const s of j.sentries) {
