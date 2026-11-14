@@ -140,7 +140,7 @@ export function installHeist(Missions) {
     const can = step < 4 || !this.finaleDone();
     $('coupGo').style.display = can ? '' : 'none';
     $('coupGo').textContent = step >= 4 ? '👑 Finale alleine' : `▶ Mission ${step + 1} starten`;
-    $('coupCoop').style.display = step >= 4 ? '' : 'none'; // crew of up to 4 (online)
+    $('coupCoop').style.display = ''; // crew of up to 4 (online) – helpers need no preparation missions
     $('coupInfo').textContent = step >= 4 ? (this.finaleDone() ? 'Diese Woche hast du Radj schon ausgeraubt – nächste Woche wieder. Als Helfer in einer Koop-Crew kannst du trotzdem mit.' : 'Finale alleine: 150.000 D$ · Koop (bis 4 Spieler): Anführer 100.000, Helfer je 37.500 · 1× pro Woche · ohne Polizei, aber mit 20 Wachen.') : 'Missionen laufen ohne Polizei. Belohnung nach dem Finale: 150.000 D$ (alleine).';
     $('coup').classList.add('show');
   };

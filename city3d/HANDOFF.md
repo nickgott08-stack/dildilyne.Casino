@@ -147,7 +147,7 @@ Dildi City (Quellcode):
   Leute im Stadtpark und vor dem Casino (`world.extraHotspots`).
 - **Koop-Coup** (`src/coop.js`, Server `server/server.js`):
   - Planungsbrett → „👥 Koop-Finale“ → Lobby (nur online, gleicher Raum): Crew gründen / beitreten (max. 4), jeder „Bereit“,
-    Anführer startet (mind. 2). Alle brauchen die Missionen 1–4; Anführer darf das Finale diese Woche noch nicht gemacht haben.
+    Anführer startet (mind. 2). Nur der Anführer braucht die Missionen 1–4 und darf das Finale diese Woche noch nicht gemacht haben; Helfer können sofort mitmachen (Knopf immer am Planungsbrett).
   - Server: `t:'crew'` (create/join/leave/done/ready/start) → `crews`-Liste an alle im Raum, `crewgo` (mit `seed`) an die Crew;
     `t:'cev'` wird an die anderen der Crew weitergeleitet. Anführer weg → Crew aufgelöst (`crewx`).
   - Ereignisse (`cx()`): `fly` (wer zuerst einsteigt, nimmt alle mit), `kill` (Wachen-Index), `card`, `gate`, `alarm`, `glass`,

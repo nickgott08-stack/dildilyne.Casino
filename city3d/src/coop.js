@@ -2,7 +2,7 @@
 // Jeder spielt das Finale auf seinem eigenen Gerät; wichtige Ereignisse (Flug, Wachen ausgeschaltet,
 // Karten, Tor, Alarm, Glas, Beute, Flucht) gehen über den Online-Server an die anderen der Crew.
 // Beute: Anführer 100.000 (zählt als sein Wochen-Finale), jeder Helfer 37.500 (1× pro Woche).
-// Alle in der Crew brauchen die Missionen 1–4.
+// Nur der Anführer braucht die Missionen 1–4, Helfer können sofort mitmachen.
 import { store } from './util.js';
 import { weekId, fmt } from './heist.js';
 import { ISL } from './radj.js';
@@ -85,7 +85,7 @@ export function installCoop(Missions) {
           }
         } else h = '<div class="sub">Im Raum gibt es noch keine Crew. Gründe eine – die anderen sehen sie dann hier.</div>';
         b = B('close', 'Zurück') + B('create', '👑 Crew gründen', '#b8860b');
-        info = `Beute: Anführer ${fmt(COOP_PAY.leader)} · jeder Helfer ${fmt(COOP_PAY.helper)} (1× pro Woche). Alle brauchen die Missionen 1–4.`;
+        info = `Beute: Anführer ${fmt(COOP_PAY.leader)} · jeder Helfer ${fmt(COOP_PAY.helper)} (1× pro Woche). Nur der Anführer braucht die Missionen 1–4.`;
       }
     }
     $('crewBody').innerHTML = h;
@@ -93,7 +93,7 @@ export function installCoop(Missions) {
     $('crewBtns').innerHTML = b;
   };
   P.coopBlock = function (asLeader) {
-    if (this.coupStep() < 4) return 'Erst die Missionen 1–4 am Planungsbrett schaffen';
+    if (asLeader && this.coupStep() < 4) return 'Als Anführer brauchst du die Missionen 1–4 – du kannst aber einer Crew als Helfer beitreten!';
     if (asLeader && this.finaleDone()) return 'Du hast Radj diese Woche schon ausgeraubt – als Anführer erst nächste Woche. Tritt einer Crew als Helfer bei!';
     return '';
   };
