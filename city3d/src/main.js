@@ -10,6 +10,7 @@ import { makeHuman, animateHuman, nickLook, humanMat } from './human.js';
 import { Vehicle, collideVehicles, MODELS } from './vehicles.js';
 import { TrafficDriver, PoliceDriver, OutDriver, Ped, randomSidewalkPoint, randomRoadSpawn, randomOutRoadSpawn } from './ai.js';
 import { FX } from './fx.js';
+import { Online } from './online.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
 import { clamp, lerp, damp, dampAngle, angleWrap, rand, randi, pick, store, casino } from './util.js';
@@ -1530,6 +1531,7 @@ function render(dt) {
   if (!G.paused) updateHUD(dt);
   mapT -= dt;
   if (mapT <= 0) { mapT = 1 / 30; drawMini(); }
+  online.update(dt);
   renderer.render(scene, camera);
   // auto quality: if the device struggles on "hoch", drop once
   if (G.started && !G.paused) {
@@ -1551,6 +1553,8 @@ function render(dt) {
   }
 }
 qBtns.forEach((b) => b.addEventListener('click', () => store.set('dc3d_qmanual', '1')));
+const online = new Online({ scene, camera, player, G, toast, pause: (p) => setPaused(p) });
+G.online = online;
 requestAnimationFrame(loop);
 // minimap canvas resolution
 {

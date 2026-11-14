@@ -41,3 +41,14 @@ Im Casino läuft das Spiel im iframe: das Casino ersetzt `/*GCFG*/null` durch `{
 - Echte Bits-Wechselstube erst nach Einbau ins Casino.
 - Finale/Landung/Schleichen: Schwierigkeit nach Nicks Test feinjustieren.
 - Koop (zu viert) für den Coup: bewusst später.
+
+## Online-Modus (bis zu 10 Spieler) – Stand 14.11.2026
+- `src/online.js`: Pausenmenü → „🌐 Online spielen“ (Name, Raum, Hoodie-Farbe, Chat). Sendet 10×/s Position,
+  Fahrzeug (Typ, Farbe, Richtung) bzw. Flugzeug; andere Spieler werden 150 ms verzögert interpoliert,
+  mit Namensschild und Punkt auf der Minikarte (`G.friends`). Fremde Autos sind nur Modelle (keine Kollision).
+- `server/server.js` (Node + ws): liefert unter `/` das gebaute Spiel aus, WebSocket unter `/ws`, `/status` zeigt die Räume.
+  Max. 10 pro Raum, 10 Snapshots/s, Eingaben werden geprüft und gedrosselt.
+- Server-Adresse: `?server=wss://…/ws` in der URL, im Online-Menü unter „Server“, sonst gleicher Host
+  (wenn vom Server ausgeliefert), sonst `DEFAULT_SERVER` in `online.js`.
+- Deployment: `render.yaml` im Repo-Root (Render Free Tier, schläft nach ~15 Min ohne Besucher ein).
+- Lokal testen: `cd city3d && node build.mjs && cd .. && node server/server.js` → http://localhost:8080

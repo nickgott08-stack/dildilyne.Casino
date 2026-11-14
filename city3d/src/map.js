@@ -203,6 +203,8 @@ export function drawMinimap(mctx, S2, G, cam, pp, heading, zoomM) {
   const t = G.time;
   for (const v of G.vehicles) if (v.type === 'police' && !v.dead) dot(v.pos.x, v.pos.z, S2 * 0.022, Math.sin(t * 10) > 0 ? '#ff2a2a' : '#2a6bff');
   for (const p of G.peds) if (p.role === 'cop' && !p.dead) dot(p.pos.x, p.pos.z, S2 * 0.014, '#2a6bff');
+  // andere Online-Spieler
+  if (G.friends) for (const f of G.friends) { dot(f.x, f.z, S2 * 0.034, '#fff'); dot(f.x, f.z, S2 * 0.025, f.c); }
   mctx.restore();
   // waypoint + mission target (clamped to the edge)
   for (const [wp, col] of [[G.waypoint && G.waypoint.pos, '#ff3df0'], [G.missionTarget, G.missionTarget && G.missionTarget.color]]) {

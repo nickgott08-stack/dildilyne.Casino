@@ -233,6 +233,26 @@ body.notouch #bCam,body.notouch #bPause{display:none}
 #dialMsg{font-size:13px;opacity:.85;text-align:center;min-height:18px}
 .drow{display:flex;gap:8px;justify-content:center;margin-top:8px}
 @media (max-height:500px){#miniWrap,#mini{width:118px;height:118px}#bars{top:calc(140px + env(safe-area-inset-top));width:118px}#wpInfo{top:calc(160px + env(safe-area-inset-top));width:118px}#bCam,#bPause{left:calc(140px + env(safe-area-inset-left))}#bCam{top:calc(60px + env(safe-area-inset-top))}#money{font-size:20px}#stars{font-size:22px}}
+#mpBadge{font-size:13px;font-weight:800;padding:4px 10px;color:#3bff6a;pointer-events:auto;cursor:pointer}
+#mpTags{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.mpTag{position:absolute;left:0;top:0;display:none;white-space:nowrap;font-weight:800;font-size:13px;padding:3px 8px 3px 6px;border-radius:10px;background:rgba(10,8,18,.6);border:1px solid rgba(255,255,255,.2);text-shadow:0 1px 2px #000;will-change:transform}
+.mpTag span{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.mpF{display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap}
+.mpF label{min-width:100px;font-size:13px;opacity:.85;text-align:left}
+#online input{flex:1;min-width:140px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 12px;font-size:16px;user-select:text;-webkit-user-select:text}
+#online input:disabled{opacity:.55}
+#online .mb{min-width:auto;padding:10px 14px}
+#mpHood{display:flex;flex-wrap:wrap;gap:6px}
+.mpHc{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.3);cursor:pointer;padding:0}
+.mpHc.sel{border-color:#fff;box-shadow:0 0 0 2px #3bff6a}
+.mpRow{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
+.mpRow small{margin-left:auto;opacity:.7}
+.mpDot{width:12px;height:12px;border-radius:50%;flex:none}
+#mpLog{max-height:110px;overflow:auto;font-size:13px;text-align:left;margin:6px 0}
+#mpLog:empty{display:none}
+#mpChatRow{display:none;gap:6px;align-items:center}
+#mpAdv{margin-top:6px;font-size:13px;opacity:.8;text-align:left}
+#mpAdv summary{cursor:pointer}
 </style>
 </head>
 <body>
@@ -247,6 +267,7 @@ body.notouch #bCam,body.notouch #bPause{display:none}
   </div>
   <div id="topR">
     <div id="clock" class="pill">06:00</div>
+    <div id="mpBadge" class="pill" style="display:none">🌐</div>
     <div id="money">D$ 0</div>
     <div id="stars"></div>
     <div id="weap" class="pill"><div id="wIcon">🔫</div><div><div id="wName">Pistole</div><div id="wAmmo"></div></div></div>
@@ -297,11 +318,22 @@ body.notouch #bCam,body.notouch #bPause{display:none}
 <div id="phone" class="ovl"><div class="card"><div id="phoneIco">📞</div><h3 id="phoneT"></h3><div id="phoneS"></div><div id="phoneR"></div><div class="drow"><button class="mb" id="phoneNo">Doch nicht</button><button class="mb" id="phoneYes" style="background:#2e9e44">Los geht's</button></div></div></div>
 <div id="garage" class="ovl"><div class="card"><h3 id="garageTitle">GARAGE</h3><div id="garageList"></div><div class="drow"><button class="mb" id="garageClose">Zurück</button></div></div></div>
 <div id="dial" class="ovl"><div class="card" style="text-align:center"><h3 style="text-shadow:0 0 12px #ffd23b">🔐 TRESOR KNACKEN</h3><div id="dialSteps"></div><div id="dialWrap"><div id="dialFace"></div><div id="dialKnob"><span id="dialNum">00</span></div></div><div id="dialBar"><div id="dialFeel"></div></div><div id="dialMsg"></div><div class="drow" id="dialRow1"><button class="mb" id="dialL">◀</button><button class="mb big" id="dialLock">EINRASTEN</button><button class="mb" id="dialR">▶</button></div><div class="drow" id="dialRow2"><button class="mb" id="dialExit" style="min-width:auto;opacity:.75">Später</button></div></div></div>
+<div id="online" class="ovl"><div class="card" style="min-width:min(460px,92vw);border-color:#3bff6a"><h3 style="text-shadow:0 0 12px #3bff6a">🌐 ONLINE SPIELEN</h3>
+  <div class="mpF"><label>Dein Name</label><input id="mpName" maxlength="16" placeholder="z. B. Nick" autocomplete="off"></div>
+  <div class="mpF"><label>Raum</label><input id="mpRoom" maxlength="12" placeholder="dildi" autocomplete="off"></div>
+  <div class="mpF"><label>Hoodie-Farbe</label><div id="mpHood"></div></div>
+  <div id="mpList"></div>
+  <div id="mpLog"></div>
+  <div id="mpChatRow"><input id="mpChat" maxlength="120" placeholder="Nachricht…" autocomplete="off"><button class="mb" id="mpSend">Senden</button></div>
+  <details id="mpAdv"><summary>Server</summary><div class="mpF"><input id="mpServer" autocomplete="off" spellcheck="false"><button class="mb" id="mpServerSave">Speichern</button></div></details>
+  <div class="drow"><button class="mb" id="mpClose">Zurück</button><button class="mb" id="mpGo" style="background:#2e9e44">▶ Beitreten</button></div>
+</div></div>
 <div id="dead" class="ov"><div>ERLEDIGT</div><p>Ab ins Krankenhaus…</p></div>
 <div id="pause" class="ov">
   <h2>PAUSE</h2>
   <button class="mb big" id="resume">▶ Weiter</button>
   <div class="row"><span style="align-self:center;opacity:.8;font-size:13px;margin-right:6px">Grafik:</span><button class="mb" data-q="hoch">Hoch</button><button class="mb" data-q="mittel">Mittel</button><button class="mb" data-q="niedrig">Niedrig</button></div>
+  <button class="mb" id="onlineBtn" style="background:rgba(46,158,68,.35);border-color:#3bff6a">🌐 Online spielen</button>
   <div class="row"><button class="mb" id="shopBtn">🛒 Shop</button><button class="mb" id="xchgBtn">💱 Wechselstube</button></div>
   <button class="mb" id="casinoBtn" style="display:none">🎰 Zurück ins Casino</button>
   <button class="mb" id="muteBtn">🔊 Ton an</button>
