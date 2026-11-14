@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0710">
+<title>Dildi City 3D</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#fff;touch-action:none;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#touchArea{position:fixed;inset:0;z-index:2}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:3}
+.pill{background:rgba(10,8,18,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.12);border-radius:14px}
+#miniWrap{pointer-events:auto;cursor:pointer;position:absolute;left:calc(12px + env(safe-area-inset-left));top:calc(12px + env(safe-area-inset-top));width:150px;height:150px;border-radius:50%;box-shadow:0 0 0 3px rgba(0,0,0,.55),0 4px 18px rgba(0,0,0,.5)}
+#mini{width:150px;height:150px;border-radius:50%}
+#miniTag{position:absolute;right:-4px;bottom:-4px;background:#ff3df0;color:#fff;border-radius:10px;font-size:10px;font-weight:900;padding:2px 6px;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+#topR{position:absolute;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#clock{font-size:15px;font-weight:700;padding:4px 10px;letter-spacing:1px}
+#money{font-size:24px;font-weight:900;color:#5dff7c;text-shadow:0 2px 0 #0a3a14,0 0 12px rgba(80,255,120,.35);font-family:"Arial Black",Impact,sans-serif}
+#stars{font-size:26px;letter-spacing:2px;color:rgba(255,255,255,.18);text-shadow:0 2px 3px rgba(0,0,0,.6)}
+#stars .on{color:#fff;text-shadow:0 0 10px #fff,0 2px 3px #000}
+#stars .blink{animation:blink .5s steps(2) infinite}
+#stars.flash{animation:pop .6s}
+@keyframes blink{50%{opacity:.25}}
+@keyframes pop{0%{transform:scale(1.6)}100%{transform:scale(1)}}
+#weap{display:flex;align-items:center;gap:8px;padding:6px 10px}
+#wIcon{font-size:26px}
+#wName{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:1px}
+#wAmmo{font-size:16px;font-weight:800}
+#bars{position:absolute;left:calc(12px + env(safe-area-inset-left));top:calc(172px + env(safe-area-inset-top));width:150px}
+.bar{height:8px;background:rgba(0,0,0,.55);border-radius:5px;overflow:hidden;margin-bottom:4px;border:1px solid rgba(255,255,255,.15)}
+#hpFill{height:100%;width:100%;background:linear-gradient(90deg,#3fd15a,#7cff8e)}
+#hpBar.low #hpFill{background:linear-gradient(90deg,#e22,#ff6a4a)}
+#arFill{height:100%;width:0;background:linear-gradient(90deg,#2f6bff,#7fb0ff)}
+#carInfo{position:absolute;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);text-align:center;padding:4px 14px;display:none;min-width:130px}
+body.incar #carInfo{display:block}
+#spd{font-size:28px;font-weight:900;font-family:"Arial Black",Impact,sans-serif;line-height:1}
+#spdU{font-size:11px;opacity:.7;letter-spacing:2px}
+#carName{font-size:11px;opacity:.8;margin-top:2px}
+#carHpBar{height:4px;background:rgba(0,0,0,.5);border-radius:3px;margin-top:4px;overflow:hidden}
+#carHp{height:100%;width:100%;background:#ffb02e}
+#toast{position:absolute;left:50%;top:calc(18% + env(safe-area-inset-top));transform:translateX(-50%) translateY(-10px);padding:10px 18px;font-weight:700;font-size:16px;opacity:0;transition:.25s;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#toast.show{opacity:1;transform:translateX(-50%)}
+#hint{position:absolute;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:7px 14px;font-size:14px;font-weight:700;opacity:0;transition:.2s}
+#hint.show{opacity:1}
+#cross{position:absolute;left:50%;top:50%;width:30px;height:30px;transform:translate(-50%,-50%);pointer-events:none}
+#cross i{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.55);transition:background .1s}
+#cross b{position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);opacity:0;transition:opacity .12s,transform .12s}
+#cross b:nth-child(2){left:14px;top:0;width:2px;height:8px}
+#cross b:nth-child(3){left:14px;bottom:0;width:2px;height:8px}
+#cross b:nth-child(4){top:14px;left:0;height:2px;width:8px}
+#cross b:nth-child(5){top:14px;right:0;height:2px;width:8px}
+#cross.gun b{opacity:1}
+#cross.gun.aim b:nth-child(2){transform:translateY(3px)}#cross.gun.aim b:nth-child(3){transform:translateY(-3px)}#cross.gun.aim b:nth-child(4){transform:translateX(3px)}#cross.gun.aim b:nth-child(5){transform:translateX(-3px)}
+#cross.lock i,#cross.lock b{background:#ff2a3a}
+#cross.hide{display:none}
+#lockMark{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border:3px solid #ff2a3a;border-radius:6px;transform:rotate(45deg);display:none;box-shadow:0 0 10px rgba(255,40,60,.6)}
+#lockMark.show{display:block;animation:lockIn .25s}
+@keyframes lockIn{from{transform:rotate(45deg) scale(1.8);opacity:0}}
+#wpInfo{position:absolute;left:calc(12px + env(safe-area-inset-left));top:calc(196px + env(safe-area-inset-top));width:150px;text-align:center;font-size:12px;font-weight:800;color:#ff8af6;text-shadow:0 1px 2px #000;display:none}
+#wpInfo.show{display:block}
+#areaName{position:absolute;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);font:900 30px "Arial Black",Impact,sans-serif;letter-spacing:2px;color:#fff;text-shadow:0 0 14px rgba(0,0,0,.8),0 3px 0 rgba(0,0,0,.6);opacity:0;transition:opacity .6s;pointer-events:none;white-space:nowrap}
+#areaName.show{opacity:1}
+#vign{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(200,0,0,.65));opacity:0;transition:opacity .15s}
+#hitDir{position:absolute;left:50%;top:50%;width:220px;height:220px;opacity:0}
+#hitDir:before{content:"";position:absolute;left:50%;top:0;transform:translateX(-50%);border-left:16px solid transparent;border-right:16px solid transparent;border-bottom:26px solid rgba(255,40,40,.85)}
+#hitDir.show{animation:hit 1s}
+@keyframes hit{0%{opacity:1}100%{opacity:0}}
+.moneyFloat{position:absolute;right:20px;top:90px;color:#5dff7c;font-weight:900;font-size:22px;animation:mf 1.4s forwards;text-shadow:0 2px 0 #063}
+@keyframes mf{from{transform:translateY(0);opacity:1}to{transform:translateY(-50px);opacity:0}}
+/* touch controls */
+#ctrl{position:fixed;inset:0;pointer-events:none;z-index:4}
+.tb{position:absolute;pointer-events:auto;line-height:1.05;text-align:center;border-radius:50%;background:rgba(15,12,25,.45);border:2px solid rgba(255,255,255,.35);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:.5px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:none}
+.tb.down{background:rgba(255,61,240,.45);border-color:#ff3df0;transform:scale(.94)}
+.tb.on{background:rgba(255,61,240,.4);border-color:#ff3df0}
+.tb small{display:block;font-size:9px;opacity:.85;letter-spacing:.5px;margin-top:1px}
+.foot{} .car{display:none}
+body.incar .foot{display:none} body.incar .car{display:flex}
+.tb.plane{display:none}body.inplane .tb.plane{display:flex}body.inplane #bHand,body.inplane #bHorn{display:none}
+#bUp,#bDown{right:calc(226px + env(safe-area-inset-right));width:74px;height:62px;border-radius:18px;font-size:20px;flex-direction:column;background:rgba(30,60,120,.5);border-color:rgba(120,180,255,.6)}
+#bUp{bottom:calc(98px + env(safe-area-inset-bottom))}#bDown{bottom:calc(26px + env(safe-area-inset-bottom))}#bUp.down,#bDown.down{background:rgba(60,130,255,.6)}
+#bShoot{right:calc(24px + env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));width:96px;height:96px;font-size:30px;flex-direction:column}
+#bAim{right:calc(136px + env(safe-area-inset-right));bottom:calc(64px + env(safe-area-inset-bottom));width:72px;height:72px;font-size:24px;flex-direction:column}
+#bJump{right:calc(222px + env(safe-area-inset-right));bottom:calc(22px + env(safe-area-inset-bottom));width:58px;height:58px;font-size:10px}
+#bEnter{right:calc(36px + env(safe-area-inset-right));bottom:calc(150px + env(safe-area-inset-bottom));width:62px;height:62px}
+#bWeapon{right:calc(118px + env(safe-area-inset-right));bottom:calc(150px + env(safe-area-inset-bottom));width:52px;height:52px;font-size:22px}
+#bSprint{right:calc(222px + env(safe-area-inset-right));bottom:calc(92px + env(safe-area-inset-bottom));width:50px;height:50px;font-size:20px}
+#bReload{right:calc(178px + env(safe-area-inset-right));bottom:calc(150px + env(safe-area-inset-bottom));width:54px;height:54px;font-size:18px;flex-direction:column}
+#bReload.empty{border-color:#ffb02e;box-shadow:0 0 12px rgba(255,176,46,.6)}
+/* car pedals */
+#bGas{right:calc(22px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));width:92px;height:132px;border-radius:22px;font-size:15px;flex-direction:column;background:rgba(20,90,40,.5);border-color:rgba(120,255,150,.6)}
+#bGas.down{background:rgba(60,220,110,.6);border-color:#7dff9c}
+#bBrake{right:calc(128px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));width:84px;height:96px;border-radius:20px;font-size:13px;flex-direction:column;background:rgba(110,20,20,.5);border-color:rgba(255,120,120,.6)}
+#bBrake.down{background:rgba(230,50,50,.6);border-color:#ff8080}
+#bHand{right:calc(226px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));width:64px;height:64px;font-size:10px}
+#bHorn{right:calc(140px + env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:24px}
+#bExit{right:calc(36px + env(safe-area-inset-right));bottom:calc(176px + env(safe-area-inset-bottom));width:62px;height:62px}
+#bCam{left:calc(172px + env(safe-area-inset-left));top:calc(62px + env(safe-area-inset-top));width:46px;height:46px;font-size:18px}
+#bPause{left:calc(172px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));width:46px;height:46px;font-size:15px}
+#bPause i{display:inline-block;width:5px;height:16px;background:#fff;border-radius:2px;margin:0 2px}
+body.incar #weap{display:none}
+#wheel{position:fixed;left:calc(18px + env(safe-area-inset-left));bottom:calc(14px + env(safe-area-inset-bottom));width:min(42vh,170px);height:min(42vh,170px);z-index:4;pointer-events:none;display:none;opacity:.88;filter:drop-shadow(0 4px 8px rgba(0,0,0,.5))}
+body.incar #wheel{display:block}
+body.notouch #wheel{display:none!important}
+body.incar #joyHint{display:none}
+#joyBase{position:fixed;width:120px;height:120px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);transform:translate(-50%,-50%);display:none;z-index:4;pointer-events:none}
+#joyKnob{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 14px rgba(255,61,240,.6);transform:translate(-50%,-50%)}
+#joyHint{position:fixed;left:calc(30px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:110px;height:110px;border-radius:50%;border:2px dashed rgba(255,255,255,.18);z-index:3;pointer-events:none}
+body.notouch #ctrl,body.notouch #joyHint{display:none}
+body.notouch #bCam,body.notouch #bPause{display:none}
+/* overlays */
+.ov{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px}
+#start{overflow-y:auto;justify-content:flex-start;padding-top:max(20px,env(safe-area-inset-top))}
+#start>#logo{margin-top:auto}#start>#helpTxt{margin-bottom:auto}
+#start{background:radial-gradient(ellipse at 50% 30%,#2a0d33 0%,#0b0710 60%,#000 100%);transition:opacity .6s}
+#start.hide{opacity:0}
+#logo{font-family:"Arial Black",Impact,sans-serif;font-size:min(16vw,92px);line-height:.9;letter-spacing:-2px;color:#fff;text-shadow:0 0 18px #ff3df0,0 0 40px #ff3df0,0 6px 0 #6a0c66}
+#logo small{display:block;font-size:.42em;letter-spacing:6px;color:#ffd700;text-shadow:0 0 14px #ffae00,0 4px 0 #6a4a00;margin-top:8px}
+#sub{opacity:.75;margin:18px 0 26px;font-size:15px;max-width:520px;line-height:1.45}
+#startBtn{font:900 22px "Arial Black",Impact,sans-serif;color:#0b0710;background:linear-gradient(180deg,#ffe46b,#ffae00);border:0;border-radius:40px;padding:16px 44px;box-shadow:0 0 30px rgba(255,190,0,.55),0 6px 0 #8a5a00;cursor:pointer;letter-spacing:1px}
+#startBtn:active{transform:translateY(3px);box-shadow:0 0 30px rgba(255,190,0,.55),0 3px 0 #8a5a00}
+#loading{margin-top:16px;opacity:.7;font-size:13px}
+#helpTxt{font-size:12.5px;opacity:.7;margin-top:20px;max-width:620px;line-height:1.6}
+@media (max-height:500px){#logo{font-size:min(11vw,64px)}#sub{margin:10px 0 14px;font-size:13px}#helpTxt{margin-top:12px;font-size:11.5px}}
+#pause{background:rgba(5,3,10,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none}
+#pause.show{display:flex}
+#pause h2{font:900 40px "Arial Black",Impact,sans-serif;margin:0 0 18px;text-shadow:0 0 18px #ff3df0}
+.mb{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:12px 20px;font-size:16px;font-weight:700;margin:5px;min-width:200px;cursor:pointer}
+.mb.big{background:linear-gradient(180deg,#ff6af5,#c21bb7);border:0;font-size:19px}
+.row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:6px 0}
+.row .mb{min-width:auto;padding:10px 14px}
+.mb.sel{background:#ffd000;color:#000}
+#pause label{font-size:13px;opacity:.8;margin-top:12px}
+#sens{width:220px;margin-top:6px}
+#dead{background:radial-gradient(ellipse at center,rgba(60,0,0,.35),rgba(0,0,0,.75));display:none;pointer-events:none}
+#dead.show{display:flex;animation:fadeIn 1s}
+#dead div{font:900 min(18vw,110px) "Arial Black",Impact,sans-serif;color:#c80000;text-shadow:0 0 30px #000,0 6px 0 #300;letter-spacing:-2px}
+#dead p{opacity:.8}
+@keyframes fadeIn{from{opacity:0}}
+#bigmap{position:fixed;inset:0;z-index:12;background:#0b1a26;display:none}
+#bigmap.show{display:block}
+#bigCanvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+#mapTop{position:absolute;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 10px calc(12px + env(safe-area-inset-left));display:flex;gap:8px;align-items:center;background:linear-gradient(rgba(0,0,0,.7),transparent);pointer-events:none}
+#mapTop *{pointer-events:auto}
+#mapTitle{font:900 22px "Arial Black",Impact,sans-serif;text-shadow:0 0 12px #ff3df0;margin-right:auto}
+.mbtn{background:rgba(15,12,25,.7);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:12px;padding:9px 13px;font-weight:800;font-size:14px;cursor:pointer}
+#mapClose{background:#ff3df0;border:0}
+#mapInfo{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:8px 14px;font-weight:700;font-size:13px;white-space:nowrap;pointer-events:none}
+#job{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);padding:7px 16px;text-align:center;display:none;min-width:220px;max-width:62vw}
+#job.show{display:block}
+#job.urgent{border-color:#ff4040;box-shadow:0 0 14px rgba(255,60,60,.5)}
+#jobTitle{font:900 13px "Arial Black",Impact,sans-serif;letter-spacing:1px;color:#ffd23b}
+#jobLine{font-size:14px;font-weight:800;margin-top:2px}
+#jobSub{font-size:12px;opacity:.85;margin-top:2px}
+#banner{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);text-align:center;opacity:0;pointer-events:none}
+#banner.show{animation:bannerA 3.6s forwards}
+@keyframes bannerA{0%{opacity:0;transform:translate(-50%,-50%) scale(1.4)}10%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+#bannerT{font:900 min(9vw,52px) "Arial Black",Impact,sans-serif;color:#ffd23b;text-shadow:0 0 18px rgba(0,0,0,.8),0 4px 0 #5a3a00;letter-spacing:1px;white-space:nowrap}
+#bannerS{font-size:16px;font-weight:800;text-shadow:0 2px 4px #000;margin-top:4px}
+.ovl{position:fixed;inset:0;z-index:13;display:none;align-items:center;justify-content:center;background:rgba(5,3,10,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.ovl.show{display:flex}
+.ovl .card>.drow:last-child{position:sticky;bottom:-18px;margin:8px -18px -18px;padding:10px 0 12px;background:linear-gradient(rgba(15,11,28,0),#0f0b1c 35%)}
+.ovl .card{touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#pause{overflow-y:auto;touch-action:pan-y;justify-content:flex-start}
+#pause>:first-child{margin-top:auto}#pause>:last-child{margin-bottom:auto}
+.card{background:linear-gradient(180deg,#1b1530,#0f0b1c);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:18px;max-width:92vw;max-height:88vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.card h3{margin:0 0 10px;font:900 22px "Arial Black",Impact,sans-serif;text-shadow:0 0 12px #3d8bff}
+#garageList{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;min-width:min(640px,86vw)}
+.gcar{display:flex;flex-direction:column;align-items:center;gap:3px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:12px 8px;color:#fff;cursor:pointer}
+.gcar:active{transform:scale(.97);background:rgba(61,139,255,.35)}
+.cmoney{font-weight:900;color:#3bff6a;margin-bottom:8px}
+.crow{background:rgba(255,255,255,.06);border-radius:14px;padding:10px;margin-bottom:8px}
+.crow small{opacity:.65;font-size:11px}.cpr{float:right;font-size:12px;opacity:.8}
+.sw{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.swb{width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.35);color:#fff;font-weight:900}
+.swb.sel{border:3px solid #fff;transform:scale(1.12)}
+.cbs{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+.cb{flex:1;min-width:92px;display:flex;flex-direction:column;align-items:center;gap:2px;background:rgba(255,61,240,.16);border:1px solid rgba(255,61,240,.5);border-radius:12px;padding:8px 6px;color:#fff;font-weight:800;font-size:13px}
+.cb small{opacity:.8;font-weight:600}.cb.own{background:rgba(59,255,106,.14);border-color:rgba(59,255,106,.5)}
+.cb:active,.swb:active{transform:scale(.94)}
+#callBox{position:absolute;left:50%;top:calc(4px + env(safe-area-inset-top));transform:translateX(-50%);display:none;align-items:center;gap:10px;pointer-events:auto;background:linear-gradient(180deg,#2a2208,#16120a);border:2px solid #ffd23b;border-radius:16px;padding:8px 10px;box-shadow:0 0 22px rgba(255,210,59,.45);max-width:94vw;z-index:6}
+#callBox.show{display:flex;animation:callIn .35s}
+@keyframes callIn{from{transform:translate(-50%,-20px);opacity:0}to{transform:translateX(-50%);opacity:1}}
+#callIco{font-size:30px;animation:ring .25s infinite alternate}
+.cInfo{font-size:13px;line-height:1.3;white-space:nowrap}.cInfo b{color:#ffd23b;font-size:14px}.cInfo small{opacity:.75;font-size:11px}
+#callBox button{border:0;border-radius:12px;font-weight:900;color:#fff;padding:12px 14px;font-size:15px}
+#callYes{background:#2e9e44}#callNo{background:rgba(255,255,255,.15)}
+#phone .card{text-align:center;max-width:min(420px,92vw);border-color:#ffd23b}
+#phoneIco{font-size:46px;animation:ring .25s infinite alternate}
+@keyframes ring{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
+#phoneS{font-style:italic;opacity:.9;margin:8px 0;line-height:1.4}#phoneR{font-weight:900;color:#3bff6a;margin-bottom:10px}
+.wal{display:flex;gap:10px;margin-bottom:10px}.wal>div{flex:1;background:rgba(255,255,255,.07);border-radius:12px;padding:8px 10px}.wal small{display:block;opacity:.7;font-size:11px}.wal b{font-size:18px}
+.shopGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.xrow{background:rgba(255,255,255,.06);border-radius:14px;padding:10px;margin-bottom:8px}
+.sub{font-size:13px;opacity:.85;margin:4px 0 10px}
+.gcar.locked{opacity:.85;border-style:dashed}.gp{margin-top:4px;font-size:12px;font-weight:900;color:#ffd23b}.gp.own{color:#3bff6a}
+.cm{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 10px;margin-bottom:6px;border:1px solid rgba(255,255,255,.1)}
+.cm.next{border-color:#ffd23b;box-shadow:0 0 12px rgba(255,210,59,.3)}.cm.lock{opacity:.5}.cm.done span{color:#3bff6a}
+.cmI{font-size:26px}.cmT{flex:1;line-height:1.25}.cmT small{display:block;opacity:.7;font-size:11px}.cm span{font-size:12px;font-weight:900;white-space:nowrap}
+#film{position:fixed;inset:0;z-index:20;background:radial-gradient(circle at 50% 45%,#1d1608,#000 75%);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8vw}
+#film.show{display:flex}.fbar{position:absolute;left:0;right:0;top:0;height:11vh;background:#000}.fbar.b{top:auto;bottom:0}
+#filmT{font:900 15px "Arial Black",Impact,sans-serif;color:#ffd23b;letter-spacing:3px;margin-bottom:10px}
+#filmIco{font-size:min(17vh,96px)}#filmIco.pop{animation:fpop .6s}@keyframes fpop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+#filmTxt{font-size:min(4.6vh,20px);font-weight:700;max-width:640px;min-height:3em;margin-top:10px;text-shadow:0 2px 6px #000}
+#filmSkip{position:absolute;bottom:13vh;font-size:11px;opacity:.5}
+#hackGrid{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-content:center;margin:10px 0}
+.hk{height:54px;border-radius:10px;border:1px solid #1e8449;background:#062312;color:#39ff88;font:900 18px monospace}.hk.lit{background:#39ff88;color:#000;box-shadow:0 0 18px #39ff88}
+#hackMsg{min-height:20px;font-size:13px;color:#b8ffd0}#hackBar{height:100%;width:0;background:#39ff88;transition:width .4s}
+.gi{font-size:34px}.gn{font-weight:900;font-size:14px}.gs{font-size:11px;opacity:.7}
+#dialWrap{width:min(56vh,250px);height:min(56vh,250px);border-radius:50%;margin:6px auto;position:relative;touch-action:none;cursor:grab;background:radial-gradient(circle,#4a4f57 0%,#2a2d33 60%,#15171b 100%);box-shadow:inset 0 0 0 8px #9aa0a6,0 6px 20px rgba(0,0,0,.6)}
+#dialFace{position:absolute;inset:12px;border-radius:50%;background:repeating-conic-gradient(from -1.8deg,#d4af37 0 1.2deg,transparent 1.2deg 3.6deg);-webkit-mask:radial-gradient(circle,transparent 62%,#000 63%);mask:radial-gradient(circle,transparent 62%,#000 63%)}
+#dialKnob{position:absolute;left:50%;top:50%;width:46%;height:46%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 35% 35%,#e8e8e8,#7a7f86);display:flex;align-items:center;justify-content:center;font:900 30px "Arial Black",Impact,sans-serif;color:#1b1b1b}
+#dialWrap:after{content:"▼";position:absolute;left:50%;top:-4px;transform:translateX(-50%);color:#ff3d3d;font-size:20px}
+#dialBar{height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden;margin:8px 0}
+#dialFeel{height:100%;width:0;transition:width .08s}
+#dialSteps{display:flex;gap:8px;justify-content:center;margin:6px 0}
+#dialSteps span{background:rgba(255,255,255,.1);border-radius:8px;padding:4px 10px;font-weight:900;font-family:monospace;font-size:18px}
+#dialSteps span.ok{background:#1e8449}#dialSteps span.cur{outline:2px solid #ffd23b}
+@media (max-height:520px) and (orientation:landscape){
+ #dial .card{display:grid;grid-template-columns:auto minmax(200px,280px);grid-template-areas:"h h" "w s" "w b" "w m" "w r" "w x";column-gap:16px;align-items:center;padding:12px 16px}
+ #dial h3{grid-area:h;margin-bottom:4px}#dialWrap{grid-area:w;width:min(62vh,230px);height:min(62vh,230px);margin:0}
+ #dialSteps{grid-area:s}#dialBar{grid-area:b}@media (max-height:520px) and (orientation:landscape){#cutter .card{display:grid;grid-template-columns:auto 220px;column-gap:14px;align-items:center}#cutter h3,#cutMsg{grid-column:2}#cutCv{grid-row:1/span 4;grid-column:1}#cutter .bar,#cutter .drow{grid-column:2}}
+#dialMsg{grid-area:m}#dialRow1{grid-area:r}#dialRow2{grid-area:x}
+ #dial .mb{min-width:auto;padding:10px 14px}
+ #custBody{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}#custBody .cmoney{grid-column:1/-1;margin-bottom:4px}#custBody .crow:first-of-type{grid-column:1/-1}
+ .crow{padding:7px 9px;margin-bottom:6px}.swb{width:30px;height:30px}.sw,.cbs{margin-top:5px;gap:6px}.cb{padding:5px 4px;font-size:12px}
+ .ovl .card>.drow:last-child{bottom:-12px;margin:6px -12px -12px;padding:8px 0 10px}
+ .card{max-height:92vh;padding:12px}.card h3{font-size:18px;margin-bottom:6px}
+}
+#dialMsg{font-size:13px;opacity:.85;text-align:center;min-height:18px}
+.drow{display:flex;gap:8px;justify-content:center;margin-top:8px}
+@media (max-height:500px){#miniWrap,#mini{width:118px;height:118px}#bars{top:calc(140px + env(safe-area-inset-top));width:118px}#wpInfo{top:calc(160px + env(safe-area-inset-top));width:118px}#bCam,#bPause{left:calc(140px + env(safe-area-inset-left))}#bCam{top:calc(60px + env(safe-area-inset-top))}#money{font-size:20px}#stars{font-size:22px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="touchArea"></div>
+<div id="hud">
+  <div id="miniWrap"><canvas id="mini" width="300" height="300"></canvas><div id="miniTag">KARTE</div></div>
+  <div id="wpInfo"></div>
+  <div id="bars">
+    <div class="bar" id="hpBar"><div id="hpFill"></div></div>
+    <div class="bar"><div id="arFill"></div></div>
+  </div>
+  <div id="topR">
+    <div id="clock" class="pill">06:00</div>
+    <div id="money">D$ 0</div>
+    <div id="stars"></div>
+    <div id="weap" class="pill"><div id="wIcon">🔫</div><div><div id="wName">Pistole</div><div id="wAmmo"></div></div></div>
+  </div>
+  <div id="carInfo" class="pill"><div id="spd">0</div><div id="spdU">KM/H</div><div id="carName"></div><div id="carHpBar"><div id="carHp"></div></div></div>
+  <div id="toast" class="pill"></div>
+  <div id="hint" class="pill"></div>
+  <div id="cross"><i></i><b></b><b></b><b></b><b></b></div>
+  <div id="lockMark"></div>
+  <div id="areaName"></div>
+  <div id="hitDir"></div>
+  <div id="job" class="pill"><div id="jobTitle"></div><div id="jobLine"></div><div id="jobSub"></div></div>
+  <div id="callBox"><div id="callIco">📞</div><div class="cInfo"><b>Anruf für dich!</b><div><span id="callJob"></span> · <span id="callPay"></span></div><small>Annehmen = Route zur Telefonzelle · <span id="callT"></span></small></div><button id="callNo">✕</button><button id="callYes">Annehmen</button></div>
+  <div id="banner"><div id="bannerT"></div><div id="bannerS"></div></div>
+  <div id="vign"></div>
+</div>
+<div id="joyHint"></div>
+<div id="joyBase"><div id="joyKnob"></div></div>
+<div id="wheel"><svg viewBox="-100 -100 200 200" width="100%" height="100%"><defs><radialGradient id="wg" cx="50%" cy="40%"><stop offset="0" stop-color="#3a3a44"/><stop offset="1" stop-color="#14141a"/></radialGradient></defs><circle r="88" fill="none" stroke="#1b1b22" stroke-width="22"/><circle r="88" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/><circle r="99" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="2"/><rect x="-10" y="-99" width="20" height="22" rx="4" fill="#ff3df0"/><path d="M-80,8 L-26,14 L-18,40 L18,40 L26,14 L80,8 L76,-6 L22,-4 L-22,-4 L-76,-6Z" fill="url(#wg)" stroke="#000" stroke-width="2"/><path d="M-12,40 L12,40 L10,80 L-10,80Z" fill="url(#wg)" stroke="#000" stroke-width="2"/><circle r="26" fill="url(#wg)" stroke="#000" stroke-width="2"/><text y="9" text-anchor="middle" font-family="Arial Black,Impact" font-size="26" fill="#ffd700">D</text></svg></div>
+<div id="ctrl">
+  <div class="tb foot" id="bShoot">💥<small>SCHIESSEN</small></div>
+  <div class="tb foot" id="bAim">🎯<small>ZIELEN</small></div>
+  <div class="tb foot" id="bEnter">EIN</div>
+  <div class="tb foot" id="bWeapon">🔄</div>
+  <div class="tb foot" id="bReload">🔃<small>LADEN</small></div>
+  <div class="tb car" id="bGas">▲<small>GAS</small></div>
+  <div class="tb car" id="bBrake">▼<small>BREMSE</small></div>
+  <div class="tb car" id="bHand">HAND-<br>BREMSE</div>
+  <div class="tb car" id="bHorn">📯</div>
+  <div class="tb car" id="bExit">RAUS</div>
+  <div class="tb plane" id="bUp">▲<small>NASE HOCH</small></div>
+  <div class="tb plane" id="bDown">▼<small>RUNTER</small></div>
+  <div class="tb" id="bCam">🎥</div>
+  <div class="tb" id="bPause"><i></i><i></i></div>
+</div>
+<div id="bigmap">
+  <canvas id="bigCanvas"></canvas>
+  <div id="mapTop"><div id="mapTitle">KARTE</div><button class="mbtn" id="mapMe">📍 Ich</button><button class="mbtn" id="mapZoomOut">−</button><button class="mbtn" id="mapZoomIn">+</button><button class="mbtn" id="mapClear">Markierung löschen</button><button class="mbtn" id="mapClose">✕ Zurück</button></div>
+  <div id="mapInfo" class="pill"></div>
+</div>
+<div id="shop" class="ovl"><div class="card" style="min-width:min(520px,90vw)"><h3 id="shopTitle"></h3><div id="shopBody"></div><div class="drow"><button class="mb" id="shopClose">Zurück</button></div></div></div>
+<div id="coup" class="ovl"><div class="card" style="min-width:min(560px,92vw)"><h3 style="text-shadow:0 0 14px #ffd23b">👑 RADJ-COUP</h3><div id="coupList"></div><div id="coupInfo" class="sub"></div><div class="drow"><button class="mb" id="coupClose">Zurück</button><button class="mb" id="coupGo" style="background:#b8860b">▶ Start</button></div></div></div>
+<div id="film"><div class="fbar"></div><div id="filmT"></div><div id="filmIco">🎩</div><div id="filmTxt"></div><div id="filmSkip">Tippen = weiter</div><div class="fbar b"></div></div>
+<div id="cutter" class="ovl"><div class="card" style="text-align:center;border-color:#9ff"><h3 style="color:#bff;text-shadow:0 0 12px #39c6ff">💎 GLASSCHNEIDER</h3><div id="cutMsg" class="sub"></div><canvas id="cutCv" style="touch-action:none;border-radius:12px;background:#0a1018;display:block;margin:4px auto"></canvas><div class="bar" style="height:8px;margin:8px 0"><div id="cutBar" style="height:100%;width:0;background:#9ff"></div></div><div class="drow"><button class="mb" id="cutExit" style="min-width:auto;opacity:.75">Später</button></div></div></div>
+<div id="win" class="ovl"><div class="card" style="text-align:center;border-color:#ffd700;box-shadow:0 0 40px rgba(255,215,0,.4)"><div style="font-size:64px">👑</div><h3 style="font-size:30px;color:#ffd700;text-shadow:0 0 18px #ffae00">GESCHAFFT!</h3><div style="font-weight:800;margin:4px 0 8px">Die goldene Bubensahne gehört dir.</div><div style="font:900 26px Arial Black,Impact,sans-serif;color:#3bff6a">+150.000 D$</div><div id="winStats" class="sub" style="margin-top:8px"></div><div class="drow"><button class="mb big" id="winOk">Zurück ins Versteck</button></div></div></div>
+<div id="hack" class="ovl"><div class="card" style="text-align:center;font-family:monospace"><h3 style="color:#39ff88;text-shadow:0 0 12px #39ff88">💻 RADJ-SERVER</h3><div id="hackMsg"></div><div id="hackGrid"></div><div class="bar" style="height:8px;margin:8px 0"><div id="hackBar"></div></div><div class="drow"><button class="mb" id="hackExit" style="min-width:auto;opacity:.75">Später</button></div></div></div>
+<div id="customs" class="ovl"><div class="card" style="min-width:min(520px,90vw)"><h3 style="text-shadow:0 0 12px #ff3df0">🎨 DILDI CUSTOMS</h3><div id="custBody"></div><div class="drow"><button class="mb" id="custClose">Fertig</button></div></div></div>
+<div id="phone" class="ovl"><div class="card"><div id="phoneIco">📞</div><h3 id="phoneT"></h3><div id="phoneS"></div><div id="phoneR"></div><div class="drow"><button class="mb" id="phoneNo">Doch nicht</button><button class="mb" id="phoneYes" style="background:#2e9e44">Los geht's</button></div></div></div>
+<div id="garage" class="ovl"><div class="card"><h3 id="garageTitle">GARAGE</h3><div id="garageList"></div><div class="drow"><button class="mb" id="garageClose">Zurück</button></div></div></div>
+<div id="dial" class="ovl"><div class="card" style="text-align:center"><h3 style="text-shadow:0 0 12px #ffd23b">🔐 TRESOR KNACKEN</h3><div id="dialSteps"></div><div id="dialWrap"><div id="dialFace"></div><div id="dialKnob"><span id="dialNum">00</span></div></div><div id="dialBar"><div id="dialFeel"></div></div><div id="dialMsg"></div><div class="drow" id="dialRow1"><button class="mb" id="dialL">◀</button><button class="mb big" id="dialLock">EINRASTEN</button><button class="mb" id="dialR">▶</button></div><div class="drow" id="dialRow2"><button class="mb" id="dialExit" style="min-width:auto;opacity:.75">Später</button></div></div></div>
+<div id="dead" class="ov"><div>ERLEDIGT</div><p>Ab ins Krankenhaus…</p></div>
+<div id="pause" class="ov">
+  <h2>PAUSE</h2>
+  <button class="mb big" id="resume">▶ Weiter</button>
+  <div class="row"><span style="align-self:center;opacity:.8;font-size:13px;margin-right:6px">Grafik:</span><button class="mb" data-q="hoch">Hoch</button><button class="mb" data-q="mittel">Mittel</button><button class="mb" data-q="niedrig">Niedrig</button></div>
+  <div class="row"><button class="mb" id="shopBtn">🛒 Shop</button><button class="mb" id="xchgBtn">💱 Wechselstube</button></div>
+  <button class="mb" id="casinoBtn" style="display:none">🎰 Zurück ins Casino</button>
+  <button class="mb" id="muteBtn">🔊 Ton an</button>
+  <button class="mb" id="abortBtn">✖ Auftrag abbrechen</button>
+  <label>Kamera-Empfindlichkeit</label>
+  <input type="range" id="sens" min="0.4" max="2.2" step="0.1" value="1">
+</div>
+<div id="start" class="ov">
+  <div id="logo">DILDI CITY<small>3D</small></div>
+  <div id="sub">Stadt, zwei Wüsten, Docks und Flughafen – Jobs, Telefon-Aufträge, Bankraub und der Radj-Coup.<br>Tag &amp; Nacht laufen automatisch (15 + 15 Minuten).</div>
+  <button id="startBtn">LOS GEHT'S</button>
+  <div id="loading">Stadt wird gebaut…</div>
+  <div id="helpTxt"></div>
+</div>
+<script>
+if(!('ontouchstart' in window||navigator.maxTouchPoints>0))document.body.classList.add('notouch');
+window.addEventListener('error',function(e){var l=document.getElementById('loading');if(l){l.style.display='block';l.style.color='#ff6a6a';l.textContent='Fehler: '+e.message;}});
+</script>
+<script>window.GCFG=/*GCFG*/null;</script>
+<script>/*BUNDLE*/</script>
+</body>
+</html>
