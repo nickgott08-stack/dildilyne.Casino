@@ -77,3 +77,20 @@ Im Casino wird der Casino-Name als Online-Name vorgeschlagen; Online-Server = `D
 - Anwesen: kein Schleich-Tempo mehr (`G.walkMul = 0`), Gehen/Rennen wie überall.
 - Motorsound: 5-Gang-Drehzahl (fällt beim Schalten), im 5. Gang mittlere Drehzahl; nach ~3 s Vollgas bei Höchsttempo
   wird der Motor leiser/dumpfer (`cruise` in `audio.engine`), weicherer Klang (Dreieck statt Rechteck, tieferer Filter).
+
+## Saison 1 – neue Wirtschaft (Start Mo 16.11.2026)
+Casino-Änderungen per `tools/patch_season1.py` (einmalig angewendet, dokumentiert die Stellen):
+- Saison-Reset (`ssApply`): alles auf 0 (Bits, Euro, Erfolge, Sigma-Pass, Skins, Rekorde, Dildi City), es bleiben nur
+  Karten + Shop-Käufe (items/buys/packs/noAds) und Technisches (adm, bx, cm, Fischmarkt-Angebote lst/sacc/srej, arch).
+  Doppelte Karten → Händlerpreis. Sparschwein `pig` = Bits + Euro×100 + D$ (alt /10) + Doppelte×100 + Anteile/Aktien×100,
+  nur Anzeige (Saison-Ansage + Profil).
+- Rangliste `mkTabs()` = nur Rekord-Kategorien; `mkTabsAll()` = alle (für Saison-0-Archiv/Meisterschaft „Saison 0“).
+- `ssW()` Saisonwoche 0–4, `ssDay()` Tag 0–29, `ssM()` Faktor 1/1,25/1,5/1,75/2 für Minispiele, Erfolge (`ACHB`), Wochenaufgaben (`WK.r`).
+- Hafen-Fang ~500/Runde (Fang-Wert und Deckel ×2, gleiche Fisch-Dichte), Memory und Flugschule halbiert, Kippen alle 5 Min.
+- Einsätze: kleines Pferderennen + Boxen max. 1.000; großes Pferderennen max 5k/10k/25k (Woche 1/2/3+), 50-%-Knopf, ALL-IN ab Woche 3.
+  Der Coup (Roulette) 1 h zwischen Missionen.
+- Dildi City bekommt `sd`/`wk`/`son` in GCFG.
+Dildi City (Quellcode):
+- Kurs 1 D$ = 1 Bit, alte D$ einmalig /10 (`dc3d_eco2`), Preise /10, alle Job-Bezahlungen über `ecoPay()` (alt/10 × Wochen-Faktor),
+  Radj-Finale fest 150.000 (1×/Woche). Tauschgrenze D$→Bits pro Tag 10.000 + 5.000 × Saisontag, ab Tag 24 unbegrenzt.
+- Bankraub + Docks-Coup: alle 30 Min, max. 10× pro Tag (`robCheck`/`robDone`).

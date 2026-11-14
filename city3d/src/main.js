@@ -13,7 +13,7 @@ import { FX } from './fx.js';
 import { Online } from './online.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
-import { clamp, lerp, damp, dampAngle, angleWrap, rand, randi, pick, store, casino } from './util.js';
+import { clamp, lerp, damp, dampAngle, angleWrap, rand, randi, pick, store, casino, ecoPay, season } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 function lockPointer() {
@@ -46,7 +46,7 @@ const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 2200);
 const G = {
   scene, camera, time: 0, vehicles: [], peds: [], pickups: [], shake: 0,
   wanted: { level: 0, stars: 0, evadeT: 0, seenT: 0 },
-  money: parseInt(store.get('dc3d_dollar') || '500', 10),
+  money: parseInt(store.get('dc3d_dollar') || '0', 10),
   cycle: ((Date.now() / 1000) / 1800) % 1, // time of day (0..1), follows the real clock
   paused: true,
 };
@@ -342,7 +342,7 @@ function updatePickups(dt) {
       else if (p.type === 'ak') {
         if (!player.has[2]) { player.has[2] = true; player.weapon = 2; toast('🪖 AK-47 aufgesammelt!'); }
         else took = false;
-      } else if (p.type === 'money') { addMoney(p.amount); }
+      } else if (p.type === 'money') { addMoney(ecoPay(p.amount)); }
       if (took) {
         audio.pickup();
         if (p.once) { scene.remove(p.mesh); p.gone = true; }
@@ -1365,7 +1365,14 @@ $('resume').addEventListener('click', () => setPaused(false));
 
 // ---------- shop + exchange (pause menu) ----------
 const fmtN = (n) => Math.round(n).toLocaleString('de-DE');
-const RATE = 10; // 10 D$ = 1 Bit
+const RATE = 1; // ab Saison 1: 1 D$ = 1 Bit
+// einmalige Umstellung: alte D$ (Kurs 10:1) durch 10 teilen, damit der Wert gleich bleibt
+if (store.get('dc3d_eco2') !== '1') { G.money = Math.round(G.money / 10); store.set('dc3d_dollar', String(G.money)); store.set('dc3d_eco2', '1'); }
+// Tauschgrenze D$ → Bits pro Tag: Saisontag 1: 10.000, Tag 2: 15.000, … ; letzte Saisonwoche unbegrenzt
+const xLimit = () => (season.day >= 23 ? Infinity : 10000 + 5000 * season.day);
+const xDay = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function xUsed() { let s = null; try { s = JSON.parse(store.get('dc3d_xch') || 'null'); } catch (e) {} return s && s.d === xDay() ? s.n : 0; }
+function xAdd(n) { store.set('dc3d_xch', JSON.stringify({ d: xDay(), n: xUsed() + n })); }
 function openShop(tab) {
   G.shopTab = tab;
   $('pause').classList.remove('show');
@@ -1382,15 +1389,16 @@ function renderShop() {
   let h = `<div class="wal"><div><small>Dildi-Dollar</small><b style="color:#3bff6a">D$ ${fmtN(G.money)}</b></div><div><small>Deine Bits${casino.linked ? '' : ' (Test)'}</small><b style="color:#ffd23b">◆ ${fmtN(casino.bits())}</b></div></div>`;
   if (tab === 'shop') {
     const items = [
-      ['vest', '🦺', 'Schutzweste', 'Volle Panzerung (100)', 1500, player.armor >= 100 ? 'Schon voll' : ''],
-      ['heal', '🩹', 'Erste-Hilfe-Kasten', 'Volle Gesundheit', 500, player.hp >= 100 ? 'Schon voll' : ''],
-      ['ak', '🪖', 'AK-47', 'Für immer freigeschaltet', 8000, player.has[2] ? 'Gekauft' : ''],
+      ['vest', '🦺', 'Schutzweste', 'Volle Panzerung (100)', 150, player.armor >= 100 ? 'Schon voll' : ''],
+      ['heal', '🩹', 'Erste-Hilfe-Kasten', 'Volle Gesundheit', 50, player.hp >= 100 ? 'Schon voll' : ''],
+      ['ak', '🪖', 'AK-47', 'Für immer freigeschaltet', 800, player.has[2] ? 'Gekauft' : ''],
     ];
     h += '<div class="shopGrid">' + items.map(([k, ic, n, d, pr, off]) => `<button class="gcar" data-buy="${k}" ${off ? 'disabled style="opacity:.45"' : ''}><div class="gi">${ic}</div><div class="gn">${n}</div><div class="gs">${d}</div><div class="gs" style="opacity:1;color:#3bff6a;font-weight:900">${off || fmtN(pr) + ' D$'}</div></button>`).join('') + '</div>';
   } else {
-    h += `<p class="sub">Kurs: <b>10 D$ = 1 Bit</b> – in beide Richtungen.${casino.linked ? '' : '<br><span style="color:#ff8a8a">Nur im Casino werden echte Bits getauscht – hier läuft ein Test-Konto.</span>'}</p>`;
+    const lim = xLimit(), left = Math.max(0, lim - xUsed());
+    h += `<p class="sub">Kurs: <b>1 D$ = 1 Bit</b> – in beide Richtungen.<br>D$ → Bits heute noch: <b>${lim === Infinity ? 'unbegrenzt' : fmtN(left) + ' von ' + fmtN(lim)}</b>${casino.linked ? '' : '<br><span style="color:#ff8a8a">Nur im Casino werden echte Bits getauscht – hier läuft ein Test-Konto.</span>'}</p>`;
     h += '<div class="xrow"><b>Bits → D$</b><div class="cbs">' + [100, 1000, 5000, 25000].map((b) => `<button class="cb" data-x="in" data-v="${b}" ${casino.bits() < b ? 'disabled style="opacity:.4"' : ''}>◆ ${fmtN(b)}<small>→ D$ ${fmtN(b * RATE)}</small></button>`).join('') + '</div></div>';
-    h += '<div class="xrow"><b>D$ → Bits</b><div class="cbs">' + [1000, 10000, 50000, 250000].map((d) => `<button class="cb" data-x="out" data-v="${d}" ${G.money < d ? 'disabled style="opacity:.4"' : ''}>D$ ${fmtN(d)}<small>→ ◆ ${fmtN(d / RATE)}</small></button>`).join('') + '</div></div>';
+    h += '<div class="xrow"><b>D$ → Bits</b><div class="cbs">' + [100, 1000, 5000, 25000].map((d) => `<button class="cb" data-x="out" data-v="${d}" ${G.money < d || d > left ? 'disabled style="opacity:.4"' : ''}>D$ ${fmtN(d)}<small>→ ◆ ${fmtN(d / RATE)}</small></button>`).join('') + '</div></div>';
   }
   const body = $('shopBody');
   body.innerHTML = h;
@@ -1398,7 +1406,7 @@ function renderShop() {
   body.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', () => exchange(b.dataset.x, +b.dataset.v)));
 }
 function buyItem(k) {
-  const price = { vest: 1500, heal: 500, ak: 8000 }[k];
+  const price = { vest: 150, heal: 50, ak: 800 }[k];
   if (G.money < price) { toast(`💸 Zu wenig Geld (${fmtN(price)} D$)`); return; }
   if (k === 'vest') { if (G.noVest) { toast('🦺 Im Finale gibt es keine Weste'); return; } if (player.armor >= 100) return; player.armor = 100; }
   else if (k === 'heal') { if (player.hp >= 100) return; player.hp = 100; }
@@ -1414,8 +1422,10 @@ function exchange(dir, v) {
     addMoney(v * RATE);
   } else {
     if (G.money < v) { toast('Zu wenig D$'); return; }
+    if (v > xLimit() - xUsed()) { toast('Tauschgrenze für heute erreicht'); return; }
     addMoney(-v);
     casino.addBits(v / RATE);
+    xAdd(v);
   }
   audio.tone(0.2, 700, 1300, 0.12, 'triangle');
   renderShop();
