@@ -1,5 +1,6 @@
 // Geography: terrain height, road layout and elevated decks (flyover).
 import * as THREE from 'three';
+import './dildi_cars.js'; // Nicks Modelle (liefert u. a. die Straßen des Dildi-Kreuzes) – vor den Straßen laden
 
 export const WALL_OUT = 246; // outer edge of the building wall around the city
 export const COAST_Z = -420; // south land ends here (sea beyond)
@@ -77,9 +78,10 @@ R('Gehöft-Weg', [[480, 240], [502, 256], [516, 262], [520, 266]], { kind: 'dirt
 
 // --- south: harbour road + compact flyover "Dildi-Kreuz" ---
 R('Hafenstraße', [[0, -236, 0], [0, -290, 0], [0, -350, 0], [0, -400, 0], [0, -416, 0]], { w: 12, lamps: true });
-R('Dildi-Kreuz', [[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -324, 9], [0, -324, 9], [60, -324, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]], { kind: 'deck', w: 12, lamps: true });
-R('Rampe West', [[-64, -324, 9], [-46, -332, 8.2], [-32, -352, 5.5], [-20, -374, 2.6], [-9, -392, 0.6], [-4, -402, 0]], { kind: 'deck', w: 9 });
-R('Rampe Ost', [[4, -402, 0], [9, -392, 0.6], [20, -374, 2.6], [32, -352, 5.5], [46, -332, 8.2], [64, -324, 9]], { kind: 'deck', w: 9 });
+// Dildi-Kreuz (Nicks Modell, dildi_cars.js): Hochstraße y=9 bei z=-322 + 4 Kleeblatt-Schleifen auf die Hafenstraße.
+// Gezeichnet wird es vom Spiel selbst (Fahrbahn, Schutzwände mit Lücken an den Einmündungen, Pfeiler),
+// die Deko (Schilderbrücken, Rasthof, Motel, Skatepark, Plakate) kommt aus dildiKreuz.decor() in outskirts.js.
+for (const r of globalThis.DildiCars.dildiKreuz.roads()) R(r.name, r.pts, r.opts);
 // island roads (flat)
 R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -560, 0], [0, -610, 0]], { w: 12, lamps: true });
 R('Kaistraße', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [0, -560, 0], [70, -560, 0], [150, -560, 0], [215, -560, 0]], { w: 11, lamps: true });
@@ -240,7 +242,7 @@ function buildDeckIndex() {
     const S = r.samples;
     for (let i = 0; i < S.length - 1; i++) {
       const a = S[i], b = S[i + 1];
-      const seg = { a, b, w: r.w };
+      const seg = { a, b, w: r.w, r };
       const x0 = Math.min(a.x, b.x) - r.w, x1 = Math.max(a.x, b.x) + r.w, z0 = Math.min(a.z, b.z) - r.w, z1 = Math.max(a.z, b.z) + r.w;
       for (let cx = Math.floor(x0 / DCELL); cx <= Math.floor(x1 / DCELL); cx++)
         for (let cz = Math.floor(z0 / DCELL); cz <= Math.floor(z1 / DCELL); cz++) {
@@ -255,18 +257,22 @@ function buildDeckIndex() {
 export function deckAt(x, z, refY, step = 1.1) {
   const l = deckIdx.get(dkey(Math.floor(x / DCELL), Math.floor(z / DCELL)));
   if (!l) return -1e9;
-  let best = -1e9;
+  // per deck road only its nearest segment counts (clamped to the segment ends, so there is no gap on the
+  // outer side of curves where cars used to drop through); between different decks the highest usable wins
+  const near = new Map();
   for (const s of l) {
     const abx = s.b.x - s.a.x, abz = s.b.z - s.a.z;
     const L2 = abx * abx + abz * abz;
-    let t = ((x - s.a.x) * abx + (z - s.a.z) * abz) / (L2 + 1e-9);
-    if (t < -0.02 || t > 1.02) continue;
-    t = Math.min(1, Math.max(0, t));
-    const px = s.a.x + abx * t, pz = s.a.z + abz * t;
-    if (Math.hypot(x - px, z - pz) > s.w / 2 + 0.4) continue;
+    const t = Math.min(1, Math.max(0, ((x - s.a.x) * abx + (z - s.a.z) * abz) / (L2 + 1e-9)));
+    const d = Math.hypot(x - (s.a.x + abx * t), z - (s.a.z + abz * t));
+    if (d > s.w / 2 + 0.4) continue;
     const y = s.a.y + (s.b.y - s.a.y) * t;
-    if (y <= refY + step && y > best) best = y;
+    if (y > refY + step) continue;
+    const o = near.get(s.r);
+    if (!o || d < o.d - 1e-6) near.set(s.r, { d, y });
   }
+  let best = -1e9;
+  for (const o of near.values()) if (o.y > best) best = o.y;
   return best;
 }
 

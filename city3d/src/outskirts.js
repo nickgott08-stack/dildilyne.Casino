@@ -231,6 +231,10 @@ export function buildOutskirts(scene, K) {
     }
     if (r.lamps) for (let i = 6; i < S.length; i += 9) {
       const p = S[i];
+      { // no lamp post where another road joins (it would stand in that road's lane)
+        const lx = p.x - Math.cos(p.h) * (r.w / 2 + 0.8), lz = p.z + Math.sin(p.h) * (r.w / 2 + 0.8);
+        if (ROADS.some((o) => o !== r && o.samples.some((q) => Math.hypot(q.x - lx, q.z - lz) < o.w / 2 + 1.2))) continue;
+      }
       lampPos.push([p.x - Math.cos(p.h) * (r.w / 2 + 0.8), p.z + Math.sin(p.h) * (r.w / 2 + 0.8), p.h - Math.PI / 2, r.kind === 'deck' ? p.y : T(p.x - Math.cos(p.h) * (r.w / 2 + 0.8), p.z + Math.sin(p.h) * (r.w / 2 + 0.8))]);
     }
     if (r.kind === 'deck') {
@@ -273,11 +277,18 @@ export function buildOutskirts(scene, K) {
   world.cullList.push(...tiledMeshes(scene, dirtGeos, new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1 }), 250, true, rcv));
   world.cullList.push(...tiledMeshes(scene, deckBody, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), 250, false, (m) => { m.castShadow = true; m.receiveShadow = true; }));
   // sign on the flyover
-  signs('DILDI-KREUZ', '#ffffff', 0, 15, -324, Math.PI, 16, 2.4, { bg: '#1f5fa8', size: 120 });
-  for (const sx of [-8.5, 8.5]) metal.push(cbox(0.35, 6.5, 0.35, sx, 12.2, -324, '#555'));
-  metal.push(cbox(18, 0.4, 0.4, 0, 15.6, -324, '#555'));
-  signs('↓ HAFEN · DOCKS · FLUGHAFEN', '#ffffff', 0, 5, -275, Math.PI, 14, 1.8, { bg: '#1f7a3a', size: 90 });
-  for (const sx of [-7.5, 7.5]) metal.push(cbox(0.3, 6, 0.3, sx, 3, -275, '#555'));
+  // Dildi-Kreuz deco from Nick's model file: sign gantries, skatepark under the flyover, diner + petrol station,
+  // motel with pool, billboards (the decks themselves are drawn above by the game, with clean joins)
+  if (globalThis.DildiCars && globalThis.DildiCars.dildiKreuz) {
+    const deko = globalThis.DildiCars.dildiKreuz.decor(THREE, { decks: false });
+    scene.add(deko);
+    for (const c of deko.userData.colliders) addBox(c.x0, c.x1, c.z0, c.z1, c.h);
+    world.signMats.push(deko.userData.glow);
+    deko.traverse((o) => { if (o.isMesh) world.cullList.push(o); });
+  }
+  // text signs on the two gantries (south-bound from the city / north-bound from the bridge)
+  signs('DILDI-KREUZ · ↓ HAFEN · DOCKS · FLUGHAFEN', '#ffffff', 0, 5.25, -251.6, 0, 15, 1.4, { bg: '#1f5fa8', size: 90 });
+  signs('DILDI-KREUZ · ↑ INNENSTADT', '#ffffff', 0, 5.25, -404.4, Math.PI, 12, 1.4, { bg: '#1f5fa8', size: 90 });
 
   // ================= SOUTH: coast, bridge, island =================
   {

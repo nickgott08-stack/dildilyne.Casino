@@ -112,3 +112,10 @@ Dildi City (Quellcode):
 - Mittelstreifen außerhalb: von Straßenpunkt zu Straßenpunkt mit Höhe an beiden Enden (kein Schweben an Hängen/Rampen).
 - Kamera near 0.3 statt 0.1 (bessere Tiefengenauigkeit, weniger Flackern); Bank-Seitenwände überlappen die Rückwand nicht mehr.
 - Kreisverkehr am Ende der Brückenstraße (`KREISEL` in geo.js): Einbahn-Ring (`oneway`), Mittelinsel mit Kollision, auf der Karte.
+
+## Neues Dildi-Kreuz + Jeep (dildi_cars.js v3, 14.11.2026)
+- `dildi_cars.js` ersetzt (Nicks Version 3): neue Fahrzeugmodelle jeep/bus/truck (jeep wird automatisch genutzt).
+- Straßen des Kreuzes aus `DildiCars.dildiKreuz.roads()` (Hochstraße w14 bei z=-322 + 4 Kleeblatt-Schleifen),
+  gezeichnet vom Spiel (Schutzwand-Lücken an Einmündungen), Deko aus `dildiKreuz.decor(THREE, {decks:false})`
+  (Schilderbrücken, Skatepark, Rasthof/Tanke, Motel, Plakate) mit Kollision. Laternen werden nicht in Einmündungen gesetzt.
+- `deckAt`: pro Hochstraße zählt nur das nächste Segment (geklemmt) – vorher fielen Autos auf der Kurven-Außenseite durch Spalten.
