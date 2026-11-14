@@ -253,6 +253,7 @@ body.notouch #bCam,body.notouch #bPause{display:none}
 #mpChatRow{display:none;gap:6px;align-items:center}
 #mpAdv{margin-top:6px;font-size:13px;opacity:.8;text-align:left}
 #mpAdv summary{cursor:pointer}
+#fps{font-size:12px;font-weight:800;padding:3px 9px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -268,6 +269,7 @@ body.notouch #bCam,body.notouch #bPause{display:none}
   <div id="topR">
     <div id="clock" class="pill">06:00</div>
     <div id="mpBadge" class="pill" style="display:none">🌐</div>
+    <div id="fps" class="pill" style="display:none"></div>
     <div id="money">D$ 0</div>
     <div id="stars"></div>
     <div id="weap" class="pill"><div id="wIcon">🔫</div><div><div id="wName">Pistole</div><div id="wAmmo"></div></div></div>
@@ -337,6 +339,7 @@ body.notouch #bCam,body.notouch #bPause{display:none}
   <div class="row"><button class="mb" id="shopBtn">🛒 Shop</button><button class="mb" id="xchgBtn">💱 Wechselstube</button></div>
   <button class="mb" id="casinoBtn" style="display:none">🎰 Zurück ins Casino</button>
   <button class="mb" id="muteBtn">🔊 Ton an</button>
+  <button class="mb" id="fpsBtn">📊 FPS-Anzeige: aus</button>
   <button class="mb" id="abortBtn">✖ Auftrag abbrechen</button>
   <label>Kamera-Empfindlichkeit</label>
   <input type="range" id="sens" min="0.4" max="2.2" step="0.1" value="1">

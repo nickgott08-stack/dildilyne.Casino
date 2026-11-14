@@ -106,7 +106,7 @@ export function updateSky(S, t, focus, dt, quality) {
   const ld = isDay ? dir : moonDir;
   S.sun.position.set(focus.x + ld.x * 250, ld.y * 250, focus.z + ld.z * 250);
   // snap shadow camera to texel grid to prevent shimmering
-  const snap = 180 / (quality.shadow || 1024);
+  const snap = (2 * (quality.shadowR || 90)) / (quality.shadow || 1024);
   S.sun.target.position.set(Math.round(focus.x / snap) * snap, 0, Math.round(focus.z / snap) * snap);
   S.sun.position.x += S.sun.target.position.x - focus.x;
   S.sun.position.z += S.sun.target.position.z - focus.z;
