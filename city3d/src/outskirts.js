@@ -3,7 +3,7 @@ import './dildi_cars.js';
 const DC = globalThis.DildiCars;
 import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, lerp, clamp, tiledMeshes } from './util.js';
 import { world, roadC, RW, BOUND, H } from './world.js';
-import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround } from './geo.js';
+import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround, KREISEL } from './geo.js';
 
 export { LAKE, ISLAND };
 export const DOCKS = { x0: ISLAND.x0, x1: -10, z0: ISLAND.z0, z1: ISLAND.z1, name: 'Docks' };
@@ -211,12 +211,21 @@ export function buildOutskirts(scene, K) {
     if (r.kind === 'dirt') { dirtGeos.push(drapedRibbon(S, r.w, 0.12)); continue; }
     asphaltGeos.push(r.kind === 'deck' ? ribbonGeo(S.map((p) => ({ ...p, y: Math.max(p.y, 0.05) })), r.w, 0.06) : flatGround ? ribbonGeo(S, r.w, 0.06) : drapedRibbon(S, r.w, 0.1));
     // centre dashes
-    for (let i = 2; i < S.length - 2; i += 3) {
-      const p = S[i];
-      const d = new THREE.PlaneGeometry(0.22, 3);
-      d.rotateX(-Math.PI / 2);
-      d.rotateY(p.h);
-      d.translate(p.x, (r.kind === 'deck' || flatGround ? p.y : terrainH(p.x, p.z)) + (r.kind === 'deck' ? 0.05 : 0.13), p.z);
+    // each dash spans exactly from one road sample to the next, with the right height at both ends,
+    // so it lies on the road on slopes, ramps and curves (instead of a flat plank floating in the air)
+    const dy = (p) => (r.kind === 'deck' || flatGround ? p.y : terrainH(p.x, p.z)) + (r.kind === 'deck' ? 0.07 : 0.14);
+    for (let i = 2; i < S.length - 3; i += 2) {
+      const a = S[i], b = S[i + 1], hw = 0.11;
+      const pos = [];
+      for (const p of [a, b]) {
+        const rx = -Math.cos(p.h) * hw, rz = Math.sin(p.h) * hw, y = dy(p);
+        pos.push(p.x + rx, y, p.z + rz, p.x - rx, y, p.z - rz);
+      }
+      const d = new THREE.BufferGeometry();
+      d.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      d.setIndex([0, 2, 1, 1, 2, 3]);
+      d.computeVertexNormals();
+      if (d.attributes.normal.getY(0) < 0) d.setIndex([0, 1, 2, 1, 3, 2]), d.computeVertexNormals();
       colorize(d, r.w >= 12 ? '#f2c94c' : '#e8e8e2');
       mark.push(d);
     }
@@ -622,6 +631,23 @@ export function buildOutskirts(scene, K) {
     world.cullList = world.cullList || [];
     world.cullList.push(...tiledMeshes(scene, deco, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }), 200, false, (m) => { m.castShadow = true; m.receiveShadow = true; }));
   }
+  // roundabout centre island: grass with a stone kerb, palms and a golden Dildilyne monument
+  {
+    const K2 = KREISEL, ri = K2.r - K2.w / 2 - 0.4;
+    const kerb = new THREE.CylinderGeometry(ri + 0.35, ri + 0.45, 0.35, 48);
+    colorize(kerb, '#cfc9bb'); kerb.translate(K2.x, 0.17, K2.z);
+    const lawn = new THREE.CylinderGeometry(ri, ri, 0.42, 48);
+    colorize(lawn, '#4f8f3a'); lawn.translate(K2.x, 0.2, K2.z);
+    plain.push(kerb, lawn);
+    plain.push(ccyl(2.4, 2.8, 1.2, 12, K2.x, 1.0, K2.z, '#e8e0cf'), ccyl(0.7, 0.9, 3.2, 10, K2.x, 3.2, K2.z, '#c9a227'), ccyl(1.0, 0.7, 1.1, 10, K2.x, 5.3, K2.z, '#c9a227'));
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2, x = K2.x + Math.sin(a) * (ri - 3), z = K2.z + Math.cos(a) * (ri - 3);
+      plain.push(ccyl(0.18, 0.28, 5, 6, x, 2.7, z, '#8a6a45'));
+      for (let f = 0; f < 6; f++) plain.push(cbox(0.45, 0.08, 2.8, x + Math.sin(f) * 1.2, 5.2, z + Math.cos(f) * 1.2, '#2e8b3a', f, -0.35));
+    }
+    addCirc(K2.x, K2.z, ri + 0.4, 1.4, -1);
+  }
+
   // world limits (invisible) + far horizon
   {
     addBox(WORLD.x0 - 4, WORLD.x0 + 6, -560, WORLD.z1, 400, { inv: true, y0: -50 });

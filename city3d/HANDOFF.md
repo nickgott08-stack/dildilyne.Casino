@@ -104,3 +104,11 @@ Dildi City (Quellcode):
 - Außenbereich (Straßen, Wüsten-Deko, Horizont-Berge) in Kacheln (`tiledMeshes` in util.js); Gelände-Kacheln + diese
   werden hinter der Nebelgrenze ausgeblendet (`distCull` in main.js). Wegweiser-Strahl bleibt sichtbar.
 - Automatik: bei <30 FPS (2× hintereinander) zuerst Grafikstufe runter, dann Auflösung, aber nie unter Pixel-Ratio 1.0.
+
+## Passanten, Zeitrennen, Straßen, Bank (14.11.2026)
+- Passanten: mehr (hoch 42 / mittel 34 / niedrig 22), erscheinen ab 35 m (außerhalb des Bildes), Sichtbarkeit mit Hysterese
+  (an <125 m, aus >140 m) gegen Aufblitzen; Laufspur 2,9–3,4 m vom Gehwegrand (Straßenbäume stehen bei 2,2 m).
+- Zeitrennen: Schild über dem Checkpoint zeigt die nächste Richtung (`Marker.arrow`, berechnet in `raceMark`).
+- Mittelstreifen außerhalb: von Straßenpunkt zu Straßenpunkt mit Höhe an beiden Enden (kein Schweben an Hängen/Rampen).
+- Kamera near 0.3 statt 0.1 (bessere Tiefengenauigkeit, weniger Flackern); Bank-Seitenwände überlappen die Rückwand nicht mehr.
+- Kreisverkehr am Ende der Brückenstraße (`KREISEL` in geo.js): Einbahn-Ring (`oneway`), Mittelinsel mit Kollision, auf der Karte.

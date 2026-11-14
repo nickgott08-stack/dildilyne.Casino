@@ -57,11 +57,39 @@ class Marker {
     this.group.position.set(x, groundAt(x, z), z);
     this.group.visible = true;
   }
-  clear() { this.pos = null; this.group.visible = false; }
+  clear() { this.pos = null; this.group.visible = false; this.arrow(null); }
+  // big glowing sign above the marker that tells where to go next ('left' | 'right' | 'straight' | 'back'),
+  // facing a driver who arrives from direction (dx, dz)
+  arrow(kind, dx = 0, dz = 1) {
+    if (!kind) { if (this.sign) this.sign.visible = false; return; }
+    if (!this.sign) {
+      this.signTex = {};
+      for (const k of ['left', 'right', 'straight', 'back']) {
+        this.signTex[k] = canvasTex(256, 128, (ctx, w, h) => {
+          ctx.fillStyle = 'rgba(20,14,4,0.82)';
+          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(6, 6, w - 12, h - 12, 22); else ctx.rect(6, 6, w - 12, h - 12); ctx.fill();
+          ctx.lineWidth = 6; ctx.strokeStyle = '#ffd23b'; ctx.stroke();
+          ctx.fillStyle = '#ffd23b';
+          ctx.save(); ctx.translate(w / 2, h / 2);
+          ctx.rotate({ right: 0, left: Math.PI, straight: -Math.PI / 2, back: Math.PI / 2 }[k]);
+          ctx.beginPath(); ctx.moveTo(-70, -16); ctx.lineTo(10, -16); ctx.lineTo(10, -42); ctx.lineTo(66, 0); ctx.lineTo(10, 42); ctx.lineTo(10, 16); ctx.lineTo(-70, 16); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }, false);
+      }
+      this.sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.5), new THREE.MeshBasicMaterial({ map: this.signTex.right, transparent: true, side: THREE.DoubleSide, fog: false, toneMapped: false, depthWrite: false }));
+      this.sign.position.y = 7.5;
+      this.group.add(this.sign);
+    }
+    this.sign.material.map = this.signTex[kind];
+    this.sign.material.needsUpdate = true;
+    this.sign.rotation.y = Math.atan2(-dx, -dz); // the sign's front faces the arriving driver
+    this.sign.visible = true;
+  }
   update(t) {
     if (!this.pos) return;
     const s = 1 + Math.sin(t * 5) * 0.1;
     this.ring.scale.set(s, s, s);
+    if (this.sign && this.sign.visible) this.sign.position.y = 7.5 + Math.sin(t * 3) * 0.25;
   }
 }
 
@@ -624,6 +652,16 @@ export class Missions {
     const j = this.job, p = j.pts[j.k];
     this.marker.set(p.x, p.z);
     this.G.missionTarget = { x: p.x, z: p.z, color: '#ffd23b' };
+    // arrow sign: where to drive after this checkpoint
+    const nx = j.pts[j.k + 1];
+    if (!nx) { this.marker.arrow(null); return; }
+    const from = j.k > 0 ? j.pts[j.k - 1] : this.api.playerPos();
+    let ix = p.x - from.x, iz = p.z - from.z, ox = nx.x - p.x, oz = nx.z - p.z;
+    const il = Math.hypot(ix, iz) || 1, ol = Math.hypot(ox, oz) || 1;
+    ix /= il; iz /= il; ox /= ol; oz /= ol;
+    const dot = ix * ox + iz * oz, cross = ix * oz - iz * ox; // world: +x is to the left when facing +z
+    const kind = dot < -0.6 ? 'back' : cross > 0.35 ? 'right' : cross < -0.35 ? 'left' : 'straight';
+    this.marker.arrow(kind, ix, iz);
   }
   updateRace(dt) {
     const j = this.job, G = this.G;

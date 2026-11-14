@@ -54,7 +54,7 @@ export function rawH(x, z) {
 // kind: road (asphalt), dirt, deck (elevated, own heights)
 // yMode: 'given' uses y from points, 'terrain' follows smoothed terrain, 'pass' climbs from the city over a pass
 export const ROADS = [];
-const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7 }; ROADS.push(r); return r; };
+const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway }; ROADS.push(r); return r; };
 
 // --- mountain passes from the west/east city exits into the two deserts ---
 R('Pass West-Süd', [[-236, -68], [-264, -69], [-294, -80], [-324, -68], [-352, -82], [-372, -94]], { yMode: 'pass', fall: 30, lamps: true, bump: 7, w: 14 });
@@ -84,6 +84,10 @@ R('Rampe Ost', [[4, -402, 0], [9, -392, 0.6], [20, -374, 2.6], [32, -352, 5.5], 
 R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -560, 0], [0, -610, 0]], { w: 12, lamps: true });
 R('Kaistraße', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [0, -560, 0], [70, -560, 0], [150, -560, 0], [215, -560, 0]], { w: 11, lamps: true });
 R('Dockring', [[-60, -560, 0], [-66, -610, 0], [-110, -645, 0], [-170, -640, 0], [-210, -600, 0], [-215, -560, 0]], { w: 10 });
+// roundabout at the end of the Brückenstraße (was a dead end where cars tried to turn on the spot).
+// One-way ring, counter-clockwise from above (right-hand traffic): start at the top, east, south, west, back to the top.
+export const KREISEL = { x: 0, z: -632, r: 20, w: 10 };
+R('Kreisverkehr', Array.from({ length: 17 }, (_, k) => { const t = (k / 16) * Math.PI * 2; return [KREISEL.x + Math.sin(t) * KREISEL.r, KREISEL.z + Math.cos(t) * KREISEL.r, 0]; }), { w: KREISEL.w, oneway: true });
 
 // ---------------- sampling ----------------
 export function sampleRoad(r) {

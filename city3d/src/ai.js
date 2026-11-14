@@ -240,7 +240,7 @@ function junctionsAt(x, z, except) {
     if (bi < 0) continue;
     const dirs = [];
     if (bi < S.length - 3) dirs.push(1);
-    if (bi > 2) dirs.push(-1);
+    if (bi > 2 && !r.oneway) dirs.push(-1);
     out.push({ road: r, idx: bi, dirs });
   }
   return out;
@@ -248,7 +248,7 @@ function junctionsAt(x, z, except) {
 
 // follows a sampled road; shared by out-of-town traffic and police
 class RoadFollow {
-  constructor(road, idx, dir) { this.road = road; this.idx = idx; this.dir = dir; }
+  constructor(road, idx, dir) { this.road = road; this.idx = idx; this.dir = road.oneway ? 1 : dir; }
   advance(v) {
     const S = this.road.samples;
     for (let k = 0; k < 5; k++) {
@@ -339,7 +339,7 @@ export function randomOutRoadSpawn(minD, maxD, from) {
     if (inCityArea(s.x, s.z)) continue;
     const d = Math.hypot(s.x - from.x, s.z - from.z);
     if (d < minD || d > maxD) continue;
-    const dir = Math.random() < 0.5 ? 1 : -1;
+    const dir = road.oneway || Math.random() < 0.5 ? 1 : -1;
     const h = dir > 0 ? s.h : s.h + Math.PI;
     return { x: s.x - Math.cos(h) * 2.6, z: s.z + Math.sin(h) * 2.6, h, road, idx, dir };
   }
@@ -633,7 +633,7 @@ export class Ped {
     const bj = clamp(Math.floor((this.pos.z + H) / P), 0, NB - 1);
     this.blk = world.blocks[bi * NB + bj];
     this.dirSign = Math.random() < 0.5 ? 1 : -1;
-    this.inset = rand(1.4, 2.8);
+    this.inset = rand(2.9, 3.4); // house side of the 4 m sidewalk – street trees stand at 2.2 m
     this.t = this.project();
     this.cross = null;
   }
@@ -889,7 +889,7 @@ export class Ped {
 export function randomSidewalkPoint(minD, maxD, from) {
   for (let k = 0; k < 30; k++) {
     const b = pick(world.blocks);
-    const s = rand(1.5, 2.6);
+    const s = rand(2.9, 3.4);
     const side = randi(0, 3);
     const t = rand(0, 1);
     let x, z;

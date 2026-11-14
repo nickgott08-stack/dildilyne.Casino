@@ -749,8 +749,8 @@ export function buildWorld(scene, quality) {
     plain.push(cbox(doorW * 2, HH - 5.5, T, cx, 5.5 + (HH - 5.5) / 2, bz0 + T / 2, stone));
     addBox(cx - doorW, cx + doorW, bz0, bz0 + T, HH, { y0: 5.4 });
     wallBox(bx0, bx1, bz1 - T, bz1);
-    wallBox(bx0, bx0 + T, bz0, bz1);
-    wallBox(bx1 - T, bx1, bz0, bz1);
+    wallBox(bx0, bx0 + T, bz0, bz1 - T);
+    wallBox(bx1 - T, bx1, bz0, bz1 - T);
     // roof slab (ceiling inside at y = CEIL)
     plain.push(cbox(bx1 - bx0 + 0.6, HH - CEIL, bz1 - bz0 + 0.6, (bx0 + bx1) / 2, CEIL + (HH - CEIL) / 2, (bz0 + bz1) / 2, '#b8ae98'));
     addBox(bx0, bx1, bz0, bz1, HH + 0.4, { y0: CEIL });
