@@ -27,6 +27,9 @@
  *      body.geometry.attributes.color funktioniert weiter.
  *    - 'police' liefert siren:{red,blue} (das Spiel laesst sie wie bisher blinken).
  *    - 'van': Seitenwaende sitzen bei x = +-0.975, die Flaschenpost-Beklebung liegt sauber an.
+ *    - NEU 'bus' (10.5x2.5x3.1 m) und 'truck' (7.3x2.45x3.6 m): in die Fahrzeugliste des Spiels eintragen, z. B.
+ *      bus:{name:"Dildi Bus",len:10.5,wid:2.5,maxSpeed:16,accel:4,brake:14,grip:6,turn:1.3,mass:3.5,colors:["#d81e2a","#f4c20d","#1f5fa8"]}
+ *      truck:{name:"LKW",len:7.3,wid:2.45,maxSpeed:19,accel:4.5,brake:14,grip:6,turn:1.4,mass:3,colors:["#1f5fa8","#c0392b","#f5f5f5"]}
  *    - Masse passen zur Fahrzeugliste: RS6 5.0x1.95, Ferrari 4.6x1.96, Skoda 4.7x1.83, Van 5.1x1.95.
  *
  * 2) FLUGZEUG  -  in der Funktion, die das Flugzeug baut (gibt { root, tilt, prop } zurueck):
@@ -822,6 +825,114 @@
     return { root, tilt, prop: p };
   }
 
+
+  // ======================================================================
+  // Linienbus (10.5 m) und LKW (7,5 t Koffer) - kastig, Radlaeufe ausgespart
+  // ======================================================================
+  const BUS_AXLES = [
+    { z: 3.0, r: 0.5, w: 0.30, x: 1.02, arch: 0.62, liner: 0.8 },
+    { z: -2.4, r: 0.5, w: 0.36, x: 1.0, arch: 0.62, liner: 0.8 }];
+  const TRUCK_AXLES = [
+    { z: 2.35, r: 0.48, w: 0.30, x: 0.98, arch: 0.6, liner: 0.75 },
+    { z: -1.9, r: 0.48, w: 0.36, x: 0.96, arch: 0.6, liner: 0.75 }];
+
+  // Unterteil mit Aussparungen fuer die Raeder
+  function skirt(mb, m, hw, y0, y1, zf, zr, axles) {
+    const cuts = axles.map((a) => [a.z - a.arch, a.z + a.arch]).sort((a, b) => a[0] - b[0]);
+    let z = zr;
+    for (const [c0, c1] of cuts) { if (c0 > z) mb.box(m, [-hw, y0, z], [hw, y1, c0]); z = c1; }
+    if (zf > z) mb.box(m, [-hw, y0, z], [hw, y1, zf]);
+    for (const a of axles) {
+      mb.box('Underbody', [-hw + 0.02, a.r + 0.05, a.z - a.arch], [hw - 0.02, y1, a.z + a.arch]);
+      for (const s of SIDES) mb.box('TrimGloss', [s * hw - 0.04, a.r + a.arch * 0.9, a.z - a.arch - 0.05], [s * hw + 0.04, a.r + a.arch * 0.9 + 0.08, a.z + a.arch + 0.05]);
+    }
+  }
+
+  function busBody() {
+    const mb = new MB(), hw = 1.25, zf = 5.25, zr = -5.25;
+    skirt(mb, 'Paint', hw, 0.32, 1.12, zf, zr, BUS_AXLES);
+    mb.hexa('Paint', [[-hw, 1.12, zf], [hw, 1.12, zf], [hw, 2.95, zf - 0.25], [-hw, 2.95, zf - 0.25],
+      [-hw, 1.12, zr], [hw, 1.12, zr], [hw, 2.95, zr + 0.1], [-hw, 2.95, zr + 0.1]]);
+    mb.box('Paint', [-hw + 0.15, 2.95, zr + 0.4], [hw - 0.15, 3.12, zf - 0.6]);
+    mb.box('Concrete', [-0.7, 3.12, -3.5], [0.7, 3.4, -1.8]);            // Klimaanlage
+    // Seitenfenster-Band + Tueren (rechte Seite = -X)
+    for (const s of SIDES) {
+      mb.box('Glass', [s * hw - 0.02 * s - 0.02, 1.35, zr + 0.6], [s * hw + 0.02 * s + 0.02, 2.65, zf - 0.6].map((v, i) => v));
+      for (let z = zr + 1.6; z < zf - 0.8; z += 1.5) mb.box('TrimGloss', [s * hw - 0.05, 1.33, z - 0.06], [s * hw + 0.05, 2.67, z + 0.06]);
+    }
+    for (const dz of [zf - 1.4, -0.4]) {
+      mb.box('Glass', [-hw - 0.05, 0.4, dz - 0.65], [-hw + 0.02, 2.7, dz + 0.65]);
+      mb.box('Chrome', [-hw - 0.07, 0.4, dz - 0.02], [-hw - 0.04, 2.7, dz + 0.02]);
+    }
+    mb.box('PoliceYellow', [-hw - 0.01, 1.14, zr + 0.3], [hw + 0.01, 1.24, zf - 0.3]);   // Zierlinie
+    // Front: grosse Scheibe, Zielanzeige, Lichter
+    mb.hexa('Glass', [[-hw + 0.08, 1.35, zf + 0.0], [hw - 0.08, 1.35, zf + 0.0], [hw - 0.08, 2.55, zf - 0.17], [-hw + 0.08, 2.55, zf - 0.17],
+      [-hw + 0.08, 1.35, zf + 0.03], [hw - 0.08, 1.35, zf + 0.03], [hw - 0.08, 2.55, zf - 0.14], [-hw + 0.08, 2.55, zf - 0.14]]);
+    mb.hexa('Black', [[-0.9, 2.6, zf - 0.18], [0.9, 2.6, zf - 0.18], [0.9, 2.88, zf - 0.22], [-0.9, 2.88, zf - 0.22],
+      [-0.9, 2.6, zf - 0.15], [0.9, 2.6, zf - 0.15], [0.9, 2.88, zf - 0.19], [-0.9, 2.88, zf - 0.19]]);
+    mb.box('TaxiSign', [-0.8, 2.64, zf - 0.24], [0.8, 2.84, zf - 0.2]);
+    mb.box('TrimGloss', [-hw, 0.32, zf], [hw, 0.75, zf + 0.08]);
+    mb.box('Plate', [-0.26, 0.45, zf + 0.08], [0.26, 0.56, zf + 0.1]);
+    for (const s of SIDES) {
+      mb.box('LightLens', [s * 0.95 - 0.25, 0.8, zf], [s * 0.95 + 0.25, 1.05, zf + 0.05]);
+      mb.box('HeadLight', [s * 0.95 - 0.2, 0.84, zf + 0.04], [s * 0.95 + 0.2, 0.92, zf + 0.06]);
+      mb.box('TrimGloss', [s * (hw + 0.02), 2.3, zf - 0.5], [s * (hw + 0.08), 2.35, zf - 0.1]);   // Spiegelarm
+      mb.box('TrimGloss', [s * (hw + 0.08) - 0.04, 1.9, zf - 0.15], [s * (hw + 0.08) + 0.04, 2.35, zf - 0.05]);
+      mb.box('TailLight', [s * 1.05 - 0.15, 0.7, zr - 0.04], [s * 1.05 + 0.15, 1.5, zr]);
+    }
+    mb.box('Glass', [-1.0, 1.9, zr - 0.03], [1.0, 2.7, zr]);
+    mb.box('TrimGloss', [-1.0, 1.25, zr - 0.04], [1.0, 1.65, zr]);   // Motorklappe
+    mb.box('Plate', [-0.26, 0.5, zr - 0.04], [0.26, 0.61, zr]);
+    mb.box('TrimGloss', [-hw, 0.32, zr - 0.08], [hw, 0.62, zr]);
+    return mb;
+  }
+
+  function truckBody() {
+    const mb = new MB(), hw = 1.22, zf = 3.55, zc = 1.45, zr = -3.7;
+    // Fahrerhaus (Frontlenker)
+    skirt(mb, 'Paint', hw, 0.45, 1.25, zf, zc, [TRUCK_AXLES[0]]);
+    mb.hexa('Paint', [[-hw, 1.25, zf], [hw, 1.25, zf], [hw, 2.95, zf - 0.22], [-hw, 2.95, zf - 0.22],
+      [-hw, 1.25, zc], [hw, 1.25, zc], [hw, 2.95, zc], [-hw, 2.95, zc]]);
+    mb.hexa('Paint', [[-hw + 0.1, 2.95, zf - 0.3], [hw - 0.1, 2.95, zf - 0.3], [hw - 0.2, 3.4, zf - 0.7], [-hw + 0.2, 3.4, zf - 0.7],
+      [-hw + 0.1, 2.95, zc], [hw - 0.1, 2.95, zc], [hw - 0.2, 3.4, zc], [-hw + 0.2, 3.4, zc]]);   // Windabweiser
+    mb.hexa('Glass', [[-hw + 0.1, 1.85, zf + 0.0], [hw - 0.1, 1.85, zf + 0.0], [hw - 0.1, 2.75, zf - 0.17], [-hw + 0.1, 2.75, zf - 0.17],
+      [-hw + 0.1, 1.85, zf + 0.03], [hw - 0.1, 1.85, zf + 0.03], [hw - 0.1, 2.75, zf - 0.14], [-hw + 0.1, 2.75, zf - 0.14]]);
+    for (const s of SIDES) {
+      mb.box('Glass', [s * hw - 0.03, 1.85, zf - 1.0], [s * hw + 0.03, 2.75, zf - 0.25]);
+      mb.box('TrimGloss', [s * (hw + 0.02), 2.6, zf - 0.6], [s * (hw + 0.25), 2.65, zf - 0.5]);
+      mb.box('TrimGloss', [s * (hw + 0.25) - 0.05, 1.9, zf - 0.6], [s * (hw + 0.25) + 0.05, 2.65, zf - 0.45]);
+      mb.box('Chrome', [s * hw - 0.03, 0.55, zf - 1.3], [s * hw + 0.03, 1.15, zf - 1.25]);   // Einstiegsgriff
+      mb.box('LightLens', [s * 0.9 - 0.25, 0.75, zf], [s * 0.9 + 0.25, 1.05, zf + 0.05]);
+      mb.box('HeadLight', [s * 0.9 - 0.2, 0.8, zf + 0.04], [s * 0.9 + 0.2, 0.9, zf + 0.06]);
+      mb.box('HeadLight', [s * 0.6 - 0.12, 3.3, zf - 0.68], [s * 0.6 + 0.12, 3.38, zf - 0.62]);   // Dachleuchten
+    }
+    // Kuehlergrill + Stossstange
+    mb.box('TrimGloss', [-0.7, 1.15, zf], [0.7, 1.75, zf + 0.04]);
+    for (const y of [1.25, 1.4, 1.55]) mb.box('Chrome', [-0.68, y, zf + 0.04], [0.68, y + 0.04, zf + 0.06]);
+    mb.box('TrimGloss', [-hw, 0.45, zf], [hw, 0.75, zf + 0.12]);
+    mb.box('Plate', [-0.26, 0.5, zf + 0.12], [0.26, 0.61, zf + 0.14]);
+    // Rahmen + Kofferaufbau
+    mb.box('Underbody', [-0.5, 0.55, zr + 0.2], [0.5, 0.95, zc]);
+    mb.box('TrimGloss', [-hw, 0.95, zr], [hw, 1.1, zc - 0.15]);
+    mb.box('White', [-hw - 0.03, 1.1, zr], [hw + 0.03, 3.6, zc - 0.2]);
+    for (let z = zr + 0.6; z < zc - 0.3; z += 0.6) for (const s of SIDES) mb.box('HangarGrey', [s * (hw + 0.03) - 0.02, 1.15, z - 0.03], [s * (hw + 0.03) + 0.02, 3.55, z + 0.03]);
+    mb.box('Paint', [-hw - 0.05, 2.4, zr - 0.01], [hw + 0.05, 2.9, zc - 0.25].map((v) => v));    // Firmenstreifen
+    for (const s of SIDES) mb.box('Paint', [s * (hw + 0.05) - 0.02, 2.4, zr], [s * (hw + 0.05) + 0.02, 2.9, zc - 0.2]);
+    // Hecktueren
+    mb.box('HangarGrey', [-hw, 1.1, zr - 0.04], [hw, 3.6, zr]);
+    mb.box('TrimGloss', [-0.02, 1.15, zr - 0.06], [0.02, 3.55, zr - 0.03]);
+    for (const x of [-0.6, 0.6]) mb.box('Chrome', [x - 0.03, 1.2, zr - 0.08], [x + 0.03, 3.5, zr - 0.04]);
+    for (const s of SIDES) {
+      mb.box('TailLight', [s * 1.0 - 0.15, 0.7, zr - 0.06], [s * 1.0 + 0.15, 0.9, zr - 0.02]);
+      mb.box('TrimGloss', [s * hw - 0.05, 0.45, zr + 0.6], [s * hw + 0.05, 0.95, zc - 0.6]);    // Seitenschutz
+      mb.box('Chrome', [s * 0.8 - 0.25, 0.55, -0.2], [s * 0.8 + 0.25, 0.95, 0.6]);           // Tank
+    }
+    mb.box('TrimGloss', [-hw, 0.5, zr - 0.06], [hw, 0.68, zr + 0.1]);
+    mb.box('Plate', [-0.26, 0.72, zr - 0.08], [0.26, 0.83, zr - 0.06]);
+    mb.box('TrimGloss', [-0.06, 2.95, zc - 0.05], [0.06, 3.5, zc + 0.05]);   // Auspuff hinterm Fahrerhaus
+    return mb;
+  }
+
   // ======================================================================
   // three.js-Aufbau
   // ======================================================================
@@ -1000,6 +1111,8 @@
     skoda: { body: () => octaviaBody(''), axles: OCT_AXLES, paint: '#7f8c8d', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL },
     police: { body: () => octaviaBody('police'), axles: OCT_AXLES, paint: '#e8eef5', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL, siren: true },
     taxi: { body: () => octaviaBody('taxi'), axles: OCT_AXLES, paint: '#f4c20d', rim: [0.62, 0.63, 0.65], caliper: GREY_CAL },
+    bus: { body: () => busBody(), axles: BUS_AXLES, paint: '#d81e2a', rim: [0.75, 0.76, 0.78], caliper: GREY_CAL },
+    truck: { body: () => truckBody(), axles: TRUCK_AXLES, paint: '#1f5fa8', rim: [0.75, 0.76, 0.78], caliper: GREY_CAL },
     van: { body: () => vanBody(), axles: VAN_AXLES, paint: '#f5f5f5', rim: [0.60, 0.61, 0.63], caliper: GREY_CAL },
   };
 
