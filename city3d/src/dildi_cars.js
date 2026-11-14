@@ -1360,7 +1360,7 @@
     const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
     const geo = (fn) => { const mb = new MB(), g = new MB(); fn(mb, g); return [vcGeometry(THREE, mb, () => true, colorOf), g.t && Object.keys(g.t).length ? vcGeometry(THREE, g, () => true, colorOf) : null]; };
     const mat = o.material || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 });
-    const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+    const glowMat = o.glowMat || new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
     const r = rng(11);
     const KINDS = {
       lamp: { parts: geo(lampPoleParts), stub: geo(lampStubParts)[0], radius: 0.25, height: 7.7, fall: 'tip' },
@@ -1385,6 +1385,7 @@
     };
     const setMat = (it, visible) => {
       const I = inst[it.kind];
+      if (it.idx < 0) return; // currently not drawn (see cull)
       dummy.position.set(it.x, it.y, it.z); dummy.rotation.set(0, it.ry, 0); dummy.scale.setScalar(visible ? 1 : 0); dummy.updateMatrix();
       I.body.setMatrixAt(it.idx, dummy.matrix); I.body.instanceMatrix.needsUpdate = true;
       if (I.glow) { I.glow.setMatrixAt(it.idx, dummy.matrix); I.glow.instanceMatrix.needsUpdate = true; }
@@ -1486,7 +1487,25 @@
       const L = Math.hypot(x1 - x0, z1 - z0), nx = -(z1 - z0) / L, nz = (x1 - x0) / L;
       for (let d = step / 2; d < L; d += step) add(kind, x0 + (x1 - x0) * d / L + nx * offset, y, z0 + (z1 - z0) * d / L + nz * offset, Math.atan2(-nx, -nz));
     }
-    return { group: root, add, update, scatterAlong, items, glow: glowMat };
+    // Nur Objekte im Umkreis R um (cx, cz) zeichnen: Instanzen werden nach vorn umsortiert, count = sichtbare.
+    // (Spiel ruft das alle paar Frames auf – vorher wurden immer alle Laternen der Karte gezeichnet.)
+    function cull(cx, cz, R) {
+      const R2 = R * R, n = {};
+      for (const it of items) {
+        const dx = it.x - cx, dz = it.z - cz;
+        if (dx * dx + dz * dz > R2) { it.idx = -1; continue; }
+        const I = inst[it.kind];
+        it.idx = n[it.kind] = (n[it.kind] || 0);
+        n[it.kind]++;
+        setMat(it, !it.down);
+        if (I.stub) { dummy.position.set(it.x, it.y, it.z); dummy.rotation.set(0, it.ry, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); I.stub.setMatrixAt(it.idx, dummy.matrix); I.stub.instanceMatrix.needsUpdate = true; }
+      }
+      for (const k in inst) {
+        const I = inst[k], c = n[k] || 0;
+        for (const m of [I.body, I.glow, I.stub, I.lid]) if (m) { m.count = c; m.instanceMatrix.needsUpdate = true; m.boundingSphere = null; }
+      }
+    }
+    return { group: root, add, update, scatterAlong, items, glow: glowMat, cull };
   }
 
   // ======================================================================

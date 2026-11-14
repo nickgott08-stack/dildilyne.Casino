@@ -40,6 +40,8 @@ export class Online {
     this.remotes = new Map();
     this.sendT = 0;
     this.wantOnline = false; this.retryT = 0; this.retries = 0;
+    this.crews = []; // Koop-Coup-Crews im Raum (vom Server)
+    this.hooks = {}; // crews / crewgo / cev / crewx / crewerr – von coop.js gesetzt
     // im Casino: Name aus dem Casino-Konto übernehmen
     const cfg = typeof window !== 'undefined' && window.GCFG;
     this.name = store.get('dc3d_mpname') || (cfg && typeof cfg.name === 'string' ? cfg.name.slice(0, 16) : '');
@@ -138,6 +140,7 @@ export class Online {
       const was = this.state;
       this.ws = null; this.id = null; this.state = 'off';
       this.clearRemotes();
+      this.crews = []; this.hooks.crews && this.hooks.crews(); this.hooks.offline && this.hooks.offline();
       if (this.wantOnline) {
         this.retries++;
         if (this.retries > 6) { this.wantOnline = false; this.toast('Server nicht erreichbar 😕'); }
@@ -152,6 +155,7 @@ export class Online {
     if (this.ws) { try { this.ws.close(); } catch (e) {} }
     this.ws = null; this.state = 'off'; this.id = null;
     this.clearRemotes();
+    this.crews = []; this.hooks.crews && this.hooks.crews(); this.hooks.offline && this.hooks.offline();
     if (byUser) this.toast('Offline');
     this.refresh();
   }
@@ -177,6 +181,12 @@ export class Online {
         r.buf.push({ t: now, s: m.s[id] });
         if (r.buf.length > 12) r.buf.shift();
       }
+    } else if (m.t === 'crews') {
+      this.crews = m.list || [];
+      this.hooks.crews && this.hooks.crews();
+    } else if (m.t === 'crewgo' || m.t === 'cev' || m.t === 'crewx' || m.t === 'crewerr') {
+      if (m.t === 'crewerr') this.toast('👥 ' + m.m);
+      this.hooks[m.t] && this.hooks[m.t](m);
     } else if (m.t === 'chat') {
       this.chatLog.push({ n: m.name, m: m.m });
       if (this.chatLog.length > 30) this.chatLog.shift();
@@ -185,6 +195,12 @@ export class Online {
       const lg = $('mpLog'); lg.scrollTop = lg.scrollHeight;
     }
   }
+  // ---------- Koop-Coup ----------
+  send(obj) { if (this.state === 'on' && this.ws && this.ws.readyState === 1) { this.ws.send(JSON.stringify(obj)); return true; } return false; }
+  crew(a, extra) { return this.send({ t: 'crew', a, ...(extra || {}) }); }
+  crewEv(e) { return this.send({ t: 'cev', e }); }
+  myCrew() { return this.crews.find((c) => c.members.some((q) => q.id === this.id)) || null; }
+
   sendChat() {
     const el = $('mpChat');
     const t = el.value.trim();

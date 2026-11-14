@@ -27,9 +27,9 @@ const QUALITY = {
   // shadowR: half size of the shadow area (m), shadowEvery: redraw shadows every n-th frame,
   // fxLights: point lights for muzzle flash / explosions, headLight: car headlight at night.
   // Every extra light is computed for every pixel, even at intensity 0 – so they are dropped on weaker settings.
-  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, traffic: 22, peds: 42, lod: 70 },
-  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 35, traffic: 17, peds: 34, lod: 50 },
-  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, traffic: 13, peds: 22, lod: 35 },
+  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, traffic: 26, peds: 48, lod: 70 },
+  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 35, traffic: 21, peds: 40, lod: 50 },
+  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, traffic: 15, peds: 26, lod: 35 },
 };
 let qName = store.get('dc3d_q') || 'hoch';
 let Q = QUALITY[qName];
@@ -196,7 +196,7 @@ function spawnOutTraffic(initial) {
   for (const v of G.vehicles) if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 12) return;
   if (!initial && isVisible(p.x, 1, p.z, 6)) return;
   const desert = p.z > 0;
-  const type = pick(desert ? ['skoda', 'van', 'van', 'rs6', 'ferrari', 'taxi', 'skoda'] : ['van', 'van', 'skoda', 'taxi']);
+  const type = pick(desert ? ['skoda', 'van', 'van', 'rs6', 'ferrari', 'taxi', 'skoda', 'jeep', 'jeep', 'truck'] : ['van', 'van', 'skoda', 'taxi', 'truck', 'truck', 'bus', 'jeep']);
   const v = new Vehicle(scene, type, p.x, p.z, p.h);
   v.driver = new OutDriver(v, p.road, p.idx, p.dir);
   v.vel.set(Math.sin(p.h) * 10, Math.cos(p.h) * 10);
@@ -307,7 +307,8 @@ function spawnTraffic(initial) {
   // avoid spawning on other cars
   for (const v of G.vehicles) if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 9) return;
   if (!initial && isVisible(p.x, 1, p.z, 6)) return;
-  const type = pick(['skoda', 'skoda', 'skoda', 'van', 'van', 'rs6', 'taxi', 'taxi', 'skoda', 'van']);
+  // now and then a city bus, a delivery truck or a jeep between the cars
+  const type = pick(['skoda', 'skoda', 'skoda', 'van', 'van', 'rs6', 'taxi', 'taxi', 'skoda', 'van', 'truck', 'jeep', 'skoda', 'taxi', 'van', 'bus']);
   const v = new Vehicle(scene, type, p.x, p.z, p.h);
   v.driver = new TrafficDriver(v);
   v.driverLook = true;
@@ -1628,6 +1629,7 @@ function simStep(dt) {
     updateAmbient(dt);
   }
 }
+G.distCull = () => distCull();
 G.step = (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) { simStep(dt); updateCamera(dt); } };
 G.input = input;
 G.tryEnter = () => tryEnter();
@@ -1662,6 +1664,7 @@ function tickFps(dt) {
 // distance culling: terrain tiles, outskirts tiles and horizon mountains that lie completely
 // behind the fog are invisible anyway, so they are not drawn at all (big saving outside the city)
 let cullList = null, cullT = 0;
+const propCull = { x: 1e9, z: 1e9 };
 function distCull() {
   if (!cullList) {
     cullList = [];
@@ -1673,6 +1676,8 @@ function distCull() {
   }
   const far = (scene.fog ? scene.fog.far : 700) + 40, cx = camera.position.x, cz = camera.position.z;
   for (const c of cullList) c.m.visible = Math.hypot(c.x - cx, c.z - cz) - c.r < far;
+  // street furniture: redraw the instance list when the camera moved (lamps are small – 170 m is plenty)
+  if (world.props && world.props.cull && (Math.abs(cx - propCull.x) > 15 || Math.abs(cz - propCull.z) > 15)) { propCull.x = cx; propCull.z = cz; world.props.cull(cx, cz, 170); }
 }
 function render(dt) {
   tickFps(dt);
@@ -1721,6 +1726,7 @@ function render(dt) {
 qBtns.forEach((b) => b.addEventListener('click', () => store.set('dc3d_qmanual', '1')));
 const online = new Online({ scene, camera, player, G, toast, pause: (p) => setPaused(p) });
 G.online = online;
+missions.coopHooks(); // Koop-Coup: Lobby + Finale über den Online-Server
 requestAnimationFrame(loop);
 // minimap canvas resolution
 {

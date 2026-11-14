@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, clamp, lerp } from './util.js';
+import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, clamp, lerp, tiledMeshes } from './util.js';
 import { buildOutskirts } from './outskirts.js';
 import './dildi_cars.js';
 const deco = (scene, kind, params) => { const DC = globalThis.DildiCars; if (!DC) return; const d = DC.dildiCityBuilding(THREE, kind, params); scene.add(d); world.signMats.push(d.userData.glow); };
@@ -1013,6 +1013,7 @@ export function buildWorld(scene, quality) {
         benchGeos.push(cbox(2.2, 0.12, 0.6, bx, 0.65, bz, '#8b5a2b', r));
         benchGeos.push(cbox(2.2, 0.5, 0.1, bx + Math.sin(r) * -0.3, 0.95, bz + Math.cos(r) * -0.3, '#8b5a2b', r));
       }
+      (world.extraHotspots = world.extraHotspots || []).push({ x: cx, z: cz, r: 16, n: 7 }); // people in the park
       world.landmarks.push({ name: 'Stadtpark', x: cx, z: cz, icon: '🌳', color: '#3cb371' });
       world.spawn = new THREE.Vector3(cx + 12, 0.2, cz - 2);
       world.pickups.push({ type: 'health', x: cx + 6, z: cz + 6 });
@@ -1044,6 +1045,7 @@ export function buildWorld(scene, quality) {
       // palms
       for (const px of [x0 + 1, x1 - 1]) treePos.push([px, z0 - 5, 1.2, 'palm']);
       deco(scene, 'casino', { x0, x1, z0, z1, h: 22 });
+      (world.extraHotspots = world.extraHotspots || []).push({ x: cx, z: z0 - 8, r: 7, n: 5 }); // guests in front of the casino
       world.landmarks.push({ name: 'Casino Dildilyne', x: cx, z: cz, icon: '🎰', color: '#ff3df0' });
     } else if (type === 'tower') {
       const s = 13;
@@ -1356,6 +1358,7 @@ export function buildWorld(scene, quality) {
   // street lamps + bins from Nick's model file: cars can knock them over (lamps tip and flicker out,
   // bins fly away with lid and rubbish), everything stands again after 90 s. No fixed collision any more.
   const DCm = globalThis.DildiCars;
+  // only the props near the camera are drawn (props.cull in main.js; was: all 464 lamps always, ~90k triangles + shadow pass)
   const props = DCm && DCm.dildiCityProps ? DCm.dildiCityProps(THREE, scene, { respawn: 90, max: lampPos.length + 400 }) : null;
   world.props = props;
   for (const [x, z, ang, yy] of lampPos) {
@@ -1525,13 +1528,10 @@ export function buildWorld(scene, quality) {
       addCirc(x, z, 0.2, 1);
     }
   }
-  const plainMesh = new THREE.Mesh(merge(plain), plainMat);
-  plainMesh.castShadow = true;
-  plainMesh.receiveShadow = true;
-  scene.add(plainMesh);
-  const metalMesh = new THREE.Mesh(merge(metal), metalMat);
-  metalMesh.castShadow = true;
-  scene.add(metalMesh);
+  // in tiles (were two meshes over the whole map, always drawn incl. shadow pass); far tiles are hidden by distCull
+  world.cullList = world.cullList || [];
+  world.cullList.push(...tiledMeshes(scene, plain, plainMat, 260, false, (m) => { m.castShadow = true; m.receiveShadow = true; }));
+  world.cullList.push(...tiledMeshes(scene, metal, metalMat, 260, false, (m) => { m.castShadow = true; }));
 
   // roof aircraft lights (blinking red)
   const rl = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.4, 0), new THREE.MeshBasicMaterial({ color: '#ff2020', toneMapped: false }), world.roofLights.length + 1);

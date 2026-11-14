@@ -9,10 +9,11 @@ import { Plane } from './plane.js';
 import { buildRadjIsland, ISL } from './radj.js';
 import { RADJ_CELLAR, radjE } from './geo.js';
 import { neonSign, rand, store } from './util.js';
+import { seeded } from './coop.js';
 
 const $ = (id) => document.getElementById(id);
-const weekId = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return t.getUTCFullYear() + '-' + Math.ceil(((t - y0) / 864e5 + 1) / 7); };
-const fmt = (n) => Math.round(n).toLocaleString('de-DE');
+export const weekId = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return t.getUTCFullYear() + '-' + Math.ceil(((t - y0) / 864e5 + 1) / 7); };
+export const fmt = (n) => Math.round(n).toLocaleString('de-DE');
 
 export const COUP = [
   {
@@ -52,11 +53,11 @@ export const COUP = [
     title: "Bilal's Flugzeug",
     icon: '✈️',
     where: 'Flughafen → Landebahn Westwüste',
-    short: 'Flugzeug klauen und auf der verlassenen Landebahn landen',
+    short: 'Flugzeug klauen und zur verlassenen Landebahn fliegen',
     film: [
       ['🏝️', 'Radjs Insel erreicht man nur aus der Luft.'],
       ['✈️', "Bilal lässt sein Schulflugzeug immer am Rollfeld stehen. Schlüssel steckt."],
-      ['🛬', 'Flieg es zur verlassenen Landebahn in der Westwüste und lande sauber. Dort wartet es aufs Finale.'],
+      ['🛬', 'Steig ein und flieg es zur verlassenen Landebahn in der Westwüste. Dort wartet es aufs Finale.'],
     ],
   },
   {
@@ -66,7 +67,7 @@ export const COUP = [
     short: 'Mit dem Auto zur Landebahn, Flug zur Insel, Anwesen, goldene Bubensahne',
     film: [
       ['🚙', 'Heute Nacht holen wir sie. Fahr mit einem Auto deiner Wahl zur Landebahn in der Westwüste.'],
-      ['✈️', 'Flieg nach Süden aufs Meer – Radjs Insel liegt hinter den Docks. Lande auf seiner Privatpiste.'],
+      ['✈️', 'Mit Bilals Flugzeug geht es nach Süden übers Meer – Radjs Insel liegt hinter den Docks, wir landen auf seiner Privatpiste.'],
       ['🌲', 'Ein Schlängelweg durch dichten Wald führt zum Anwesen. Die Torwache hat die Torkarte.'],
       ['🔦', 'Drinnen patrouillieren rund 20 Wachen mit Taschenlampen. Bleib aus den Lichtkegeln. Nur Schalldämpfer, keine Weste.'],
       ['💳', 'Eine Wache trägt die Aufzugkarte. Der Aufzug führt in den Keller zum Glaskasten.'],
@@ -138,8 +139,9 @@ export function installHeist(Missions) {
     }).join('');
     const can = step < 4 || !this.finaleDone();
     $('coupGo').style.display = can ? '' : 'none';
-    $('coupGo').textContent = step >= 4 ? '👑 Finale starten' : `▶ Mission ${step + 1} starten`;
-    $('coupInfo').textContent = step >= 4 ? (this.finaleDone() ? 'Diese Woche hast du Radj schon ausgeraubt – nächste Woche wieder.' : 'Finale: 150.000 D$ · 1× pro Woche · ohne Polizei, aber mit 20 Wachen.') : 'Missionen laufen ohne Polizei. Belohnung nach dem Finale: 150.000 D$.';
+    $('coupGo').textContent = step >= 4 ? '👑 Finale alleine' : `▶ Mission ${step + 1} starten`;
+    $('coupCoop').style.display = step >= 4 ? '' : 'none'; // crew of up to 4 (online)
+    $('coupInfo').textContent = step >= 4 ? (this.finaleDone() ? 'Diese Woche hast du Radj schon ausgeraubt – nächste Woche wieder. Als Helfer in einer Koop-Crew kannst du trotzdem mit.' : 'Finale alleine: 150.000 D$ · Koop (bis 4 Spieler): Anführer 100.000, Helfer je 37.500 · 1× pro Woche · ohne Polizei, aber mit 20 Wachen.') : 'Missionen laufen ohne Polizei. Belohnung nach dem Finale: 150.000 D$ (alleine).';
     $('coup').classList.add('show');
   };
   P.closeBoard = function () { $('coup').classList.remove('show'); this.G.paused = false; };
@@ -254,8 +256,45 @@ export function installHeist(Missions) {
     if (j.n === 4) return this.finaleHint(pp, v);
     if (j.n === 0 && j.stage === 'hack' && !v && Math.hypot(pp.x - this.coupPC.x, pp.z - this.coupPC.z) < 3) return { text: '💻 Computer hacken', run: () => this.openHack() };
     if ((j.n === 1 || j.n === 2) && j.stage === 'grab' && !v && j.crate && Math.hypot(pp.x - j.crate.x, pp.z - j.crate.z) < 3) return { text: j.n === 1 ? '📦 Waffenkiste schnappen' : '💎 Glasschneider schnappen', run: () => this.grabCrate() };
-    if (j.n === 3 && !v && !this.G.flight && Math.hypot(pp.x - this.plane.pos.x, pp.z - this.plane.pos.z) < 7) return { text: '✈️ Ins Flugzeug', run: () => { j.stage = 'fly'; this.api.enterPlane(this.plane); this.coupTarget((RUNWAY.x0 + RUNWAY.x1) / 2, (RUNWAY.z0 + RUNWAY.z1) / 2, '#39c6ff'); } };
+    if (j.n === 3 && j.stage === 'go' && !v && !this.G.flight && Math.hypot(pp.x - this.plane.pos.x, pp.z - this.plane.pos.z) < 7) return { text: '✈️ Ins Flugzeug', run: () => { j.stage = 'fly'; this.flyTo({ from: '🛫 Flughafen', to: '🛬 Landebahn Westwüste', lines: ['Bilals Schulflugzeug hebt ab…', 'Über die Stadt nach Westen…', 'Die verlassene Landebahn in Sicht – Landung!'], secs: 5.5 }, () => this.landRunway()); } };
     return null;
+  };
+
+  // ---------- flights: a short loading screen instead of flying yourself ----------
+  // (the flight itself took long, was hard on the phone and needed a huge map – now: board, short film, arrive)
+  P.flyTo = function (o, done) {
+    const G = this.G, el = $('travel');
+    G.paused = true;
+    $('trFrom').textContent = o.from; $('trTo').textContent = o.to;
+    $('trT').textContent = o.title || '✈️ FLUG';
+    el.classList.add('show');
+    const D = (o.secs || 5) * 1000, t0 = Date.now();
+    G.audio.engine(true, 0.55, 0.7);
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - t0) / D);
+      $('trPlane').style.left = `${p * 100}%`;
+      $('trPlane').style.marginTop = `${-Math.sin(p * Math.PI) * 14}px`;
+      $('trBar').style.width = `${p * 100}%`;
+      $('trTxt').textContent = o.lines[Math.min(o.lines.length - 1, Math.floor(p * o.lines.length))];
+      if (p < 1) return;
+      clearInterval(this._flyI);
+      G.audio.engine(false, 0, 0);
+      setTimeout(() => { el.classList.remove('show'); G.paused = false; done(); }, 350);
+    };
+    clearInterval(this._flyI);
+    this._flyI = setInterval(tick, 40);
+    tick();
+  };
+  // mission 4: the plane is now parked on the desert runway, the player stands next to it
+  P.landRunway = function () {
+    const G = this.G;
+    const x = RUNWAY.x0 + 40, z = (RUNWAY.z0 + RUNWAY.z1) / 2;
+    this.plane.remove();
+    this.plane = new Plane(this.scene, x, z, Math.PI / 2);
+    G.player.pos.set(x - 2, groundAt(x - 2, z + 7), z + 7);
+    G.player.vy = 0;
+    store.set('dc3d_planeHidden', '1');
+    this.completeCoup();
   };
 
   P.grabCrate = function () {
@@ -344,17 +383,6 @@ export function installHeist(Missions) {
       if (j.stage === 'go') {
         this.coupTarget(pl.pos.x, pl.pos.z, '#ffd23b');
         this.setJobHUD(T, "Steig in Bilal's Flugzeug", `📍 ${dist(pl.pos)} m`, false);
-      } else if (j.stage === 'fly') {
-        const R = RUNWAY;
-        const onRw = pl.pos.x > R.x0 - 25 && pl.pos.x < R.x1 + 25 && pl.pos.z > R.z0 - 25 && pl.pos.z < R.z1 + 25;
-        if (G.flight === pl && pl.onGround && onRw && pl.speed < 3) {
-          store.set('dc3d_planeHidden', '1');
-          this.api.leavePlane();
-          return this.completeCoup();
-        }
-        if (G.flight !== pl) { j.stage = 'go'; return; }
-        const hint = pl.onGround ? (pl.speed < 20 ? 'GAS geben, ab 80 km/h ▲ NASE HOCH' : '▲ NASE HOCH zum Abheben') : onRw ? 'Gas raus und sanft aufsetzen' : 'Flieg zur verlassenen Landebahn (Westwüste)';
-        this.setJobHUD(T, hint, `✈️ ${pl.kmh} km/h · Höhe ${Math.round(pl.alt)} m · 📍 ${dist({ x: (R.x0 + R.x1) / 2, z: (R.z0 + R.z1) / 2 })} m`, false);
       }
     }
   };
@@ -504,9 +532,11 @@ export function installFinale(Missions) {
       this.plane.remove();
       this.plane = new Plane(this.scene, RUNWAY.x0 + 40, (RUNWAY.z0 + RUNWAY.z1) / 2, Math.PI / 2);
     }
-    this.job = { kind: 'coup', n: 4, stage: 'rs6', peds: [], vehs: [], sentries: [], t0: G.time, takedowns: 0 };
+    this.job = { kind: 'coup', n: 4, stage: 'rs6', peds: [], vehs: [], sentries: [], t0: G.time, takedowns: 0, coop: this.coopStart || null };
+    this.coopStart = null;
     this.coupTarget(RUNWAY.x0 + 20, (RUNWAY.z0 + RUNWAY.z1) / 2, '#ffd23b');
-    this.api.banner('👑 DAS FINALE', 'Mit einem Auto zur Landebahn (Westwüste)');
+    if (this.job.coop) this.api.banner('👥 KOOP-FINALE', `Crew: ${this.job.coop.names.join(', ')} · alle zur Landebahn (Westwüste)`);
+    else this.api.banner('👑 DAS FINALE', 'Mit einem Auto zur Landebahn (Westwüste)');
   };
 
   P.spawnIsland = function () {
@@ -536,7 +566,8 @@ export function installFinale(Missions) {
     j.gateGuard = mk([[ISL.gate.x - 14, ISL.gate.z + 5], [ISL.gate.x + 14, ISL.gate.z + 5]], true);
     for (const r of I.sentryPosts) mk(r);
     // one of them carries the lift card (gold badge)
-    const holder = j.sentries[1 + Math.floor(Math.random() * (j.sentries.length - 1))];
+    const rnd = j.coop ? seeded(j.coop.seed) : Math.random; // same guard on every phone of the crew
+    const holder = j.sentries[1 + Math.floor(rnd() * (j.sentries.length - 1))];
     holder.card = true;
     const badge = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.04), new THREE.MeshBasicMaterial({ color: '#ffd700', toneMapped: false }));
     badge.position.set(0.18, 1.0, 0.17);
@@ -560,18 +591,35 @@ export function installFinale(Missions) {
     this.plane = new Plane(this.scene, RUNWAY.x0 + 40, (RUNWAY.z0 + RUNWAY.z1) / 2, Math.PI / 2);
   };
 
+  P.arriveIsland = function () {
+    const j = this.job, G = this.G, S = ISL.strip;
+    if (!j || j.n !== 4) return;
+    const x = S.x0 + 40, z = (S.z0 + S.z1) / 2;
+    this.plane.remove();
+    this.plane = new Plane(this.scene, x, z, Math.PI / 2);
+    const off = j.coop ? j.coop.idx * 2.2 : 0; // crew members side by side
+    G.player.pos.set(x + 2 + off, groundAt(x + 2 + off, z + 7, 1e9), z + 7);
+    G.player.vy = 0;
+    j.stage = 'island';
+    this.spawnIsland();
+    this.coupTarget(ISL.gate.x, ISL.gate.z + 12, '#ffd23b');
+    this.api.banner('🏝️ RADJ-INSEL', 'Folge dem Weg durch den Wald zum Anwesen');
+  };
+
   P.dropCard = function (x, z, kind) {
     const j = this.job;
+    if ((kind === 'gate' && j.hasGate) || (kind === 'lift' && j.hasLift)) return; // a crew mate already has it
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.4), new THREE.MeshBasicMaterial({ color: kind === 'gate' ? '#39c6ff' : '#ffd700', toneMapped: false }));
     m.position.set(x, groundAt(x, z) + 0.6, z);
     this.scene.add(m);
     (j.cards = j.cards || []).push({ m, x, z, kind });
   };
 
-  P.raiseAlarm = function (why) {
+  P.raiseAlarm = function (why, fromNet) {
     const j = this.job;
     if (j.alarm) return;
     j.alarm = true;
+    if (!fromNet) this.cx({ k: 'alarm', why });
     for (const s of j.sentries) { if (!s.dead) { s.calm = false; s.post = { x: s.pos.x, z: s.pos.z }; s.walkMul = 1; } if (s.cone) s.cone.material.color.set('#ff3030'); }
     this.G.audio.star();
     this.api.banner('🚨 ALARM!', why || 'Radjs Wachen haben dich entdeckt');
@@ -580,7 +628,7 @@ export function installFinale(Missions) {
   P.finaleHint = function (pp, v) {
     const j = this.job, G = this.G, I = this.isl;
     if (j.stage === 'plane' && !v && !G.flight && Math.hypot(pp.x - this.plane.pos.x, pp.z - this.plane.pos.z) < 7)
-      return { text: '✈️ Ins Flugzeug', run: () => { j.stage = 'fly'; this.api.enterPlane(this.plane); this.coupTarget((ISL.strip.x0 + ISL.strip.x1) / 2, (ISL.strip.z0 + ISL.strip.z1) / 2, '#39c6ff'); } };
+      return { text: '✈️ Ins Flugzeug', run: () => { if (j.coop) { this.cx({ k: 'fly' }); return this.crewBoard(null); } j.stage = 'fly'; this.flyTo({ from: '🛫 Landebahn Westwüste', to: '🏝️ Radj-Insel', title: '👑 FINALE · FLUG', lines: ['Start in der Westwüste…', 'Tief über dem Meer, unter Radjs Radar…', 'Die Radj-Insel – Landung auf der Privatpiste!'], secs: 6 }, () => this.arriveIsland()); } };
     if (v) {
       if (j.stage === 'escape' && Math.hypot(pp.x - ISL.helipad.x, pp.z - ISL.helipad.z) < 14) return { text: '🚁 In den Helikopter', run: () => this.winFinale() };
       return null;
@@ -595,7 +643,7 @@ export function installFinale(Missions) {
         if ((dx * fx + dz * fz) / d < -0.2) return { text: '🔪 Lautlos ausschalten', run: () => { s.hit(999, G, fx, fz, true); j.takedowns++; G.audio.tone(0.15, 200, 80, 0.12, 'sine'); } };
       }
     }
-    if (j.stage === 'gate' && j.hasGate && Math.hypot(pp.x - ISL.gate.x, pp.z - ISL.gate.z) < 7) return { text: '🔓 Tor öffnen (Torkarte)', run: () => { I.gateCol.off = true; I.gateMesh.visible = false; j.stage = 'estate'; G.audio.pickup(); this.api.banner('🔓 TOR OFFEN', 'Finde die Wache mit der Aufzugkarte (gold)'); } };
+    if (j.stage === 'gate' && j.hasGate && Math.hypot(pp.x - ISL.gate.x, pp.z - ISL.gate.z) < 7) return { text: '🔓 Tor öffnen (Torkarte)', run: () => { I.gateCol.off = true; I.gateMesh.visible = false; j.stage = 'estate'; G.audio.pickup(); this.cx({ k: 'gate' }); this.api.banner('🔓 TOR OFFEN', 'Finde die Wache mit der Aufzugkarte (gold)'); } };
     if (j.stage === 'lift' && Math.hypot(pp.x - ISL.lift.x, pp.z - (ISL.lift.z + 1)) < 3.5) return { text: '▼ Aufzug in den Keller', run: () => this.rideLift(true) };
     if (j.stage === 'cellar' && Math.hypot(pp.x - ISL.glass.x, pp.z - ISL.glass.z) < 3) {
       if (!j.drilled) return { text: '💎 Glas aufschneiden', run: () => this.openCutter() };
@@ -621,6 +669,7 @@ export function installFinale(Missions) {
       if (down) {
         const p = ISL.cellarLift;
         G.player.pos.set(p.x, RADJ_CELLAR.y, p.z - 3);
+        if (j.prize) { j.stage = 'up'; this.coupTarget(ISL.cellarLift.x, ISL.cellarLift.z, '#ff3030'); this.api.toast('👑 Die Bubensahne ist schon weg – zurück nach oben!'); return; }
         j.stage = 'cellar';
         this.coupTarget(ISL.glass.x, ISL.glass.z, '#ffd700');
       } else {
@@ -635,16 +684,17 @@ export function installFinale(Missions) {
     this.isl.prize.visible = false;
     j.stage = 'up';
     j.prize = true;
+    this.cx({ k: 'prize' });
     this.G.audio.pickup();
     this.coupTarget(ISL.cellarLift.x, ISL.cellarLift.z, '#ff3030');
     this.api.banner('👑 GOLDENE BUBENSAHNE!', 'Stiller Alarm ausgelöst – schnell zum Aufzug!');
   };
 
-  P.startEscape = function () {
+  P.startEscape = function (fromNet) {
     const j = this.job, G = this.G, I = this.isl;
     j.stage = 'escape';
     G.walkMul = 0;
-    this.raiseAlarm('Radj weiß Bescheid – ab zum Helikopter!');
+    this.raiseAlarm('Radj weiß Bescheid – ab zum Helikopter!', fromNet);
     I.westGateCol.off = true; I.westGateMesh.visible = false;
     // two jeeps full of Radj's men come after you
     for (const [x, z] of [[-60, -1300], [-80, -1380]]) {
@@ -658,13 +708,15 @@ export function installFinale(Missions) {
     this.coupTarget(ISL.helipad.x, ISL.helipad.z, '#39ff88');
   };
 
-  P.winFinale = function () {
+  P.winFinale = function (fromNet, who) {
     const j = this.job, G = this.G;
     const secs = Math.round(G.time - j.t0);
     const dead = j.sentries.filter((s) => s.dead).length;
     G.audio.pickup();
-    store.set('dc3d_coupWeek', weekId());
-    this.api.addMoney(150000);
+    const coop = j.coop;
+    if (coop && !fromNet) this.cx({ k: 'win' });
+    // solo 150.000 · crew: leader 100.000, helpers 37.500 (once a week)
+    this.coopPayout(coop ? coop.role : 'solo');
     if (G.player.inVehicle) { const v = G.player.inVehicle; v.driver = null; G.player.inVehicle = null; }
     this.cleanupCoup(false);
     this.endJob(null);
@@ -674,7 +726,8 @@ export function installFinale(Missions) {
     G.player.pos.set(h.x, 0.2, h.z);
     G.player.h.root.visible = true;
     this.api.refreshControls && this.api.refreshControls();
-    $('winStats').innerHTML = `⏱ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} Min · 🔪 ${j.takedowns} lautlos · 💀 ${dead} Wachen<br>${j.alarm ? '🚨 Mit Alarm' : '🤫 Ohne Alarm – Profi!'}`;
+    $('winStats').innerHTML = `⏱ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} Min · 🔪 ${j.takedowns} lautlos · 💀 ${dead} Wachen<br>${j.alarm ? '🚨 Mit Alarm' : '🤫 Ohne Alarm – Profi!'}${coop ? `<br>👥 Crew: ${coop.names.join(', ')}${fromNet && who ? ` · ${who} hat euch rausgeholt` : ''}` : ''}`;
+    if (coop) this.coopLeave(true);
     $('win').classList.add('show');
     G.paused = true;
   };
@@ -702,23 +755,7 @@ export function installFinale(Missions) {
       return;
     }
     if (j.stage === 'plane') { this.setJobHUD(T, 'Steig ins Flugzeug', `📍 ${dist(this.plane.pos)} m`, false); return; }
-    if (j.stage === 'fly') {
-      const pl = this.plane;
-      if (G.flight !== pl) { j.stage = 'plane'; return; }
-      if (pl.onGround && pl.speed < 3 && radjE(pl.pos.x, pl.pos.z) < 0.9) {
-        this.api.leavePlane();
-        j.stage = 'island';
-        this.spawnIsland();
-        this.coupTarget(ISL.gate.x, ISL.gate.z + 12, '#ffd23b');
-        this.api.banner('🏝️ RADJ-INSEL', 'Folge dem Weg durch den Wald zum Anwesen');
-        return;
-      }
-      const S = ISL.strip;
-      const sd = dist({ x: (S.x0 + S.x1) / 2, z: (S.z0 + S.z1) / 2 });
-      const hint = pl.onGround ? (pl.speed < 20 ? 'GAS geben, ab 80 km/h ▲ NASE HOCH' : '▲ NASE HOCH zum Abheben') : sd < 260 ? 'Gas raus und auf der Piste aufsetzen' : 'Flieg nach Süden zur Radj-Insel';
-      this.setJobHUD(T, hint, `✈️ ${pl.kmh} km/h · Höhe ${Math.round(pl.alt)} m · 📍 ${sd} m`, false);
-      return;
-    }
+    if (j.stage === 'fly') return; // loading screen running
     // ---- on the island ----
     if (G.flight || G.player.dead) return;
     const E = ISL.estate;
@@ -731,6 +768,7 @@ export function installFinale(Missions) {
         if (s.cone) { this.scene.remove(s.cone); s.cone = null; }
         if (s.dead && !s.dropped) {
           s.dropped = true;
+          if (!s.remote) this.cx({ k: 'kill', i: j.sentries.indexOf(s) });
           if (s.gate) this.dropCard(s.pos.x, s.pos.z, 'gate');
           if (s.card) this.dropCard(s.pos.x, s.pos.z, 'lift');
         }
@@ -772,6 +810,7 @@ export function installFinale(Missions) {
         c.taken = true;
         this.scene.remove(c.m);
         G.audio.pickup();
+        this.cx({ k: 'card', kind: c.kind });
         if (c.kind === 'gate') { j.hasGate = true; this.api.toast('💳 Torkarte genommen'); }
         else { j.hasLift = true; this.api.toast('💳 Aufzugkarte genommen – ab zum Aufzug!'); }
       }
@@ -903,6 +942,6 @@ export function installCutter(Missions) {
     $('cutter').classList.remove('show');
     this.G.paused = false;
     const j = this.job;
-    if (ok && j) { j.drilled = true; this.isl.glass.visible = false; this.api.toast('💎 Glas offen – nimm die Bubensahne!'); }
+    if (ok && j) { j.drilled = true; this.isl.glass.visible = false; this.cx({ k: 'glass' }); this.api.toast('💎 Glas offen – nimm die Bubensahne!'); }
   };
 }
