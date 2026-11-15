@@ -188,7 +188,7 @@ export function addFloor(x0, x1, z0, z1, y, y2 = y, axis = 'x') {
   floorBB.x0 = Math.min(floorBB.x0, f.x0); floorBB.x1 = Math.max(floorBB.x1, f.x1); floorBB.z0 = Math.min(floorBB.z0, f.z0); floorBB.z1 = Math.max(floorBB.z1, f.z1);
   return f;
 }
-world.addFloor = addFloor; world.addBox = addBox; world.floors = floors; // also reachable for tests (G.world)
+world.addFloor = addFloor; world.addBox = addBox; world.floors = floors; world.collideCircle = collideCircle; // also reachable for tests (G.world)
 
 
 // segment vs AABB test for line of sight / bullets (2D slab + height)

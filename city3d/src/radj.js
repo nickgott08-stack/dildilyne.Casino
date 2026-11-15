@@ -2,7 +2,7 @@
 // secret cellar with the golden Bubensahne, helipad. Built once at start (visible from the plane).
 import * as THREE from 'three';
 import { RADJ, RADJ_CELLAR, RADJ_STRIP, RADJ_ESTATE, radjGround, radjE } from './geo.js';
-import { addBox, addCirc, world } from './world.js';
+import { addBox, addCirc, addFloor, world } from './world.js';
 import { cbox, ccyl, merge, neonSign, srand, srange, canvasTex, colorize } from './util.js';
 import { makeHuman } from './human.js';
 
@@ -11,12 +11,12 @@ const H = (x, z) => radjGround(x, z);
 
 export const ISL = {
   strip: RADJ_STRIP,
-  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [90, -1206], [54, -1214], [40, -1228]],
+  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [92, -1206], [86, -1222], [74, -1234]], // ends at the foot of the ramp up to the main gate
   estate: RADJ_ESTATE,
   gate: { x: 40, z: -1240 },
   westGate: { x: -60, z: -1335 },
-  mansion: { x0: 10, x1: 74, z0: -1366, z1: -1322 },
-  lift: { x: 42, z: -1320 },
+  mansion: { x0: 37, x1: 60, z0: -1320, z1: -1296 },
+  lift: { x: 34.5, z: -1307 }, // lift door on the west face of the villa (podium, level 3)
   helipad: { x: -186, z: -1332 },
   helRoad: [[-60, -1335], [-80, -1340], [-120, -1326], [-160, -1334], [-186, -1332]],
   cellarLift: { x: 316, z: -1212 },
@@ -307,6 +307,7 @@ export function buildRadjIsland(sceneRoot) {
       const wall = (x, z) => {
         if (radjE(x, z) > 1.0) return;
         if (x > E.x0 - 3 && x < E.x1 + 3 && z > E.z0 - 3 && z < E.z1 + 3) return;
+        if (x > 20 && x < 75 && z > E.z1 - 1 && z < E.z1 + 13) return; // ramp + landing in front of the gate
         if (Math.hypot(x - out.clearing.x, z - out.clearing.z) < out.clearing.r + 0.5) return;
         if (out.roadTowers.some((t) => Math.hypot(t.x - x, t.z - z) < 3.6)) return;
         const y = H(x, z);
@@ -338,6 +339,7 @@ export function buildRadjIsland(sceneRoot) {
       if (e > 0.78) continue;
       if (x > ISL.strip.x0 - 10 && x < ISL.strip.x1 + 14 && z > ISL.strip.z0 - 12 && z < ISL.strip.z1 + 22) continue;
       if (x > E.x0 - 6 && x < E.x1 + 6 && z > E.z0 - 6 && z < E.z1 + 9) continue;
+      if (x > 18 && x < 78 && z > E.z1 - 2 && z < E.z1 + 16) continue; // ramp + landing in front of the gate
       if (nearPts(road.samples, x, z, 7.5) || nearPts(hel.samples, x, z, 7)) continue;
       if (out.creek && nearPts(out.creek, x, z, 4)) continue;
       if (Math.hypot(x - out.clearing.x, z - out.clearing.z) < out.clearing.r) continue;
@@ -396,288 +398,159 @@ export function buildRadjIsland(sceneRoot) {
     inst(leafG, foliage, leafy, true, true, 1.3);
     inst(bushG, foliage, bushes, true, false);
   }
-  // ---- the estate ----
+  // ---- the estate: SHELL ("Rohbau") after Nick's sketch (mirrored, west gate on the left), 15.11. ----
+  // Three levels: L1 = terrain (pool terrace, west strip with garage + west gate), L2 = +3.4 m (main gate, gate court,
+  // garden, middle court, east courts, U-hall court), L3 = +6.8 m (villa podium, north-east terrace).
+  // Everything is grey on purpose – layout first, looks later (step 3). Green boxes of the sketch = open halls (posts + roof).
   {
     const E = ISL.estate, y = H((E.x0 + E.x1) / 2, (E.z0 + E.z1) / 2);
     E.y = y;
-    const wallC = '#efe6d6', wh = 4.2;
-    const wall = (x0, x1, z0, z1) => { plain.push(cbox(x1 - x0, wh, z1 - z0, (x0 + x1) / 2, y + wh / 2 - 0.5, (z0 + z1) / 2, wallC)); plain.push(cbox(x1 - x0 + 0.3, 0.25, z1 - z0 + 0.3, (x0 + x1) / 2, y + wh - 0.4, (z0 + z1) / 2, '#cfc3ab')); addBox(x0, x1, z0, z1, y + wh, { y0: y - 2 }); };
+    const L1 = y, L2 = y + 3.4, L3 = y + 6.8;
     const g = ISL.gate, wg = ISL.westGate;
-    wall(E.x0, g.x - 6, E.z1 - 0.4, E.z1 + 0.4); wall(g.x + 6, E.x1, E.z1 - 0.4, E.z1 + 0.4);
-    wall(E.x0, E.x1, E.z0 - 0.4, E.z0 + 0.4);
-    wall(E.x1 - 0.4, E.x1 + 0.4, E.z0, E.z1);
-    wall(E.x0 - 0.4, E.x0 + 0.4, E.z0, wg.z - 6); wall(E.x0 - 0.4, E.x0 + 0.4, wg.z + 6, E.z1);
-    for (const [x, z] of [[E.x0, E.z0], [E.x1, E.z0], [E.x0, E.z1], [E.x1, E.z1], [g.x - 6.4, E.z1], [g.x + 6.4, E.z1]]) {
-      plain.push(cbox(1.6, wh + 1.2, 1.6, x, y + (wh + 1.2) / 2 - 0.5, z, '#d8cfbd'), cbox(1.9, 0.3, 1.9, x, y + wh + 0.85, z, '#c9a227'));
-    }
-    // wall lamps + cameras
-    for (let x = E.x0 + 8; x < E.x1 - 4; x += 16) for (const zz of [E.z1 + 0.5, E.z0 - 0.5]) {
-      if (Math.abs(x - g.x) < 8) continue;
-      glow.push(cbox(0.3, 0.4, 0.2, x, y + 3.0, zz, '#ffd890'));
-    }
-    for (const [x, z, r] of [[g.x - 7, E.z1 + 0.6, 0], [g.x + 7, E.z1 + 0.6, 0], [E.x0 - 0.6, wg.z + 7, Math.PI / 2], [E.x1 + 0.6, -1340, -Math.PI / 2]]) {
-      plain.push(cbox(0.25, 0.25, 0.55, x, y + 4.1, z + (r === 0 ? 0.25 : 0), '#e8e8e8', r), cbox(0.18, 0.18, 0.06, x, y + 4.1, z + (r === 0 ? 0.53 : 0), '#111', r));
-      glow.push(cbox(0.05, 0.05, 0.05, x + 0.08, y + 4.2, z + (r === 0 ? 0.56 : 0), '#ff2020'));
-    }
+    const C1 = '#7f8f78', C2 = '#a3a39c', C3 = '#c4bfb2', WALLC = '#d7d2c6', RAILC = '#8d8f93', ROOFC = '#5b5f66', POSTC = '#b9b6ad', SOLID = '#8a8479';
+    // solid raised platform with a walkable top
+    const plat = (x0, x1, z0, z1, top, col) => { plain.push(cbox(x1 - x0, top - L1 + 0.5, z1 - z0, (x0 + x1) / 2, (top + L1 - 0.5) / 2, (z0 + z1) / 2, col)); addBox(x0, x1, z0, z1, top, { y0: L1 - 1 }); addFloor(x0, x1, z0, z1, top); };
+    // wall / railing standing on `base`
+    const wallOn = (x0, x1, z0, z1, base, h = 3.2, col = WALLC) => { plain.push(cbox(Math.abs(x1 - x0) || 0.5, h + 0.5, Math.abs(z1 - z0) || 0.5, (x0 + x1) / 2, base + h / 2 - 0.25, (z0 + z1) / 2, col)); addBox(Math.min(x0, x1) - (x0 === x1 ? 0.25 : 0), Math.max(x0, x1) + (x0 === x1 ? 0.25 : 0), Math.min(z0, z1) - (z0 === z1 ? 0.25 : 0), Math.max(z0, z1) + (z0 === z1 ? 0.25 : 0), base + h, { y0: base - 0.5 }); };
+    // wall along a line with openings: line 'x' = runs along x at fixed z (c), 'z' = runs along z at fixed x (c)
+    const line = (dir, c, a, b, base, h, gaps = [], arch = false) => {
+      let from = a;
+      for (const [g0, g1] of gaps.slice().sort((p, q) => p[0] - q[0]).concat([[b, b]])) {
+        if (g0 > from) { if (dir === 'x') wallOn(from, g0, c, c, base, h, h < 1.5 ? RAILC : WALLC); else wallOn(c, c, from, g0, base, h, h < 1.5 ? RAILC : WALLC); }
+        if (arch && g1 > g0) { const m = (g0 + g1) / 2, w = g1 - g0 + 1.2; plain.push(dir === 'x' ? cbox(w, 1.0, 0.9, m, base + h + 0.2, c, '#e8c66a') : cbox(0.9, 1.0, w, c, base + h + 0.2, m, '#e8c66a')); }
+        from = g1;
+      }
+    };
+    const rail = (dir, c, a, b, base, gaps) => line(dir, c, a, b, base, 1.1, gaps);
+    // stairs: ramp for the feet + visible steps + side walls. yA at the low coordinate end, yB at the high end.
+    const stairs = (x0, x1, z0, z1, yA, yB, axis) => {
+      addFloor(x0, x1, z0, z1, yA, yB, axis);
+      const n = 12, lo = Math.min(yA, yB), hi = Math.max(yA, yB);
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, top = yA + (yB - yA) * ((k + 1) / n > 1 ? 1 : (yB > yA ? (k + 1) / n : k / n));
+        if (axis === 'x') plain.push(cbox((x1 - x0) / n, top - lo + 0.4, z1 - z0, x0 + (x1 - x0) * t, (top + lo - 0.4) / 2, (z0 + z1) / 2, '#e0dccf'));
+        else plain.push(cbox(x1 - x0, top - lo + 0.4, (z1 - z0) / n, (x0 + x1) / 2, (top + lo - 0.4) / 2, z0 + (z1 - z0) * t, '#e0dccf'));
+      }
+      if (axis === 'x') { wallOn(x0, x1, z0, z0, lo, hi - lo + 1.1, RAILC); wallOn(x0, x1, z1, z1, lo, hi - lo + 1.1, RAILC); }
+      else { wallOn(x0, x0, z0, z1, lo, hi - lo + 1.1, RAILC); wallOn(x1, x1, z0, z1, lo, hi - lo + 1.1, RAILC); }
+    };
+    // open hall: posts + roof (you can walk through and hide behind the posts)
+    const hall = (x0, x1, z0, z1, base, h = 3.6) => {
+      const xs = x1 - x0 > 14 ? [x0, (x0 + x1) / 2, x1] : [x0, x1], zs = z1 - z0 > 14 ? [z0, (z0 + z1) / 2, z1] : [z0, z1];
+      for (const x of xs) for (const z of zs) { if (x !== x0 && x !== x1 && z !== z0 && z !== z1) continue; plain.push(cbox(0.7, h, 0.7, x, base + h / 2, z, POSTC)); addBox(x - 0.35, x + 0.35, z - 0.35, z + 0.35, base + h, { y0: base - 0.5 }); }
+      plain.push(cbox(x1 - x0 + 1.6, 0.45, z1 - z0 + 1.6, (x0 + x1) / 2, base + h + 0.22, (z0 + z1) / 2, ROOFC));
+    };
+    // solid building (cannot be entered)
+    const block = (x0, x1, z0, z1, base, h) => { plain.push(cbox(x1 - x0, h, z1 - z0, (x0 + x1) / 2, base + h / 2, (z0 + z1) / 2, SOLID), cbox(x1 - x0 + 1, 0.4, z1 - z0 + 1, (x0 + x1) / 2, base + h + 0.2, (z0 + z1) / 2, ROOFC)); addBox(x0, x1, z0, z1, base + h, { y0: base - 0.5 }); };
+
+    // ---------- ground + platforms ----------
+    plain.push(cbox(E.x1 - E.x0 - 1, 0.06, E.z1 - E.z0 - 1, (E.x0 + E.x1) / 2, L1 + 0.03, (E.z0 + E.z1) / 2, C1)); // L1 floor
+    plat(-36, 66, -1329, E.z1, L2, C2);          // gate court, garden, middle court
+    plat(46, E.x1, E.z0, -1297, L2, C2);         // east corridor, east courts, U-hall court, south-east court
+    plat(30, 64, -1324, -1290, L3, C3);          // villa podium
+    plat(66, E.x1, -1297, E.z1, L3, C3);         // north-east terrace
+    plat(-60, -46, E.z0, -1384, L2, C2);         // look-out in the south-west corner
+    plat(22, 50, E.z1, E.z1 + 10, L2, C2);       // landing in front of the main gate (outside)
+    // ---------- 8 stairs + the ramp from the forest road ----------
+    stairs(50, 72, E.z1 + 2, E.z1 + 10, L2, L1, 'x');   // ramp: forest road → landing
+    stairs(58, 66, -1272, -1267, L2, L3, 'x');           // 1 gate court → north-east terrace
+    stairs(41, 46, -1290, -1282, L3, L2, 'z');           // 2 gate court → villa podium
+    stairs(22, 30, -1310, -1305, L2, L3, 'x');           // 3 middle court → villa podium (at the lift)
+    stairs(-44, -36, -1285, -1280, L1, L2, 'x');         // 4 west strip → garden
+    stairs(38, 46, -1336, -1331, L1, L2, 'x');           // 5 pool terrace → U-hall court (north arm)
+    stairs(38, 46, -1367, -1362, L1, L2, 'x');           // 6 pool terrace → U-hall court (south arm)
+    stairs(95, 100, -1305, -1297, L2, L3, 'z');          // 7 east courts → north-east terrace
+    stairs(-46, -38, -1396, -1391, L2, L1, 'x');         // 8 pool terrace → look-out
+    // ---------- railings at the drops ----------
+    rail('z', -36, -1329, E.z1, L2, [[-1285, -1280]]);
+    rail('x', -1329, -36, 46, L2, []);
+    rail('z', 46, E.z0, -1329, L2, [[-1367, -1362], [-1336, -1331]]);
+    rail('x', -1290, 30, 64, L3, [[41, 46]]); rail('z', 30, -1324, -1290, L3, [[-1310, -1305]]); rail('x', -1324, 30, 64, L3, []); rail('z', 64, -1324, -1290, L3, []);
+    rail('z', 66, -1297, E.z1, L3, [[-1272, -1267]]); rail('x', -1297, 66, E.x1, L3, [[95, 100]]);
+    rail('z', -46, E.z0, -1384, L2, [[-1396, -1391]]); rail('x', -1384, -60, -46, L2, []);
+    rail('x', E.z1 + 10, 22, 50, L2, []); rail('z', 22, E.z1, E.z1 + 10, L2, []); rail('z', 50, E.z1, E.z1 + 2, L2, []);
+    // ---------- outer wall ----------
+    line('x', E.z1, E.x0, -36, L1, 4.2); line('x', E.z1, -36, 66, L2, 3.2, [[g.x - 6, g.x + 6]]); line('x', E.z1, 66, E.x1, L3, 3.2);
+    line('z', E.x1, -1297, E.z1, L3, 3.2); line('z', E.x1, E.z0, -1297, L2, 3.2);
+    line('x', E.z0, E.x0, 46, L1, 1.2); line('x', E.z0, 46, E.x1, L2, 1.2);              // cliff side: low, view of the sea
+    line('z', E.x0, E.z0, E.z1, L1, 4.2, [[wg.z - 6, wg.z + 6]]);
     // gates
     const gateM = new THREE.Mesh(new THREE.BoxGeometry(12, 3.6, 0.25), new THREE.MeshStandardMaterial({ color: '#2b2b2b', metalness: 0.7, roughness: 0.4 }));
-    gateM.position.set(g.x, y + 1.8, E.z1);
+    gateM.position.set(g.x, L2 + 1.8, E.z1);
     scene.add(gateM);
     out.gateMesh = gateM;
-    out.gateCol = addBox(g.x - 6, g.x + 6, E.z1 - 0.3, E.z1 + 0.3, y + 3.8, { y0: y - 2 });
-    for (let k = -5; k <= 5; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), new THREE.MeshStandardMaterial({ color: '#c9a227', metalness: 0.9, roughness: 0.3 })); b.position.set(k * 1.05, 2.0, 0); gateM.add(b); }
+    out.gateCol = addBox(g.x - 6, g.x + 6, E.z1 - 0.3, E.z1 + 0.3, L2 + 3.8, { y0: L2 - 0.5 });
     const wgM = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.4, 12), gateM.material);
     wgM.position.set(wg.x, y + 1.7, wg.z);
     scene.add(wgM);
     out.westGateMesh = wgM;
     out.westGateCol = addBox(wg.x - 0.3, wg.x + 0.3, wg.z - 6, wg.z + 6, y + 3.6, { y0: y - 2 });
     const sg = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.6), new THREE.MeshBasicMaterial({ map: neonSign('ANWESEN RADJ', '#ffd700', { size: 100, bg: '#1a1408' }), toneMapped: false }));
-    sg.position.set(g.x, y + 5.2, E.z1 + 0.5);
+    sg.position.set(g.x, L2 + 5.2, E.z1 + 0.5);
     scene.add(sg);
     world.signMats.push(sg.material);
-    plain.push(cbox(2.6, 2.8, 2.6, g.x + 10, y + 1.4, E.z1 + 3, '#d8cfbd'), cbox(3.0, 0.3, 3.0, g.x + 10, y + 2.95, E.z1 + 3, '#3a3a3a'));
-    glow.push(cbox(1.6, 0.8, 0.05, g.x + 10, y + 1.8, E.z1 + 4.32, '#bfe6ff'));
-    addBox(g.x + 8.7, g.x + 11.3, E.z1 + 1.7, E.z1 + 4.3, y + 2.8, { y0: y - 2 });
-    // lawn + gravel
-    plain.push(cbox(E.x1 - E.x0 - 2, 0.04, E.z1 - E.z0 - 2, (E.x0 + E.x1) / 2, y + 0.03, (E.z0 + E.z1) / 2, '#3f7a34'));
-    const M = ISL.mansion;
-    plain.push(cbox(8, 0.06, E.z1 - M.z1, g.x, y + 0.06, (E.z1 + M.z1) / 2, '#cbbd9c'));
-    plain.push(cbox(E.x1 - E.x0 - 4, 0.06, 6, (E.x0 + E.x1) / 2, y + 0.06, wg.z, '#cbbd9c'));
-    plain.push(cbox(M.x1 - M.x0 + 34, 0.06, 5, (M.x0 + M.x1) / 2, y + 0.06, M.z0 - 6, '#cbbd9c'));
-    // fountain with a golden figure
-    plain.push(ccyl(5.2, 5.5, 0.9, 24, g.x, y + 0.45, -1300, '#d6d0c4'), ccyl(4.7, 4.7, 0.1, 24, g.x, y + 0.86, -1300, '#2f8fbf'));
-    plain.push(ccyl(1.4, 1.8, 1.2, 12, g.x, y + 1.3, -1300, '#d6d0c4'), ccyl(0.35, 0.45, 1.6, 10, g.x, y + 2.7, -1300, '#c9a227'));
-    plain.push(ccyl(0.45, 0.5, 0.8, 10, g.x, y + 3.9, -1300, '#c9a227'), ccyl(0.18, 0.22, 0.5, 8, g.x, y + 4.55, -1300, '#c9a227'));
-    addCirc(g.x, -1300, 5.5, y + 1);
-    // statues on pedestals along the drive
-    for (const [x, z] of [[30, -1290], [50, -1290], [30, -1312], [50, -1312]]) {
-      plain.push(cbox(1.4, 1.2, 1.4, x, y + 0.6, z, '#e8e0cf'), cbox(0.6, 1.8, 0.5, x, y + 2.1, z, '#f5f2ea'), ccyl(0.3, 0.3, 0.5, 8, x, y + 3.25, z, '#f5f2ea'));
-      addBox(x - 0.7, x + 0.7, z - 0.7, z + 0.7, y + 3.5, { y0: y - 1 });
-    }
-    // garden lamps
-    for (const [x, z] of [[35, -1280], [45, -1280], [35, -1318], [45, -1318], [-20, -1335], [100, -1335], [10, -1372], [70, -1372]]) {
-      plain.push(cbox(0.12, 2.2, 0.12, x, y + 1.1, z, '#2b2b2b'));
-      glow.push(cbox(0.36, 0.36, 0.36, x, y + 2.3, z, '#ffe2b0'));
-    }
-    // hedges for cover (kept clear of the patrol routes)
-    const hedge = (x, z, w, d) => { plain.push(cbox(w, 1.5, d, x, y + 0.75, z, '#24502a')); addBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + 1.5, { y0: y - 1 }); };
-    for (const [x, z, w, d] of [[-22, -1316, 6, 1.4], [104, -1316, 6, 1.4], [8, -1384, 10, 1.4], [76, -1384, 10, 1.4], [-24, -1356, 1.4, 8], [106, -1356, 1.4, 8], [16, -1300, 1.4, 6], [64, -1300, 1.4, 6], [40, -1388, 8, 1.4]]) hedge(x, z, w, d);
-    // pool with loungers and palms (east front lawn)
-    {
-      const px0 = 82, px1 = 108, pz0 = -1302, pz1 = -1288;
-      plain.push(cbox(px1 - px0 + 2, 0.25, pz1 - pz0 + 2, (px0 + px1) / 2, y + 0.12, (pz0 + pz1) / 2, '#f0ece2'));
-      const pool = new THREE.Mesh(new THREE.BoxGeometry(px1 - px0, 0.1, pz1 - pz0), new THREE.MeshStandardMaterial({ color: '#2fb6d8', roughness: 0.05, metalness: 0.2, emissive: '#06303c' }));
-      pool.position.set((px0 + px1) / 2, y + 0.27, (pz0 + pz1) / 2);
-      scene.add(pool);
-      addBox(px0, px1, pz0, pz1, y + 0.4, { y0: y - 1 });
-      for (let k = 0; k < 4; k++) { const x = px0 + 3 + k * 6.5; plain.push(cbox(0.9, 0.3, 2.1, x, y + 0.45, pz1 + 2.6, '#ffffff'), cbox(0.9, 0.5, 0.5, x, y + 0.7, pz1 + 1.7, '#ffffff', 0, -0.6)); }
-      plain.push(ccyl(1.2, 0.05, 0.6, 10, px0 + 6, y + 2.4, pz1 + 2.6, '#ff3df0'), cbox(0.06, 2.2, 0.06, px0 + 6, y + 1.1, pz1 + 2.6, '#ddd'));
-      for (const [x, z] of [[px0 - 2, pz0 - 2], [px1 + 2, pz0 - 2], [px0 - 2, pz1 + 4], [px1 + 2, pz1 + 4]]) {
-        plain.push(ccyl(0.22, 0.32, 6, 6, x, y + 3, z, '#8a6a45'));
-        for (let a = 0; a < 6; a++) plain.push(cbox(0.5, 0.08, 3.2, x + Math.sin(a) * 1.4, y + 6.0, z + Math.cos(a) * 1.4, '#2e8b3a', a, -0.35));
-        addCirc(x, z, 0.35, y + 6, y - 1);
-      }
-    }
-    // garage with luxury cars (west front)
-    {
-      const gx0 = -36, gx1 = -14, gz0 = -1302, gz1 = -1284;
-      plain.push(cbox(gx1 - gx0, 4.6, 0.4, (gx0 + gx1) / 2, y + 2.3, gz0, '#efe6d6'), cbox(gx1 - gx0, 4.6, 0.4, (gx0 + gx1) / 2, y + 2.3, gz1, '#efe6d6'));
-      plain.push(cbox(0.4, 4.6, gz1 - gz0, gx0, y + 2.3, (gz0 + gz1) / 2, '#efe6d6'));
-      plain.push(cbox(gx1 - gx0 + 1, 0.4, gz1 - gz0 + 1, (gx0 + gx1) / 2, y + 4.8, (gz0 + gz1) / 2, '#3a3a3a'));
-      plain.push(cbox(gx1 - gx0, 0.05, gz1 - gz0, (gx0 + gx1) / 2, y + 0.07, (gz0 + gz1) / 2, '#5a5d62'));
-      addBox(gx0, gx1, gz0 - 0.2, gz0 + 0.2, y + 4.6, { y0: y - 1 }); addBox(gx0, gx1, gz1 - 0.2, gz1 + 0.2, y + 4.6, { y0: y - 1 }); addBox(gx0 - 0.2, gx0 + 0.2, gz0, gz1, y + 4.6, { y0: y - 1 });
-      glow.push(cbox(gx1 - gx0 - 2, 0.08, 0.3, (gx0 + gx1) / 2, y + 4.55, (gz0 + gz1) / 2, '#ffffff'));
-      out.garageCars = [{ type: 'ferrari', x: -25, z: -1288.5, h: Math.PI / 2, color: '#111111' }, { type: 'rs6', x: -25, z: -1297, h: Math.PI / 2, color: '#d4af37' }];
-    }
-    // ---- bigger estate (15.11.): forecourt, inner wall, arcades at the fountain, guest house, gate house, store, pavilion, plants ----
-    {
-      const ROOF2 = '#b4552d', STONE = '#d9cdb4';
-      // the old outer wall line is now the inner wall between forecourt and courts: three open passages
-      for (const [a, b] of [[E.x0, -50], [-44, 33], [47, 98], [104, E.x1]]) wall(a, b, -1270.4, -1269.6);
-      for (const x of [-50, -44, 33, 47, 98, 104]) plain.push(cbox(1.3, wh + 0.9, 1.3, x, y + (wh + 0.9) / 2 - 0.5, -1270, '#d8cfbd'), cbox(1.6, 0.25, 1.6, x, y + wh + 0.5, -1270, ROOF2));
-      plain.push(cbox(14, 0.9, 1.0, 40, y + wh + 0.3, -1270, '#d8cfbd'), hipRoof(33, 47, -1270.6, -1269.4, y + wh + 0.75, 1.0, ROOF2, 0.5)); // arch over the main passage
-      const cypress = (x, z, h = 8) => { plain.push(ccyl(0.05, 1.0, h, 7, x, y + h / 2 + 0.4, z, '#1f4a2a'), ccyl(0.16, 0.2, 0.8, 5, x, y + 0.4, z, '#4d3522')); addCirc(x, z, 0.6, y + h, y - 1); };
-      const palm = (x, z, h = 6.5) => {
-        plain.push(ccyl(0.2, 0.32, h, 6, x, y + h / 2, z, '#8a6a45'));
-        for (let a = 0; a < 6; a++) plain.push(cbox(0.5, 0.08, 3.2, x + Math.sin(a) * 1.4, y + h, z + Math.cos(a) * 1.4, '#2e8b3a', a, -0.35));
-        addCirc(x, z, 0.35, y + h, y - 1);
-      };
-      const planter = (x, z, col = '#d94f8a') => { plain.push(cbox(2.6, 0.6, 1.2, x, y + 0.3, z, '#e8e0cf'), cbox(2.3, 0.35, 0.9, x, y + 0.72, z, '#2f6b2c'), cbox(1.9, 0.14, 0.6, x, y + 0.95, z, col)); addBox(x - 1.3, x + 1.3, z - 0.6, z + 0.6, y + 0.9, { y0: y - 1 }); };
-      const bed = (x, z, w, d, col) => plain.push(cbox(w + 0.5, 0.16, d + 0.5, x, y + 0.1, z, '#8a7a5c'), cbox(w, 0.3, d, x, y + 0.2, z, '#2f6b2c'), cbox(w - 0.8, 0.12, d - 0.8, x, y + 0.4, z, col));
-      const house = (x0, x1, z0, z1, h, col, roofH, doorSide) => {
-        plain.push(cbox(x1 - x0, h, z1 - z0, (x0 + x1) / 2, y + h / 2, (z0 + z1) / 2, col), cbox(x1 - x0 + 0.3, 0.5, z1 - z0 + 0.3, (x0 + x1) / 2, y + 0.25, (z0 + z1) / 2, STONE));
-        plain.push(hipRoof(x0, x1, z0, z1, y + h, roofH, ROOF2, 0.9));
-        addBox(x0, x1, z0, z1, y + h + roofH * 0.5, { y0: y - 1 });
-        // windows (glow at night like the garden lamps) + a door on the given side (+1: south face z0, -1: north face z1)
-        const fz = doorSide > 0 ? z0 - 0.03 : z1 + 0.03;
-        for (let x = x0 + 2.2; x < x1 - 1.6; x += 3.6) { plain.push(cbox(1.5, 1.7, 0.08, x, y + 2.2, fz, '#f5f2ea')); glow.push(cbox(1.2, 1.4, 0.1, x, y + 2.2, fz + (doorSide > 0 ? -0.02 : 0.02), '#ffd890')); }
-        plain.push(cbox(1.4, 2.4, 0.1, (x0 + x1) / 2 + 1.8, y + 1.2, fz, '#5a3a22'));
-      };
-      // forecourt: cypress alley at the drive, planters, gate house (west) and store house (east)
-      for (let z = -1246; z >= -1266; z -= 5) for (const sx of [-1, 1]) cypress(g.x + sx * 7.5, z);
-      for (const z of [-1250, -1260]) for (const sx of [-1, 1]) planter(g.x + sx * 11.5, z, sx > 0 ? '#d94f8a' : '#f2c230');
-      house(-30, -14, -1264, -1252, 4.2, '#e9dcc3', 2.6, 1);
-      house(72, 96, -1264, -1250, 5.0, '#d9b58a', 3.2, 1);
-      for (const [x, z] of [[-40, -1246], [-6, -1246], [62, -1246], [108, -1246], [-54, -1258], [112, -1262]]) cypress(x, z, 7);
-      bed(8, -1258, 12, 6, '#f2c230'); bed(60, -1244.5, 10, 3, '#d94f8a');
-      for (const [x, z] of [[14, -1250], [14, -1266], [66, -1266]]) { plain.push(cbox(0.12, 2.2, 0.12, x, y + 1.1, z, '#2b2b2b')); glow.push(cbox(0.36, 0.36, 0.36, x, y + 2.3, z, '#ffe2b0')); }
-      // fountain court: colonnades with terracotta roofs on both sides, paved cross paths to garage and pool
-      for (const cx of [20, 60]) {
-        for (let z = -1314; z <= -1286; z += 4) { plain.push(ccyl(0.28, 0.34, 3.6, 8, cx, y + 1.8, z, STONE), cbox(0.9, 0.25, 0.9, cx, y + 3.7, z, STONE)); addCirc(cx, z, 0.4, y + 3.8, y - 1); }
-        plain.push(cbox(1.2, 0.35, 30, cx, y + 4.0, -1300, STONE), hipRoof(cx - 1.6, cx + 1.6, -1315, -1285, y + 4.15, 1.1, ROOF2, 0.4));
-      }
-      plain.push(cbox(48, 0.06, 3, 10, y + 0.065, -1295, '#b9a98a'), cbox(22, 0.06, 3, 70, y + 0.065, -1295, '#b9a98a'), cbox(3, 0.06, 20, -6, y + 0.065, -1282, '#b9a98a'));
-      // pergola at the pool loungers, palms, flower beds
-      for (let x = 84; x <= 106; x += 5.5) plain.push(cbox(0.14, 2.6, 0.14, x, y + 1.3, -1286.8, '#f5f2ea'), cbox(0.14, 2.6, 0.14, x, y + 1.3, -1283.4, '#f5f2ea'), cbox(0.16, 0.14, 4.2, x, y + 2.65, -1285.1, '#f5f2ea'));
-      plain.push(cbox(23, 0.12, 0.16, 95, y + 2.75, -1286.8, '#f5f2ea'), cbox(23, 0.12, 0.16, 95, y + 2.75, -1283.4, '#f5f2ea'));
-      for (const [x, z] of [[-4, -1296], [70, -1300], [116, -1300], [116, -1340], [116, -1390], [-56, -1300], [-56, -1326], [-56, -1346], [2, -1385], [84, -1385], [-36, -1385]]) palm(x, z, 5.5 + ((x * 7 + z * 3) % 5 + 5) % 5 * 0.4);
-      bed(-20, -1338, 8, 4, '#d94f8a'); bed(104, -1332, 6, 6, '#f2c230'); bed(40, -1386, 14, 4, '#b06ad9'); bed(-50, -1340, 4, 4, '#f2c230');
-      for (const x of [0, 80]) for (const z of [-1326, -1360]) cypress(x, z, 7.5);
-      // guest house in the west strip: two storeys in terracotta red with arches, balcony and hip roof
-      {
-        const x0 = -58, x1 = -46, z0 = -1390, z1 = -1360, h = 7.4;
-        plain.push(cbox(x1 - x0, h, z1 - z0, (x0 + x1) / 2, y + h / 2, (z0 + z1) / 2, '#b5533c'), cbox(x1 - x0 + 0.3, 0.6, z1 - z0 + 0.3, (x0 + x1) / 2, y + 0.3, (z0 + z1) / 2, STONE));
-        plain.push(hipRoof(x0, x1, z0, z1, y + h, 3.4, ROOF2, 1.0));
-        addBox(x0, x1, z0, z1, y + h + 1.5, { y0: y - 1 });
-        plain.push(cbox(1.3, 0.25, z1 - z0 - 2, x1 + 0.65, y + 3.7, (z0 + z1) / 2, STONE), cbox(0.1, 0.9, z1 - z0 - 2, x1 + 1.25, y + 4.25, (z0 + z1) / 2, '#f5f2ea'));
-        for (let z = z0 + 3; z < z1 - 2; z += 4.2) {
-          plain.push(cbox(0.08, 2.6, 2.4, x1 + 0.03, y + 1.5, z, '#3a2418'), ccyl(1.2, 1.2, 0.08, 10, x1 + 0.03, y + 2.8, z, '#3a2418'));   // arch (dark)
-          plain.push(cbox(0.08, 1.9, 1.5, x1 + 0.03, y + 5.2, z, '#f5f2ea')); glow.push(cbox(0.1, 1.6, 1.2, x1 + 0.05, y + 5.2, z, '#ffd890'));
-        }
-      }
-      // pavilion in the south-east garden
-      {
-        const px = 108, pz = -1385;
-        plain.push(cbox(8.6, 0.3, 8.6, px, y + 0.15, pz, STONE));
-        for (const [a, b] of [[-3.6, -3.6], [3.6, -3.6], [-3.6, 3.6], [3.6, 3.6]]) { plain.push(ccyl(0.26, 0.32, 3.4, 8, px + a, y + 2.0, pz + b, '#f5f2ea')); addCirc(px + a, pz + b, 0.4, y + 3.6, y - 1); }
-        plain.push(cbox(8.2, 0.3, 8.2, px, y + 3.85, pz, STONE), hipRoof(px - 4.1, px + 4.1, pz - 4.1, pz + 4.1, y + 4.0, 2.4, ROOF2, 0.6));
-        plain.push(cbox(2.2, 0.5, 0.8, px, y + 0.55, pz, '#5a3a22'));
-      }
-    }
-    // watchtowers in the north-east and south-west corners with searchlights
-    out.towers = [];
-    for (const [tx, tz] of [[E.x1 - 4, E.z1 - 4], [E.x0 + 4, E.z0 + 4]]) {
-      for (const [a, b] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) plain.push(cbox(0.25, 8, 0.25, tx + a, y + 4, tz + b, '#4a4d52'));
-      plain.push(cbox(3.6, 0.3, 3.6, tx, y + 8, tz, '#4a4d52'), cbox(3.6, 1.1, 0.12, tx, y + 8.7, tz - 1.75, '#4a4d52'), cbox(3.6, 1.1, 0.12, tx, y + 8.7, tz + 1.75, '#4a4d52'));
-      plain.push(cbox(3.8, 0.25, 3.8, tx, y + 10.6, tz, '#2b2b2b'));
-      for (const [a, b] of [[-1.7, -1.7], [1.7, -1.7], [-1.7, 1.7], [1.7, 1.7]]) plain.push(cbox(0.12, 2.3, 0.12, tx + a, y + 9.4, tz + b, '#2b2b2b'));
-      addBox(tx - 1.6, tx + 1.6, tz - 1.6, tz + 1.6, y + 10.8, { y0: y - 1 });
-      const beam = new THREE.Mesh(new THREE.ConeGeometry(4, 22, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#fff4c0', transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
-      beam.geometry.translate(0, -11, 0);
-      const piv = new THREE.Group();
-      piv.position.set(tx, y + 9.6, tz);
-      piv.add(beam);
-      beam.rotation.x = -1.0;
-      scene.add(piv);
-      out.towers.push(piv);
-    }
-    // the mansion: cream stucco on a stone plinth, terracotta hip roofs, a central gable,
-    // white window frames with dark glass that lights up at night, two wings with balconies
-    const mh = 13;
-    const wingH = 9;
-    const WALL = '#f3ead8', TRIM = '#e4d6b8', STONE = '#c9b993', ROOF = '#a4502f', FRAME = '#fbfaf6', GOLD = '#c9a227';
-    const wins = [];
-    const winMat = new THREE.MeshStandardMaterial({ color: '#2a3946', roughness: 0.12, metalness: 0.6, emissive: '#ffbe6a', emissiveIntensity: 0 });
-    world.windowMats.push(winMat);
-    // window on a wall facing +z (dir 1) or -z (dir -1) or ±x (axis 'x')
-    const win = (x, yc, z, w, h, dir, axis = 'z') => {
-      const o = 0.06 * dir;
-      if (axis === 'z') {
-        plain.push(cbox(w + 0.5, h + 0.5, 0.14, x, yc, z + o, FRAME), cbox(w + 0.9, 0.22, 0.4, x, yc - h / 2 - 0.3, z + o * 3, TRIM), cbox(w + 0.8, 0.3, 0.25, x, yc + h / 2 + 0.45, z + o * 2, TRIM));
-        wins.push(cbox(w, h, 0.08, x, yc, z + o * 2.2, '#ffffff'));
-        plain.push(cbox(0.1, h, 0.1, x, yc, z + o * 3, FRAME), cbox(w, 0.1, 0.1, x, yc + h * 0.15, z + o * 3, FRAME));
-      } else {
-        plain.push(cbox(0.14, h + 0.5, w + 0.5, x + o, yc, z, FRAME), cbox(0.4, 0.22, w + 0.9, x + o * 3, yc - h / 2 - 0.3, z, TRIM));
-        wins.push(cbox(0.08, h, w, x + o * 2.2, yc, z, '#ffffff'));
-        plain.push(cbox(0.1, h, 0.1, x + o * 3, yc, z, FRAME));
-      }
-    };
-    const cx = (M.x0 + M.x1) / 2, cz = (M.z0 + M.z1) / 2;
-    // main house body, plinth, floor cornice, eaves cornice
-    plain.push(cbox(M.x1 - M.x0, mh, M.z1 - M.z0, cx, y + mh / 2, cz, WALL));
-    plain.push(cbox(M.x1 - M.x0 + 0.5, 1.1, M.z1 - M.z0 + 0.5, cx, y + 0.55, cz, STONE));
-    plain.push(cbox(M.x1 - M.x0 + 0.6, 0.35, M.z1 - M.z0 + 0.6, cx, y + 6.6, cz, TRIM));
-    plain.push(cbox(M.x1 - M.x0 + 1.0, 0.6, M.z1 - M.z0 + 1.0, cx, y + mh - 0.1, cz, TRIM));
-    plain.push(hipRoof(M.x0, M.x1, M.z0, M.z1, y + mh + 0.2, 7, ROOF, 1.2));
-    // corner quoins
-    for (const [qx, qz] of [[M.x0, M.z0], [M.x1, M.z0], [M.x0, M.z1], [M.x1, M.z1]]) for (let k = 0; k < 6; k++) plain.push(cbox(1.1 + (k % 2) * 0.5, 0.9, 1.1 + ((k + 1) % 2) * 0.5, qx, y + 1.6 + k * 1.9, qz, TRIM));
-    // central gable on the front with a gold oculus
-    plain.push(gable(cx - 13, cx + 13, M.z1 - 3, M.z1 + 0.7, y + mh + 0.2, 5.2, WALL, ROOF));
-    plain.push(cbox(26.6, 0.4, 0.5, cx, y + mh + 0.35, M.z1 + 0.6, TRIM));
-    plain.push(ccyl(1.0, 1.0, 0.2, 16, cx, y + mh + 2.3, M.z1 + 0.75, GOLD, Math.PI / 2));
-    glow.push(ccyl(0.7, 0.7, 0.1, 16, cx, y + mh + 2.3, M.z1 + 0.86, '#ffd890', Math.PI / 2));
-    // wings
-    for (const [wx0, wx1] of [[M.x0 - 14, M.x0], [M.x1, M.x1 + 14]]) {
-      const wz0 = M.z0 + 6, wz1 = M.z1 - 8, wcx = (wx0 + wx1) / 2, wcz = (wz0 + wz1) / 2;
-      plain.push(cbox(wx1 - wx0, wingH, wz1 - wz0, wcx, y + wingH / 2, wcz, WALL));
-      plain.push(cbox(wx1 - wx0 + 0.5, 1.0, wz1 - wz0 + 0.5, wcx, y + 0.5, wcz, STONE));
-      plain.push(cbox(wx1 - wx0 + 0.9, 0.5, wz1 - wz0 + 0.9, wcx, y + wingH - 0.1, wcz, TRIM));
-      plain.push(hipRoof(wx0, wx1, wz0, wz1, y + wingH + 0.15, 4.2, ROOF, 1.0));
-      addBox(wx0, wx1, wz0, wz1, y + wingH + 1, { y0: y - 1 });
-      // balcony on the wing front (stone slab, white balustrade)
-      plain.push(cbox(wx1 - wx0 - 2, 0.3, 2, wcx, y + 4.6, wz1 + 1, TRIM));
-      for (let x = wx0 + 1.5; x <= wx1 - 1.5; x += 0.55) plain.push(ccyl(0.07, 0.11, 0.85, 6, x, y + 5.2, wz1 + 1.85, FRAME));
-      plain.push(cbox(wx1 - wx0 - 2, 0.14, 0.22, wcx, y + 5.68, wz1 + 1.85, FRAME));
-      for (let x = wx0 + 2.5; x < wx1 - 1; x += 3.5) for (const fy of [2.4, 6.6]) win(x, y + fy, wz1, 1.5, 2.1, 1);
-      for (let x = wx0 + 2.5; x < wx1 - 1; x += 3.5) for (const fy of [2.4, 6.6]) win(x, y + fy, wz0, 1.5, 2.1, -1);
-      const sx = wx0 < M.x0 ? wx0 : wx1, sd = wx0 < M.x0 ? -1 : 1;
-      for (let z = wz0 + 3; z < wz1 - 1; z += 4) for (const fy of [2.4, 6.6]) win(sx, y + fy, z, 1.5, 2.1, sd, 'x');
-    }
-    // front: colonnade, windows between the columns
-    for (let k = 0; k < 7; k++) {
-      const x = M.x0 + 4 + k * ((M.x1 - M.x0 - 8) / 6);
-      if (Math.abs(x - ISL.lift.x) < 2.5) continue; // keep the lift door free
-      plain.push(ccyl(0.55, 0.65, 9, 14, x, y + 4.5, M.z1 + 2.4, '#ffffff'), cbox(1.5, 0.45, 1.5, x, y + 9.2, M.z1 + 2.4, GOLD), cbox(1.5, 0.4, 1.5, x, y + 0.2, M.z1 + 2.4, TRIM));
-      addCirc(x, M.z1 + 2.4, 0.7, y + 9);
-      for (const fy of [3, 8, 11.3]) {
-        if (fy === 3 && Math.abs(x - ISL.lift.x) < 3) continue;
-        win(x, y + fy, M.z1, 1.8, fy > 10 ? 1.3 : 2.2, 1);
-      }
-    }
-    // back + side windows
-    for (const fy of [3, 8, 11.3]) for (let x = M.x0 + 4; x < M.x1 - 2; x += 6) win(x, y + fy, M.z0, 1.6, fy > 10 ? 1.2 : 2.0, -1);
-    for (const [sx, sd] of [[M.x0, -1], [M.x1, 1]]) for (let z = M.z0 + 4; z < M.z1 - 2; z += 6) for (const fy of [8, 11.3]) win(sx, y + fy, z, 1.6, fy > 10 ? 1.2 : 2.0, sd, 'x');
-    // balcony over the colonnade with a white balustrade
-    plain.push(cbox(M.x1 - M.x0 + 2, 0.6, 5, cx, y + 9.4, M.z1 + 2.4, TRIM));
-    for (let x = M.x0; x <= M.x1; x += 0.55) plain.push(ccyl(0.07, 0.11, 0.85, 6, x, y + 10.15, M.z1 + 4.8, FRAME));
-    plain.push(cbox(M.x1 - M.x0 + 2, 0.14, 0.24, cx, y + 10.65, M.z1 + 4.8, FRAME));
-    // chimneys through the roof + red beacon on the ridge
-    for (const cx2 of [M.x0 + 9, M.x1 - 9]) plain.push(cbox(1.7, 6.5, 1.7, cx2, y + mh + 3.6, M.z0 + 8, '#b9a98e'), cbox(2.1, 0.35, 2.1, cx2, y + mh + 6.9, M.z0 + 8, '#6b5d4a'));
-    glow.push(cbox(0.4, 0.4, 0.4, cx, y + mh + 7.6, cz, '#ff2020'));
-    const winMesh = new THREE.Mesh(merge(wins), winMat);
-    scene.add(winMesh);
-    // grand stairs (low steps, walkable)
-    for (let k = 0; k < 3; k++) plain.push(cbox(26 - k * 3, 0.2 * (k + 1), 2.2, (M.x0 + M.x1) / 2, y + 0.1 * (k + 1), M.z1 + 5.6 - k * 1.1, '#e8e0cf'));
-    plain.push(cbox(M.x1 - M.x0 + 2, 0.3, 6, (M.x0 + M.x1) / 2, y + 0.15, M.z1 + 2.6, '#d8cfbb'));
-    addBox(M.x0, M.x1, M.z0, M.z1, y + mh + 4);
-    // lift door (golden) on the front
+    // ---------- gate court (L2) ----------
+    hall(30, 56, -1257, -1243, L2, 4.2);                 // gate house (roofed passage behind the gate)
+    block(13, 25, -1282, -1244, L2, 5.5);                // building between gate court and garden
+    wallOn(13, 25, -1242, -1242, L2);
+    // ---------- garden (L2, north-west) ----------
+    for (const [x, z, w, d] of [[-22, -1262, 10, 1.4], [-4, -1276, 1.4, 10], [-26, -1290, 8, 1.4], [2, -1254, 8, 1.4]]) { plain.push(cbox(w, 1.5, d, x, L2 + 0.75, z, '#3d6b3a')); addBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2, L2 + 1.5, { y0: L2 - 0.5 }); }
+    line('x', -1300, -36, 25, L2, 3.2, [[-12, -8]], true);       // wall garden | middle court, archway 5
+    // ---------- middle court (L2, west of the villa) ----------
+    hall(3, 16, -1329, -1308, L2); hall(-25, -12, -1312, -1302, L2); hall(-35, -27, -1326, -1302, L2);
+    // ---------- villa on its podium (L3) ----------
+    block(37, 60, -1320, -1296, L3, 8); block(50, 58, -1296, -1292, L3, 4);
     const L = ISL.lift;
-    plain.push(cbox(3.2, 3.6, 0.2, L.x, y + 1.8, M.z1 + 0.12, '#c9a227'));
-    plain.push(cbox(0.08, 3.6, 0.22, L.x, y + 1.8, M.z1 + 0.14, '#3a2a00'));
+    plain.push(cbox(0.2, 3.6, 3.2, 36.9, L3 + 1.8, L.z, '#c9a227'));
     const ls = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.9), new THREE.MeshBasicMaterial({ map: neonSign('▼ AUFZUG', '#ffd700', { size: 90 }), toneMapped: false }));
-    ls.position.set(L.x, y + 4.2, M.z1 + 0.25);
+    ls.position.set(36.75, L3 + 4.2, L.z); ls.rotation.y = -Math.PI / 2;
     scene.add(ls);
     world.signMats.push(ls.material);
-    // gazebo in the back garden
+    // ---------- north-east terrace (L3) ----------
+    hall(68, 100, -1256, -1244, L3); block(80, 90, -1284, -1272, L3, 4.5); block(70, 78, -1296, -1286, L3, 4.5);
+    // ---------- east corridor + east courts (L2) ----------
+    line('x', -1305, 78, E.x1, L2, 3.2, [[95, 100]], true);      // archway 1 (at the foot of stairs 7)
+    line('z', 78, -1345, -1305, L2, 3.2, [[-1323, -1319]], true); // archway 2 corridor ↔ east court
+    line('x', -1345, 78, E.x1, L2, 3.2, [[82, 86]], true);       // archway 3 east court ↔ south-east court
+    line('z', 78, E.z0, -1345, L2, 3.2);
+    hall(104, 118, -1318, -1307, L2); hall(92, 104, -1336, -1322, L2); hall(80, 90, -1326, -1311, L2);
+    // ---------- U-shaped hall above the pool (L2) ----------
+    hall(60, 77, -1369, -1329, L2); hall(47, 60, -1336, -1330, L2); hall(47, 60, -1368, -1362, L2);
+    plain.push(cbox(0.9, 1.0, 7, 46, L2 + 3.4, -1333.5, '#e8c66a'));                      // archway 4 over stairs 5
+    plain.push(cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1337, WALLC), cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1330, WALLC));
+    plain.push(cbox(0.9, 1.0, 7, 46, L2 + 3.4, -1364.5, '#e8c66a'));                      // archway 6 over stairs 6
+    plain.push(cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1368, WALLC), cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1361, WALLC));
+    // ---------- pool terrace (L1) ----------
     {
-      const gx = 40, gz = -1378;
-      plain.push(ccyl(3.6, 3.6, 0.3, 8, gx, y + 0.15, gz, '#e8e0cf'));
-      for (let a = 0; a < 8; a++) { const x = gx + Math.cos(a * Math.PI / 4) * 3.2, z = gz + Math.sin(a * Math.PI / 4) * 3.2; plain.push(ccyl(0.15, 0.15, 3, 6, x, y + 1.8, z, '#ffffff')); addCirc(x, z, 0.2, y + 3, y - 1); }
-      plain.push(ccyl(0.3, 4.2, 1.6, 8, gx, y + 4.1, gz, '#b03a2e'));
+      const px0 = -14, px1 = 10, pz0 = -1376, pz1 = -1356;
+      plain.push(cbox(px1 - px0 + 2, 0.25, pz1 - pz0 + 2, (px0 + px1) / 2, L1 + 0.12, (pz0 + pz1) / 2, '#e6e2d8'));
+      const pool = new THREE.Mesh(new THREE.BoxGeometry(px1 - px0, 0.1, pz1 - pz0), new THREE.MeshStandardMaterial({ color: '#2fb6d8', roughness: 0.05, metalness: 0.2, emissive: '#06303c' }));
+      pool.position.set((px0 + px1) / 2, L1 + 0.27, (pz0 + pz1) / 2);
+      scene.add(pool);
+      addBox(px0, px1, pz0, pz1, L1 + 0.4, { y0: L1 - 1 });
     }
+    hall(17, 25, -1341, -1333, L1);
+    // ---------- west strip (L1): garage hall, hall in the north ----------
+    hall(-58, -46, -1380, -1346, L1, 4); hall(-58, -44, -1275, -1250, L1, 4);
+    plain.push(cbox(12, 0.05, 34, -52, L1 + 0.07, -1363, '#5a5d62'));
+    out.garageCars = [{ type: 'ferrari', x: -52, z: -1356, h: 0, color: '#111111' }, { type: 'rs6', x: -52, z: -1368, h: 0, color: '#d4af37' }];
+    out.towers = [];
     out.estateY = y;
-    // fixed patrol routes (closed loops or there-and-back); nobody stands in the forecourt right behind the gate.
-    // All lines keep clear of walls, hedges, statues, columns and palms.
+    out.levels = { L1, L2, L3 };
+    // fixed patrol routes, each on one level (see the sketch: 9 guards + guards under the roofs)
     const loop = (x0, x1, z0, z1, start = 0) => { const P = [[x0, z1], [x1, z1], [x1, z0], [x0, z0]]; return P.slice(start).concat(P.slice(0, start)); };
     out.sentryPosts = [
-      loop(24, 56, -1316, -1284), loop(24, 56, -1316, -1284, 2),     // fountain court, two guards opposite each other
-      loop(-38, -10, -1306, -1280),                                    // round the garage
-      loop(78, 112, -1308, -1281),                                     // round the pool
-      loop(96, 112, -1364, -1320), loop(-28, -12, -1364, -1320),       // east / west of the mansion
-      loop(-10, 96, -1394, -1373), loop(-10, 96, -1394, -1373, 2),     // behind the mansion
-      [[-50, -1280], [-50, -1326]], [[-43, -1344], [-43, -1394]],      // west strip, guest house
-      [[0, -1318], [18, -1318]], [[66, -1318], [84, -1318]],           // in front of the mansion
-      [[100, -1376], [114, -1376]],                                    // pavilion
+      [[30, -1276], [54, -1276]],                                      // gate court (not right behind the gate)
+      loop(-30, 6, -1294, -1248),                                      // garden
+      [[70, -1264], [116, -1264]], [[96, -1270], [96, -1292]],         // north-east terrace
+      [[71, -1302], [71, -1326]],                                      // east corridor
+      [[108, -1322], [108, -1342]], [[85, -1309], [85, -1342]],        // east court
+      [[84, -1356], [114, -1356]],                                     // south-east court
+      [[50, -1352], [72, -1352]],                                      // under the U-hall
+      [[-22, -1323], [20, -1323]],                                     // middle court
+      [[33.5, -1294], [33.5, -1320]], [[40, -1322], [60, -1322]],      // villa podium (lift side, south side)
+      loop(-30, 30, -1392, -1346),                                     // round the pool
+      [[-52, -1290], [-52, -1328]], [[-42, -1348], [-42, -1380]],      // west strip, garage
     ];
   }
   // ---- helipad + helicopter ----

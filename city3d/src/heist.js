@@ -546,7 +546,7 @@ export function installFinale(Missions) {
     // Radj's jeep at the airstrip + the rally bike in the courtyard
     const jp = new Vehicle(this.scene, 'jeep', ISL.strip.x1 - 4, ISL.strip.z1 + 8, Math.PI / 2, '#111111');
     jp.parked = true; jp.keep = true;
-    const bk = new Vehicle(this.scene, 'bike', -6, -1296, Math.PI, '#e74c3c');
+    const bk = new Vehicle(this.scene, 'bike', -42, -1340, Math.PI, '#e74c3c');
     bk.parked = true; bk.keep = true;
     G.vehicles.push(jp, bk);
     j.vehs.push(jp, bk);
@@ -678,7 +678,7 @@ export function installFinale(Missions) {
         j.stage = 'cellar';
         this.coupTarget(ISL.glass.x, ISL.glass.z, '#ffd700');
       } else {
-        G.player.pos.set(ISL.lift.x, this.isl.estateY + 0.1, ISL.lift.z + 3);
+        G.player.pos.set(ISL.lift.x - 1, groundAt(ISL.lift.x - 1, ISL.lift.z + 3, 1e9) + 0.1, ISL.lift.z + 3);
         this.startEscape();
       }
     }, 1800);
