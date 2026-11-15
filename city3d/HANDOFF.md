@@ -262,3 +262,6 @@ Dildi City (Quellcode):
   Bogentür ins Büro (Schreibtisch, Stuhl, Regal, Deckenlampe `officeLight`), darin die goldene Fahrstuhltür (`lift`).
   `userData`: floorY, stairs, balcony, office, door, lift (lokale Koordinaten) – für Höhenabfrage/Kollision/Fahrstuhl-Logik im Spiel.
   Im Spiel muss der Fahrstuhl (bisher Westwand außen) ins Büro umziehen.
+- **`entwurf/anwesen.js`**: das ganze Anwesen als EIN three.js-Modul (mediterran.js + Lageplan aus preview_anwesen.js),
+  `anwesen({ground})` → THREE.Group. `entwurf/anwesen_demo.html` zeigt es mit three aus dem CDN. Wird aus den beiden Quellen erzeugt –
+  bei Änderungen dort neu zusammensetzen.

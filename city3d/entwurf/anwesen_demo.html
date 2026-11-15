@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Anwesen Demo</title></head>
+<body style="margin:0;overflow:hidden">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/":"https://cdn.jsdelivr.net/npm/three@0.170.0/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { anwesen } from './anwesen.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.setPixelRatio(Math.min(devicePixelRatio, 2));
+r.toneMapping = THREE.ACESFilmicToneMapping; r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color('#9fc4e8');
+s.add(new THREE.HemisphereLight('#bcd7ff', '#6b5a40', 1.1));
+const sun = new THREE.DirectionalLight('#fff1d6', 3.2); sun.position.set(-30, 50, 40); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 55, bottom: -55, far: 160 }); sun.shadow.normalBias = 0.03; s.add(sun);
+s.add(anwesen({ ground: true }));
+const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.3, 600); cam.position.set(-6, 34, 62);
+const oc = new OrbitControls(cam, r.domElement); oc.target.set(2, 2, 0);
+addEventListener('resize', () => { r.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+r.setAnimationLoop(() => { oc.update(); r.render(s, cam); });
+window.ready = true;
+</script></body></html>
