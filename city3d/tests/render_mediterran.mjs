@@ -13,7 +13,7 @@ const errs = []; pg.on('pageerror', (e) => errs.push(e.message)); pg.on('console
 await pg.goto('file://' + fs.realpathSync(out) + '/med_preview.html');
 await pg.waitForFunction('window.ready', null, { timeout: 120000 });
 console.log(JSON.stringify(await pg.evaluate('window.info')), errs);
-const views = { gesamt: [-6, 14, 34, 2, 2, -2], torbogen: [-9, 3.2, 17, -13, 3.5, 6], bogengang: [6, 3, 10, 2, 3, -4], pavillon: [6, 5, 16, 14, 4, 4], innen: [9, 1.7, -3.7, -4, 2.4, -4.4], pultdach: [-4, 4, 6, -12, 2.5, -6] };
+const views = { gesamt: [-6, 14, 34, 2, 2, -2], torbogen: [-9, 3.2, 17, -13, 3.5, 6], bogengang: [6, 3, 10, 2, 3, -4], pavillon: [6, 5, 16, 14, 4, 4], innen: [9, 1.7, -3.7, -4, 2.4, -4.4], pultdach: [-4, 4, 6, -12, 2.5, -6], set2: [60, 11, 27, 60, 1.5, 0], zwischen: [58.5, 2.2, 5, 60, 3.6, -5.3], treppe: [54.5, 2.6, 13, 50, 1.3, 5.5], gelaender: [61, 1.8, 3.6, 67, 0.5, 0], pool: [70.5, 4.2, 10.5, 66, -0.3, 5], pooloben: [66, 9, 5.01, 66, 0, 5] };
 const want = process.argv.slice(3);
 for (const [k, v] of Object.entries(views)) {
   if (want.length && !want.includes(k)) continue;

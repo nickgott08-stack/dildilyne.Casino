@@ -244,4 +244,8 @@ Dildi City (Quellcode):
   Extrude-Formen mit Bogenstein-Ring + Schlussstein, Gesimse, Balustraden (gedrechselte Baluster), toskanische Säulen, Walmdach.
   Pro Bauteil ein Mesh pro Material (4–6 Draw-Calls), `userData.colliders` = Grundriss-Kästen. Alles zusammen ~65k Dreiecke.
 - Vorschau: `PW=$(npm root -g)/playwright node tests/render_mediterran.mjs <ordner>` → `med_*.png`.
+- Zweite Runde (Nicks Skizze): `torbogenZwischen(gap)` (ohne Tor/Pilaster, füllt die Lücke zwischen zwei Häusern), `hausblock()`,
+  `treppe()` (Terrakotta-Stufen, Wangen, Pfosten mit Kugel; `userData.stairs` für die Höhenabfrage), `gelaender({len, hedge})`,
+  `hecke()`, `pool()` (Form aus Nicks Zeichnung, 5,0 × 3,9 m mit Steinrand; `depth > 0` braucht ein Loch im Boden in Form von
+  `poolOutline(0.3)`, `depth: 0` = flach aufliegend).
 - Offen: wo im Spiel (Nick fragen), dann einbauen + Kollision über `addBox`.

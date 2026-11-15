@@ -166,6 +166,40 @@ function floorTex() {
   return { map: tex(map, true), normalMap: tex(normalCanvas(hf, S, 4.0)) };
 }
 
+// Buchsbaum-Hecke: dichtes kleines Laub (1 Kachel = 1 m)
+function hedgeTex() {
+  const S = 256, a = noiseField(S, 51, 3, 32), b = noiseField(S, 52, 4, 4);
+  const hf = new Float32Array(S * S);
+  for (let i = 0; i < hf.length; i++) hf[i] = a[i];
+  const map = paint(S, hf, (x, y) => {
+    const i = y * S + x, k = cl((a[i] - 0.3) * 2.2), l = 0.8 + b[i] * 0.4;
+    return [mix(22, 86, k) * l, mix(44, 128, k) * l, mix(18, 52, k) * l];
+  });
+  return { map: tex(map, true), normalMap: tex(normalCanvas(hf, S, 5.0)) };
+}
+// Pool-Mosaik: 16×16 kleine blaue Fliesen (1 Kachel = 1,6 m)
+function mosaicTex() {
+  const S = 512, N = 16, n = noiseField(S, 61, 3, 8), R = rng(62), tint = [];
+  for (let i = 0; i < N * N; i++) tint.push([R(), 0.85 + R() * 0.3]);
+  const hf = new Float32Array(S * S);
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const fx = (x / S) * N % 1, fy = (y / S) * N % 1;
+      hf[y * S + x] = Math.min(fx, 1 - fx, fy, 1 - fy) < 0.07 ? 0 : 0.7;
+    }
+  const map = paint(S, hf, (x, y, h) => {
+    if (h === 0) return [214, 226, 228];
+    const t = tint[Math.floor((y / S) * N) * N + Math.floor((x / S) * N)], k = t[1] * (0.95 + n[y * S + x] * 0.1);
+    return [mix(40, 96, t[0]) * k, mix(132, 186, t[0]) * k, mix(190, 222, t[0]) * k];
+  });
+  return { map: tex(map, true), normalMap: tex(normalCanvas(hf, S, 2.0)) };
+}
+function waterNormal() {
+  const S = 256, t = tex(normalCanvas(noiseField(S, 71, 4, 6), S, 6.0));
+  t.repeat.set(0.5, 0.5);
+  return t;
+}
+
 export function mediterranMats() {
   if (_mats) return _mats;
   const st = stuccoTex(), sn = stoneTex(), rf = roofTex(), fl = floorTex();
@@ -177,7 +211,12 @@ export function mediterranMats() {
     floor: m(fl, 0.85, 0.6),
     iron: new THREE.MeshStandardMaterial({ color: '#1d1b19', roughness: 0.55, metalness: 0.6 }),
     wood: new THREE.MeshStandardMaterial({ color: '#5a3a22', roughness: 0.7 }),
+    chrome: new THREE.MeshStandardMaterial({ color: '#cfd4d8', roughness: 0.25, metalness: 0.7 }),
   };
+  const hg = hedgeTex(), mo = mosaicTex(), wa = waterNormal();
+  _mats.hedge = m(hg, 0.95, 1.2);
+  _mats.mosaic = m(mo, 0.35, 0.4);
+  _mats.water = new THREE.MeshStandardMaterial({ color: '#4cc3d8', transparent: true, opacity: 0.62, roughness: 0.06, metalness: 0.1, normalMap: wa, normalScale: new THREE.Vector2(0.35, 0.35), depthWrite: false });
   return _mats;
 }
 
@@ -405,17 +444,18 @@ function finish(parts, name) {
     });
     const mesh = new THREE.Mesh(mergeGeometries(list, false), M[k]);
     mesh.castShadow = mesh.receiveShadow = true;
+    if (k === 'water') { mesh.castShadow = false; mesh.renderOrder = 2; }
     mesh.name = name + '_' + k;
     grp.add(mesh);
   }
   return grp;
 }
-const P = () => ({ stucco: [], stone: [], roof: [], floor: [], iron: [], wood: [] });
+const P = () => ({ stucco: [], stone: [], roof: [], floor: [], iron: [], wood: [], hedge: [], mosaic: [], chrome: [], water: [] });
 
 // ---------------------------------------------------------------- 1) Torbogen
 // freistehendes Tor: zwei Pfeiler, großer Rundbogen, Gesims und Ziegelabdeckung, optional schmiedeeisernes Tor
 export function torbogen(opts = {}) {
-  const o = { w: 3.6, spring: 3.4, pier: 1.5, t: 0.9, gate: true, ...opts };
+  const o = { w: 3.6, spring: 3.4, pier: 1.5, t: 0.9, gate: true, ends: true, ...opts }; // ends:false = steht zwischen zwei Gebäuden (keine Eck-Pilaster/Kugeln)
   const P_ = P(), r = o.w / 2, L = o.w + 2 * o.pier, H = o.spring + r + 1.3, x0 = -L / 2;
   const wall = archWall(L, H, o.t, [{ c: L / 2, w: o.w, s: o.spring }]);
   wall.translate(x0, 0, 0);
@@ -426,6 +466,7 @@ export function torbogen(opts = {}) {
     const px = s * (r + o.pier / 2);
     P_.stone.push(box(o.pier + 0.1, 0.16, o.t + 0.14, px, o.spring - 0.08, 0, 2));
     P_.stone.push(box(o.pier + 0.12, 0.5, o.t + 0.16, px, 0.25, 0, 2));
+    if (!o.ends) continue;
     // Pilaster an den Außenkanten
     P_.stone.push(box(0.4, H - 1.0, o.t + 0.1, s * (L / 2 - 0.2), (H - 1.0) / 2 + 0.5, 0, 2));
     // Pfeiler-Aufsatz mit Kugel
@@ -435,7 +476,7 @@ export function torbogen(opts = {}) {
   }
   const c = cornice(L, CORNICE, o.t); c.translate(x0, H - 0.34, 0); P_.stone.push(c);
   // Ziegelabdeckung (Satteldach-Kappe)
-  hipRoof(x0 - 0.2, -x0 + 0.2, -o.t / 2 - 0.32, o.t / 2 + 0.32, H + 0.02, 0.5, P_.roof, P_.stone);
+  { const e = o.ends ? 0.2 : 0.85; hipRoof(x0 - e, -x0 + e, -o.t / 2 - 0.32, o.t / 2 + 0.32, H + 0.02, 0.5, P_.roof, P_.stone); } // ohne Enden: Walm steckt in den Nachbarhäusern
   // Tor: zwei Flügel aus Stäben mit Rundbogen-Abschluss
   if (o.gate) {
     const bars = Math.round(o.w / 0.13);
@@ -624,4 +665,193 @@ export function zypresse(h = 7) {
   tr.position.y = 0.4;
   g.add(m, tr);
   return g;
+}
+
+// ---------------------------------------------------------------- 4) Torbogen zwischen zwei Gebäuden
+// ohne Tor/Zaun, ohne Eck-Pilaster; gap = Abstand der beiden Hauswände (Bogen füllt ihn ganz aus)
+export function torbogenZwischen(gap = 5.4, opts = {}) {
+  const w = Math.min(3.6, gap - 1.2);
+  const g = torbogen({ w, pier: (gap - w) / 2, gate: false, ends: false, spring: 3.2, t: 0.8, ...opts });
+  g.name = 'torbogenZwischen';
+  return g;
+}
+// schlichter Hausblock im gleichen Stil (für Vorschau / als Nachbarhaus): Putz, Sockel, Gesims, Walmdach, Bogenfenster vorne
+export function hausblock(w = 8, h = 6.5, d = 7) {
+  const P_ = P();
+  P_.stucco.push(box(w, h, d, 0, h / 2, 0, 4));
+  P_.stone.push(box(w + 0.16, 0.5, d + 0.16, 0, 0.25, 0, 2), box(w + 0.3, 0.3, d + 0.3, 0, h - 0.15, 0, 2), box(w + 0.12, 0.14, d + 0.12, 0, h * 0.5, 0, 2));
+  const n = Math.max(1, Math.floor(w / 2.6));
+  for (let fl = 0; fl < 2; fl++)
+    for (let i = 0; i < n; i++) {
+      const cx = -w / 2 + (i + 0.5) * (w / n), y0 = fl ? h * 0.5 + 0.8 : 1.0, s = y0 + 1.1;
+      const pane = new THREE.PlaneGeometry(0.9, 1.1); pane.translate(cx, y0 + 0.55, d / 2 + 0.02); P_.iron.push(pane);
+      const top = new THREE.CircleGeometry(0.45, 12, 0, PI); top.translate(cx, s, d / 2 + 0.02); P_.iron.push(top);
+      const ring = archRing(cx, s, 0.45, 0.12, 0.1); ring.translate(0, 0, d / 2 + 0.05); P_.stone.push(ring);
+      P_.stone.push(box(1.15, 0.08, 0.2, cx, y0 - 0.04, d / 2 + 0.06, 2));
+    }
+  hipRoof(-w / 2 - 0.6, w / 2 + 0.6, -d / 2 - 0.6, d / 2 + 0.6, h, 0.42, P_.roof, P_.stone);
+  const grp = finish(P_, 'hausblock');
+  grp.userData.colliders = [{ x: 0, z: 0, w, d }];
+  return grp;
+}
+
+// ---------------------------------------------------------------- 5) Treppe
+// Steigt von vorne (+z, Boden) nach hinten (−z) an. Terrakotta-Stufen mit Travertin-Kante,
+// seitlich verputzte Wangen mit Stein-Abdeckung und Pfosten mit Kugel.
+// userData.stairs = {w, steps, rise, run} (für die Höhenabfrage im Spiel)
+export function treppe(opts = {}) {
+  const o = { w: 2.4, steps: 8, rise: 0.165, run: 0.32, wangen: true, ...opts };
+  const P_ = P(), T = o.steps * o.run, Ht = o.steps * o.rise;
+  for (let i = 0; i < o.steps; i++) {
+    const y = (i + 1) * o.rise, zc = -(i + 0.5) * o.run;
+    P_.stucco.push(box(o.w, y - 0.05, o.run, 0, (y - 0.05) / 2, zc, 4));
+    const tr = box(o.w, 0.05, o.run - 0.05, 0, y - 0.025, zc - 0.025, 2); P_.floor.push(tr);
+    P_.stone.push(box(o.w, 0.065, 0.1, 0, y - 0.0325 + 0.004, zc + o.run / 2 - 0.02, 2)); // Stufenkante mit 3 cm Überstand
+  }
+  if (o.wangen) {
+    const th = 0.32, rh = 0.8, sl = Math.atan2(Ht, T), len = Math.hypot(T, Ht);
+    for (const sd of [-1, 1]) {
+      const x = sd * (o.w / 2 + th / 2);
+      const sh = new THREE.Shape();
+      sh.moveTo(0, 0); sh.lineTo(T, 0); sh.lineTo(T, Ht + rh); sh.lineTo(0, rh); sh.lineTo(0, 0);
+      const g = scaleUV(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), 4);
+      g.rotateY(PI / 2); g.translate(x - th / 2, 0, 0);
+      P_.stucco.push(g);
+      const cap = box(th + 0.12, 0.1, len + 0.1, 0, 0, 0, 2); cap.rotateX(sl); cap.translate(x, rh + Ht / 2 + 0.05 / Math.cos(sl), -T / 2);
+      P_.stone.push(cap);
+      // Pfosten unten und oben
+      for (const [z, y0] of [[0.22, 0], [-T - 0.22, Ht]]) {
+        P_.stucco.push(box(0.46, y0 + 1.05, 0.46, x, (y0 + 1.05) / 2, z, 4));
+        P_.stone.push(box(0.58, 0.1, 0.58, x, y0 + 1.1, z, 2), box(0.54, 0.3, 0.54, x, 0.15, z, 2));
+        const ball = new THREE.SphereGeometry(0.2, 12, 8); scaleUV(ball, 1); ball.translate(x, y0 + 1.33, z); P_.stone.push(ball);
+      }
+    }
+  }
+  const grp = finish(P_, 'treppe');
+  grp.userData.stairs = { w: o.w, steps: o.steps, rise: o.rise, run: o.run, height: Ht, length: T };
+  grp.userData.colliders = o.wangen ? [-1, 1].map((sd) => ({ x: sd * (o.w / 2 + 0.16), z: -T / 2, w: 0.32, d: T + 0.9 })) : [];
+  return grp;
+}
+
+// ---------------------------------------------------------------- 6) Geländer + Hecke
+// Hecke (Buchsbaum, geschnitten): Länge entlang x, leicht unregelmäßig, runde Kanten
+export function heckeGeo(len, h = 0.9, d = 0.7, x = 0, z = 0, y = 0) {
+  const g = box(len, h, d, 0, h / 2, 0, 1);
+  const sx = Math.max(2, Math.round(len / 0.25)), sy = 4, sz = 3;
+  const b = new THREE.BoxGeometry(len, h, d, sx, sy, sz); b.translate(0, h / 2, 0);
+  const p = b.attributes.position, nrm = b.attributes.normal, uv = b.attributes.uv, rr = Math.min(d, h) * 0.32;
+  for (let i = 0; i < p.count; i++) {
+    let px = p.getX(i), py = p.getY(i), pz = p.getZ(i);
+    const nx0 = nrm.getX(i), ny0 = nrm.getY(i);
+    uv.setXY(i, Math.abs(ny0) > 0.5 ? px : Math.abs(nx0) > 0.5 ? pz : px, Math.abs(ny0) > 0.5 ? pz : py);
+    // Kern-Punkt (für runde Kanten): alles liegt rr vom Kern entfernt
+    const cx = Math.max(-len / 2 + rr, Math.min(len / 2 - rr, px)), cy = Math.max(0, Math.min(h - rr, py)), cz = Math.max(-d / 2 + rr, Math.min(d / 2 - rr, pz));
+    let nx = px - cx, ny = py - cy, nz = pz - cz;
+    const l = Math.hypot(nx, ny, nz) || 1;
+    nx /= l; ny /= l; nz /= l;
+    const j = Math.sin(px * 12.9 + py * 7.3 + pz * 9.1) * Math.cos(px * 3.7 - pz * 5.3 + py * 4.1) * 0.035; // gleiche Verschiebung für doppelte Eckpunkte
+    const k = py < 0.01 ? 0 : 1;
+    p.setXYZ(i, cx + nx * (rr + j) * (l > 0.001 ? 1 : 0) + (l > 0.001 ? 0 : 0), cy + ny * (rr + j) * k, cz + nz * (rr + j));
+    if (l > 0.001) nrm.setXYZ(i, nx, ny, nz);
+  }
+  b.translate(x, y, z);
+  g.dispose();
+  return b.toNonIndexed();
+}
+// Geländer: Steinbalustrade mit Pfosten alle ~2,4 m auf niedrigem Sockel.
+// hedge: 0 = keine, 1 = Hecke davor (+z), -1 = dahinter
+export function gelaender(opts = {}) {
+  const o = { len: 6, post: 2.4, hedge: 0, hedgeH: 0.85, ...opts };
+  const P_ = P(), n = Math.max(1, Math.round(o.len / o.post)), seg = o.len / n, x0 = -o.len / 2;
+  for (let i = 0; i <= n; i++) {
+    const x = x0 + i * seg;
+    P_.stone.push(box(0.36, 1.08, 0.4, x, 0.54, 0, 2), box(0.46, 0.08, 0.5, x, 1.12, 0, 2), box(0.42, 0.16, 0.46, x, 0.08, 0, 2));
+    if (i < n) balustrade(x + 0.18, x + seg - 0.18, 0, 0, P_.stone);
+  }
+  if (o.hedge) P_.hedge.push(heckeGeo(o.len - 0.2, o.hedgeH, 0.7, 0, o.hedge * 0.62));
+  const grp = finish(P_, 'gelaender');
+  grp.userData.colliders = [{ x: 0, z: o.hedge ? o.hedge * 0.3 : 0, w: o.len, d: o.hedge ? 1.0 : 0.4 }];
+  return grp;
+}
+export function hecke(len = 4, h = 0.9, d = 0.7) {
+  const P_ = P();
+  P_.hedge.push(heckeGeo(len, h, d));
+  const grp = finish(P_, 'hecke');
+  grp.userData.colliders = [{ x: 0, z: 0, w: len, d }];
+  return grp;
+}
+
+// ---------------------------------------------------------------- 7) Pool (Nicks Skizze, passt in 5 × 5 m)
+// Umriss aus der Zeichnung: kleines Becken links, großes rundes rechts, eckig gezeichnet. Mit Steinrand 5,0 × 3,9 m.
+const POOL_PX = [[415, 1320], [450, 1265], [585, 1185], [660, 1200], [750, 1155], [750, 1070], [880, 970], [960, 975], [1035, 1060], [1030, 1200],
+  [990, 1320], [870, 1425], [820, 1430], [790, 1410], [715, 1395], [600, 1430], [475, 1415]];
+const POOL_RIM = 0.3;
+function offsetPoly(pts, d) {
+  let area = 0;
+  for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; area += a[0] * b[1] - b[0] * a[1]; }
+  const sg = area > 0 ? 1 : -1, out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[(i - 1 + pts.length) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
+    const n1 = [(b[1] - a[1]), -(b[0] - a[0])], n2 = [(c[1] - b[1]), -(c[0] - b[0])];
+    const l1 = Math.hypot(...n1), l2 = Math.hypot(...n2);
+    n1[0] *= sg / l1; n1[1] *= sg / l1; n2[0] *= sg / l2; n2[1] *= sg / l2;
+    let mx = n1[0] + n2[0], mz = n1[1] + n2[1];
+    const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+    const k = Math.min(2.2, 1 / Math.max(0.3, mx * n1[0] + mz * n1[1]));
+    out.push([b[0] + mx * d * k, b[1] + mz * d * k]);
+  }
+  return out;
+}
+// Umriss in Metern [[x, z], …], Mitte = 0/0. off = Abstand nach außen (0 = Wasserkante, POOL_RIM = Außenkante Steinrand)
+export function poolOutline(off = 0, size = 5) {
+  const k = (size - 2 * POOL_RIM) / 620;
+  const pts = POOL_PX.map(([x, y]) => [(x - 725) * k, (y - 1200) * k]);
+  return off ? offsetPoly(pts, off) : pts;
+}
+// depth > 0: echtes Becken unter y = 0 (der Boden braucht dort ein Loch in Form von poolOutline(0.3));
+// depth = 0: flach auf dem Boden (Wasser 8 cm über Grund) – für Stellen, wo kein Loch möglich ist.
+export function pool(opts = {}) {
+  const o = { size: 5, depth: 1.3, ladder: true, ...opts };
+  const P_ = P(), inner = poolOutline(0, o.size), outer = poolOutline(POOL_RIM, o.size);
+  const shapeOf = (pts) => new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+  const flat = (pts, y, tile) => { const g = new THREE.ShapeGeometry(shapeOf(pts)); scaleUV(g, tile); g.rotateX(-PI / 2); g.translate(0, y, 0); return g; };
+  const sunk = o.depth > 0, rimTop = sunk ? 0.07 : 0.16, floorY = sunk ? -o.depth : 0.02, waterY = sunk ? -0.08 : 0.1;
+  // Steinrand
+  const rs = shapeOf(outer); rs.holes.push(new THREE.Path(inner.map(([x, z]) => new THREE.Vector2(x, -z))));
+  const rim = scaleUV(new THREE.ExtrudeGeometry(rs, { depth: sunk ? 0.2 : rimTop, bevelEnabled: false }), 2);
+  rim.rotateX(-PI / 2); rim.translate(0, sunk ? rimTop - 0.2 : 0, 0);
+  P_.stone.push(rim);
+  P_.mosaic.push(flat(inner, floorY, 1.6));
+  if (sunk) {
+    let u = 0;
+    const pos = [], uv = [];
+    for (let i = 0; i < inner.length; i++) {
+      const a = inner[i], b = inner[(i + 1) % inner.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const q = [[a, 0, u], [b, 0, u + l], [b, -o.depth, u + l], [a, 0, u], [b, -o.depth, u + l], [a, -o.depth, u]];
+      for (const [pt, y, uu] of q) { pos.push(pt[0], y, pt[1]); uv.push(uu / 1.6, y / 1.6); }
+      u += l;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.computeVertexNormals();
+    // Wände sollen nach innen zeigen
+    const n = g.attributes.normal, c0 = inner[0], c1 = inner[1], mid = [(c0[0] + c1[0]) / 2, (c0[1] + c1[1]) / 2];
+    if (n.getX(0) * -mid[0] + n.getZ(0) * -mid[1] < 0) flip(g);
+    P_.mosaic.push(g);
+  }
+  P_.water.push(flat(inner, waterY, 1));
+  if (o.ladder) {
+    // Einstiegsleiter an der rechten Kante
+    const a = inner[8], b = inner[9], mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+    for (const dz of [-0.25, 0.25]) {
+      const t = new THREE.TorusGeometry(0.3, 0.022, 6, 14, PI); t.translate(mx + 0.05, rimTop + 0.35, mz + dz); P_.chrome.push(t);
+      for (const dx of [-0.3, 0.3]) { const c = new THREE.CylinderGeometry(0.022, 0.022, dx < 0 ? 0.35 + 0.9 * (sunk ? 1 : 0) : 0.35, 6); c.translate(mx + 0.05 + dx, rimTop + 0.175 - (dx < 0 && sunk ? 0.45 : 0), mz + dz); P_.chrome.push(c); }
+    }
+    if (sunk) for (let i = 0; i < 3; i++) { const st = new THREE.CylinderGeometry(0.02, 0.02, 0.5, 6); st.rotateX(PI / 2); st.translate(mx - 0.25, -0.2 - i * 0.28, mz); P_.chrome.push(st); }
+  }
+  const grp = finish(P_, 'pool');
+  grp.userData.outline = outer;
+  grp.userData.water = inner;
+  return grp;
 }
