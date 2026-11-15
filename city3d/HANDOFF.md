@@ -199,3 +199,9 @@ Dildi City (Quellcode):
   Gebäude südlich der Straße werden mit `facingNorth()` an z gespiegelt (Front zur Straße). Deko ohne Zufahrt: Wasserturm, Funkmast,
   Solarpark, Park mit DILDI-Buchstaben, Plakate. Skatepark entfernt. Positionen in `KREUZ_EXTRAS`.
 - **Nicht getestet** (Nick testet selbst, Tokens sparen) – nur gebaut.
+
+## Kreisel-Tempo, iPad-Tasten, Jeeps (15.11.)
+- OutDriver (ai.js): vor einem Kreisverkehr abbremsen (`endsAtRing`, letzte ~14 Punkte), im Ring max. 6,5 m/s, nach der Ausfahrt kurz max. 7,5.
+- Tablets: Tasten unten rechts (`.tb.foot/.car/.plane`) per `zoom:1.4` größer (template.html, gleiche Media-Query wie der Joystick).
+- Jeeps fahren nicht mehr im normalen Verkehr (Stadt + außen), nur noch Radj-Missionen/Insel (heist.js).
+- Nicht getestet (Nick testet selbst).
