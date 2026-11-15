@@ -209,12 +209,10 @@ function serviceRoutes() {
   const bus = buildRoute([
     ['Kaistraße Ost', null, null],                   // east to the airport
     ['Wendeschleife Flughafen', null, null],         // turn
-    ['Kaistraße Ost', [191, -560], [19, -560]],      // back west
-    ['Hafenkreisel', [17, -560], [0, -577]],         // east arm → south arm
+    ['Kaistraße Ost', [191, -560], [5.5, -560]],     // back west to the crossing, turn left
     ['Brückenstraße Süd', null, null],               // south to the roundabout at the end
     ['Kreisverkehr', null, null],
-    ['Brückenstraße Süd', [0, -610], [0, -579]],     // back north
-    ['Hafenkreisel', [0, -577], [17, -560]],         // south arm → east arm (once round)
+    ['Brückenstraße Süd', [0, -610], [0, -565.5]],   // back north to the crossing, turn right
   ]);
   const truck = buildRoute([
     ['Kaistraße West', [-60, -560], [-215, -560]],   // west along the quay

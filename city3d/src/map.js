@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { world, BOUND, NB, roadC, RW, H } from './world.js';
 import { DOCKS, AIRPORT } from './outskirts.js';
-import { LAKE, RUNWAY, ISLAND, COAST_Z, WORLD, WALL_OUT, ROADS, DESERTS, terrainH, slopeAt, RADJ, radjE, KREISEL, WENDE, HAFENKREISEL, DILDI_KREISEL } from './geo.js';
+import { LAKE, RUNWAY, ISLAND, COAST_Z, WORLD, WALL_OUT, ROADS, DESERTS, terrainH, slopeAt, RADJ, radjE, KREISEL, WENDE } from './geo.js';
 import { ISL } from './radj.js';
 import { clamp, angleWrap, canvasTex } from './util.js';
 
@@ -94,7 +94,7 @@ export function buildMapCanvas() {
   }
   // roundabout centre island
   {
-    for (const K of [KREISEL, WENDE, HAFENKREISEL, DILDI_KREISEL]) {
+    for (const K of [KREISEL, WENDE]) {
       const [kx, ky] = toMap(K.x, K.z);
       ctx.fillStyle = '#5c9e4a';
       ctx.beginPath();
