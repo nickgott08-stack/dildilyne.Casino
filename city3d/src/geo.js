@@ -296,7 +296,7 @@ export const RADJ = { x: 0, z: -1225, rx: 255, rz: 205 };
 export const RADJ_CELLAR = { x0: 300, x1: 332, z0: -1252, z1: -1208, y: -40 };
 export function radjE(x, z) { const ex = (x - RADJ.x) / RADJ.rx, ez = (z - RADJ.z) / RADJ.rz; return ex * ex + ez * ez; }
 export const RADJ_STRIP = { x0: -140, x1: 74, z0: -1092, z1: -1066 };
-export const RADJ_ESTATE = { x0: -40, x1: 120, z0: -1400, z1: -1270 };
+export const RADJ_ESTATE = { x0: -60, x1: 120, z0: -1400, z1: -1240 }; // enlarged 15.11.: forecourt in the north, guest house strip in the west
 export function radjGround(x, z) {
   if (x > RADJ_CELLAR.x0 && x < RADJ_CELLAR.x1 && z > RADJ_CELLAR.z0 && z < RADJ_CELLAR.z1) return RADJ_CELLAR.y;
   const e = radjE(x, z);

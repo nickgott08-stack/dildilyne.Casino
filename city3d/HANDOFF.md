@@ -228,3 +228,12 @@ Dildi City (Quellcode):
   Pistole mit Schalldämpfer: auf der Insel keine Zielhilfe (`G.noAssist`), Kopfschuss auf Wache = sofort tot und lautlos.
   AK-Schuss auf der Insel → sofort Alarm (`G.lastShot.w`).
 - Offen (Teil 2): Anwesen vergrößern, Höfe/Gebäude/Pflanzen, feste Wachrouten, keine Wache direkt hinterm Tor.
+
+## Finale Teil 2: größeres Anwesen, feste Wachrouten (15.11.) – nicht getestet
+- `RADJ_ESTATE` jetzt x −60…120, z −1400…−1240 (vorher −40…120 / −1400…−1270): Vorhof im Norden, Gästehaus-Streifen im Westen.
+  Haupttor z = −1240, Westtor x = −60, Waldweg endet bei (40, −1228), `helRoad` beginnt am neuen Westtor.
+- Neuer Block „bigger estate“ in radj.js: Innenmauer auf der alten Mauerlinie (z = −1270) mit 3 Durchgängen, Zypressen-Allee, Torhaus,
+  Lagerhaus, Kolonnaden am Brunnenhof, Pflasterwege, Pergola am Pool, Palmen, Beete, Gästehaus (rot, 2 Stockwerke), Pavillon.
+- Wachen: `sentryPosts` sind feste Routen – Rundwege mit 4 Ecken (`loop()`) oder Hin-und-zurück; heist.js läuft beliebig viele Punkte ab.
+  Im Vorhof direkt hinter dem Tor steht niemand. 13 Wachen + Torwache.
+- Flucht-Jeeps starten auf dem Heli-Weg außerhalb der Mauer.
