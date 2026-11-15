@@ -264,3 +264,5 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - 15 Wachen auf festen Routen je Ebene + Torwache. `out.levels`, `out.towers = []` (Eck-Türme entfallen).
 - Getestet: alle 16 Bereiche zu Fuß vom Waldweg erreichbar (Flood-Fill mit echter Kollision), Wachen laufen auf richtiger Höhe ohne Alarm,
   Jeep fährt die Rampe hoch. Nicht getestet: Finale-Ablauf ab Tor (Karten, Aufzug, Flucht), Karte (map.js zeichnet noch das alte Anwesen).
+- Rundgang zum Anschauen: `…/city3d/dist/dildi_city_3d.html?test=anwesen` (oder `window.DC_TEST = 'anwesen'`) → `missions.estateTour()`:
+  direkt vors offene Haupttor, Wachen laufen, sehen einen aber nicht (`job.tour`), keine Auszahlung.
