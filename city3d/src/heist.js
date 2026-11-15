@@ -541,6 +541,19 @@ export function installFinale(Missions) {
     else this.api.banner('👑 DAS FINALE', 'Mit einem Auto zur Landebahn (Westwüste)');
   };
 
+  // tour mode (test link ?test=anwesen): look at the estate in peace
+  P.estateTour = function () {
+    const G = this.G, I = this.isl;
+    this.beginFinale();
+    this.job.stage = 'fly';
+    this.arriveIsland();
+    const j = this.job;
+    j.tour = true; j.hasGate = true; j.stage = 'estate';
+    I.gateCol.off = true; I.gateMesh.visible = false;
+    G.player.pos.set(ISL.gate.x, groundAt(ISL.gate.x, ISL.gate.z + 5, 1e9), ISL.gate.z + 5);
+    this.api.banner('🏗️ ROHBAU-RUNDGANG', 'Tor ist offen, Wachen sehen dich nicht. Schau dir alles in Ruhe an.');
+  };
+
   P.spawnIsland = function () {
     const j = this.job, G = this.G, I = this.isl;
     // Radj's jeep at the airstrip + the rally bike in the courtyard
@@ -721,7 +734,7 @@ export function installFinale(Missions) {
     const coop = j.coop;
     if (coop && !fromNet) this.cx({ k: 'win' });
     // solo 150.000 · crew: leader 100.000, helpers 37.500 (once a week)
-    this.coopPayout(coop ? coop.role : 'solo');
+    if (!j.tour) this.coopPayout(coop ? coop.role : 'solo'); // no money in tour mode
     if (G.player.inVehicle) { const v = G.player.inVehicle; v.driver = null; G.player.inVehicle = null; }
     this.cleanupCoup(false);
     this.endJob(null);
@@ -758,7 +771,7 @@ export function installFinale(Missions) {
       t.spot.position.set(sx, sy + 0.2, sz);
       _tv.set(sx - t.x, sy - t.y, sz - t.z).normalize();
       t.piv.quaternion.setFromUnitVectors(_down, _tv);
-      if (!onIsl || j.alarm) continue;
+      if (!onIsl || j.alarm || j.tour) continue;
       const pp0 = this.api.playerPos();
       if (Math.hypot(pp0.x - sx, pp0.z - sz) < t.r + (G.player.inVehicle ? 1.2 : 0)) t.seen += dt * 2.4; else t.seen = Math.max(0, t.seen - dt);
       if (t.seen > 0.6) this.raiseAlarm('Ein Wachturm hat dich entdeckt – die Wachen wissen, dass du kommst!');
@@ -817,13 +830,13 @@ export function installFinale(Missions) {
       // can he see you?
       const dx = pp.x - s.pos.x, dz = pp.z - s.pos.z, d = Math.hypot(dx, dz);
       const range = v ? 24 : G.player.cover ? 7 : 14; // pressed against a wall: only seen from close up
-      if (d < range && G.lastShot && G.time - G.lastShot.t < 0.1 && d < 7) { this.raiseAlarm('Ein Schuss wurde gehört!'); continue; }
+      if (!j.tour && d < range && G.lastShot && G.time - G.lastShot.t < 0.1 && d < 7) { this.raiseAlarm('Ein Schuss wurde gehört!'); continue; }
       let see = false;
       if (d < range) {
         const a = Math.acos(Math.max(-1, Math.min(1, (dx * Math.sin(s.yaw) + dz * Math.cos(s.yaw)) / (d || 1))));
         see = (a < 0.5 || d < 2.2) && !G.rayBlocked(s.pos.x, s.pos.y + 1.6, s.pos.z, pp.x, pp.y + 1.2, pp.z);
       }
-      if (see) { s.seen += dt * (1.6 - d / range); watched = Math.max(watched, s.seen); } else s.seen = Math.max(0, s.seen - dt * 0.6);
+      if (see && !j.tour) { s.seen += dt * (1.6 - d / range); watched = Math.max(watched, s.seen); } else s.seen = Math.max(0, s.seen - dt * 0.6);
       if (s.seen > 0.9) this.raiseAlarm('Eine Wache hat dich im Lichtkegel gesehen!');
     }
     $('vign').style.boxShadow = watched > 0.05 && !j.alarm ? `inset 0 0 ${60 + watched * 120}px rgba(255,200,0,${Math.min(0.7, watched)})` : '';

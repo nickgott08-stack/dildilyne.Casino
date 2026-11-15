@@ -1473,6 +1473,9 @@ function start() {
   input.enabled = true;
   if (!isTouch) lockPointer();
   toast(isTouch ? 'Minikarte antippen = große Karte' : 'Klick = Maus fangen · M = Karte');
+  // test link for Nick: …/city3d/dist/dildi_city_3d.html?test=anwesen → straight to the gate of Radj's estate,
+  // gate open, guards walk their routes but do not see you (tour mode, no payout)
+  if (new URLSearchParams(location.search).get('test') === 'anwesen' || window.DC_TEST === 'anwesen') setTimeout(() => missions.estateTour(), 300);
 }
 const qBtns = document.querySelectorAll('[data-q]');
 const markQ = () => qBtns.forEach((b) => b.classList.toggle('sel', b.dataset.q === qName));
