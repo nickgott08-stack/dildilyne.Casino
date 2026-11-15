@@ -120,7 +120,7 @@ applyQuality();
 const player = {
   pos: world.spawn.clone(),
   vy: 0, yaw: 0, grounded: true, hp: 100, armor: 0,
-  inVehicle: null, weapon: 1, has: [true, true, store.get('dc3d_ak') === '1'],
+  inVehicle: null, weapon: 1, has: [true, true, false], // the AK only exists in the Radj finale (heist.js)
   fireT: 0, reloadT: 0, ammo: [Infinity, 12, 30], punchT: 0, speed: 0, hurtT: 0, dead: false, deadT: 0, knockT: 0,
 };
 G.player = player;
@@ -530,7 +530,8 @@ function fire() {
   const d = new THREE.Vector3();
   camera.getWorldDirection(d);
   // aim assist: locked target gets hit directly, otherwise a small cone around the crosshair
-  let target = lock.target && !lock.target.dead ? lock.target : findTarget(o, d, isTouch ? 0.09 : 0.03, 70);
+  // (no aim assist with the silenced pistol in the Radj finale: you have to hit the head yourself)
+  let target = G.noAssist ? null : lock.target && !lock.target.dead ? lock.target : findTarget(o, d, isTouch ? 0.09 : 0.03, 70);
   const minT = o.distanceTo(_v2.set(player.pos.x, player.pos.y + 1.5, player.pos.z)) + 0.4;
   let partial = false;
   if (target) {
@@ -555,14 +556,16 @@ function fire() {
   fx.muzzle(mp.x, mp.y, mp.z, md.x, md.y, md.z);
   // silencer (Radj-Coup finale): quiet shot, only very close guards hear it
   if (G.silenced) audio.tone(0.08, 900, 300, 0.06, 'triangle'); else audio.shot(W.sound);
-  G.lastShot = { x: player.pos.x, z: player.pos.z, t: G.time };
+  G.lastShot = { x: player.pos.x, z: player.pos.z, t: G.time, w: player.weapon };
   G.shake = Math.min(1, G.shake + (player.weapon === 2 ? 0.12 : 0.1));
   cam.recoil = (cam.recoil || 0) + (player.weapon === 2 ? 0.012 : 0.02);
   if (hit.kind === 'world' || hit.kind === 'ground') { fx.sparks(hp.x, hp.y, hp.z, 4); fx.dust(hp.x, hp.y, hp.z); }
   else if (hit.kind === 'ped') {
     const p = hit.p;
     const wasCop = p.role === 'cop';
-    p.hit(W.dmg * (hp.y - p.pos.y > 1.65 ? 2.5 : 1), G, d.x, d.z, true);
+    const head = hp.y - p.pos.y > 1.65;
+    // silenced pistol: a head shot drops a guard at once and without a sound
+    p.hit(G.silenced && head && p.role === 'guard' ? 999 : W.dmg * (head ? 2.5 : 1), G, d.x, d.z, true);
     if (wasCop) crime(1.0, 'Polizist angeschossen');
     else if (p.role !== 'guard') crime(0.2, null, true);
   } else if (hit.kind === 'veh') {
@@ -612,6 +615,7 @@ function findTarget(o, d, cone, range, exclude) {
   return best;
 }
 function acquireLock(exclude) {
+  if (G.noAssist) { lock.target = null; return; }
   const o = new THREE.Vector3(player.pos.x, player.pos.y + 1.6, player.pos.z);
   const d = new THREE.Vector3(Math.sin(cam.yaw), 0, Math.cos(cam.yaw));
   // wide cone in front of the camera, then anything nearby
@@ -620,7 +624,7 @@ function acquireLock(exclude) {
   if (lock.target) audio.tone(0.12, 1400, 1800, 0.06, 'square');
 }
 function updateLock(dt, aiming) {
-  if (!aiming || player.weapon === 0 || player.inVehicle) { lock.target = null; return; }
+  if (!aiming || player.weapon === 0 || player.inVehicle || G.noAssist) { lock.target = null; return; }
   const t = lock.target;
   if (t) {
     const d = Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z);
@@ -1473,7 +1477,6 @@ function renderShop() {
     const items = [
       ['vest', '🦺', 'Schutzweste', 'Volle Panzerung (100)', P10(150), player.armor >= 100 ? 'Schon voll' : ''],
       ['heal', '🩹', 'Erste-Hilfe-Kasten', 'Volle Gesundheit', P10(50), player.hp >= 100 ? 'Schon voll' : ''],
-      ['ak', '🪖', 'AK-47', 'Für immer freigeschaltet', P10(800), player.has[2] ? 'Gekauft' : ''],
     ];
     h += '<div class="shopGrid">' + items.map(([k, ic, n, d, pr, off]) => `<button class="gcar" data-buy="${k}" ${off ? 'disabled style="opacity:.45"' : ''}><div class="gi">${ic}</div><div class="gn">${n}</div><div class="gs">${d}</div><div class="gs" style="opacity:1;color:#3bff6a;font-weight:900">${off || fmtN(pr) + ' D$'}</div></button>`).join('') + '</div>';
   } else {

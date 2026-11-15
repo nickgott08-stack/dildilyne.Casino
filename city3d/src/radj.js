@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RADJ, RADJ_CELLAR, RADJ_STRIP, RADJ_ESTATE, radjGround, radjE } from './geo.js';
 import { addBox, addCirc, world } from './world.js';
 import { cbox, ccyl, merge, neonSign, srand, srange, canvasTex, colorize } from './util.js';
+import { makeHuman } from './human.js';
 
 const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
 const H = (x, z) => radjGround(x, z);
@@ -265,10 +266,72 @@ export function buildRadjIsland(sceneRoot) {
     plain.push(cbox(2.4, 0.12, 0.6, lc.x, ly + 0.6, lc.z, '#7a5634', lc.h), cbox(2.4, 0.5, 0.1, lc.x + Math.cos(lc.h) * 0.3, ly + 0.9, lc.z - Math.sin(lc.h) * 0.3, '#7a5634', lc.h));
     plain.push(ccyl(0.9, 1.0, 0.3, 10, lc.x + 3, ly + 0.15, lc.z + 2, '#6b6b6b'), ccyl(0.5, 0.6, 0.25, 8, lc.x + 3, ly + 0.35, lc.z + 2, '#3a2a1a'));
   }
+  // ---- four watchtowers along the forest road (finale): a searchlight spot sweeps across the road, see heist.js ----
+  out.roadTowers = [];
+  {
+    const S = road.samples;
+    [0.18, 0.47, 0.75, 0.88].forEach((f, k) => {
+      const i = Math.floor(S.length * f), p = S[i], q = S[i + 1], dx = q.x - p.x, dz = q.z - p.z, L = Math.hypot(dx, dz) || 1;
+      const sg = k % 2 ? -1 : 1, nx = (-dz / L) * sg, nz = (dx / L) * sg;
+      const tx = p.x + nx * 7.6, tz = p.z + nz * 7.6, y = H(tx, tz);
+      for (const [a, b] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) plain.push(cbox(0.3, 8, 0.3, tx + a, y + 4, tz + b, '#5a4026'));
+      plain.push(cbox(3.6, 0.3, 3.6, tx, y + 8, tz, '#6b4a2c'));
+      for (const [a, b, w, d] of [[0, -1.75, 3.6, 0.12], [0, 1.75, 3.6, 0.12], [-1.75, 0, 0.12, 3.6], [1.75, 0, 0.12, 3.6]]) plain.push(cbox(w, 1.0, d, tx + a, y + 8.65, tz + b, '#5a4026'));
+      plain.push(cbox(4.2, 0.25, 4.2, tx, y + 10.7, tz, '#7a2f22'));
+      for (const [a, b] of [[-1.7, -1.7], [1.7, -1.7], [-1.7, 1.7], [1.7, 1.7]]) plain.push(cbox(0.14, 2.4, 0.14, tx + a, y + 9.45, tz + b, '#3a2a1a'));
+      plain.push(cbox(0.5, 0.4, 0.5, tx, y + 10.3, tz, '#222'));
+      addBox(tx - 1.7, tx + 1.7, tz - 1.7, tz + 1.7, y + 10.8, { y0: y - 1 });
+      // the guard up there cannot be shot (just a figure, no Ped)
+      const man = makeHuman({ skin: '#c68a62', hair: '#111', shirt: '#2f3b2a', pants: '#1f2a1c', shoes: '#111', hairStyle: 0, cap: '#1f2a1c' });
+      man.root.position.set(tx, y + 8.15, tz); man.root.rotation.y = Math.atan2(-nx, -nz);
+      scene.add(man.root);
+      const beam = new THREE.Mesh(new THREE.ConeGeometry(4.6, 22, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#fff4c0', transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      beam.geometry.translate(0, -11, 0);
+      const piv = new THREE.Group();
+      piv.position.set(tx, y + 10.1, tz);
+      piv.add(beam);
+      const spot = new THREE.Mesh(new THREE.CircleGeometry(5.2, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffe680', transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }));
+      spot.renderOrder = 3;
+      scene.add(piv, spot);
+      out.roadTowers.push({ x: tx, z: tz, y: y + 10.1, px: p.x, pz: p.z, nx, nz, piv, beam, spot, r: 5.2, seen: 0, k });
+    });
+  }
   // ---- forest: layered pines, leafy trees and bushes (instanced, flat-shaded like the city trees) ----
   {
     const pines = [], leafy = [], bushes = [];
     const E = ISL.estate;
+    // tree wall: two tight rows of big pines (overlapping collision) on both sides of the forest road and around the
+    // airstrip clearing, so you have to take the road – on foot and by car
+    {
+      const ST = ISL.strip, sx0 = ST.x0 - 10, sx1 = ST.x1 + 14, sz0 = ST.z0 - 12, sz1 = ST.z1 + 22;
+      const wall = (x, z) => {
+        if (radjE(x, z) > 1.0) return;
+        if (x > E.x0 - 3 && x < E.x1 + 3 && z > E.z0 - 3 && z < E.z1 + 3) return;
+        if (Math.hypot(x - out.clearing.x, z - out.clearing.z) < out.clearing.r + 0.5) return;
+        if (out.roadTowers.some((t) => Math.hypot(t.x - x, t.z - z) < 3.6)) return;
+        const y = H(x, z);
+        addCirc(x, z, 1.4, y + 6, y - 1);
+        if (out.creek && nearPts(out.creek, x, z, 3)) return; // no tree in the water, but still no way through
+        pines.push([x, y, z, srange(1.05, 1.5)]);
+      };
+      const S = road.samples;
+      for (let i = 0; i < S.length - 1; i++) {
+        const p = S[i], q = S[i + 1], dx = q.x - p.x, dz = q.z - p.z, L = Math.hypot(dx, dz) || 1;
+        for (const sgn of [-1, 1]) for (const row of [0, 1]) {
+          const off = sgn * (8.6 + row * 2.4 + srange(-0.3, 0.3)), t = row * 0.5;
+          const x = p.x + dx * t - (dz / L) * off, z = p.z + dz * t + (dx / L) * off;
+          if (x > sx0 && x < sx1 && z > sz0 && z < sz1) continue;       // the strip clearing stays open
+          if (nearPts(S, x, z, 7.4)) continue;                           // inside of hairpins: not on the road itself
+          wall(x, z);
+        }
+      }
+      // ring around the little clearing next to the road and around the airstrip clearing (open only where the road leaves)
+      for (let a = 0; a < 6.28; a += 0.2) { const x = out.clearing.x + Math.cos(a) * (out.clearing.r + 2), z = out.clearing.z + Math.sin(a) * (out.clearing.r + 2); if (!nearPts(S, x, z, 8.4)) wall(x, z); }
+      const edge = [];
+      for (let x = sx0; x <= sx1; x += 2.3) edge.push([x, sz0], [x, sz1]);
+      for (let z = sz0; z <= sz1; z += 2.3) edge.push([sx0, z], [sx1, z]);
+      for (const [x, z] of edge) if (!nearPts(S, x, z, 8.4)) wall(x + srange(-0.3, 0.3), z + srange(-0.3, 0.3));
+    }
     for (let k = 0; k < 2600; k++) {
       const x = srange(-230, 230), z = srange(-1430, -1030);
       const e = radjE(x, z);

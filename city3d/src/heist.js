@@ -10,6 +10,7 @@ import { buildRadjIsland, ISL } from './radj.js';
 import { RADJ_CELLAR, radjE } from './geo.js';
 import { neonSign, rand, store, season } from './util.js';
 import { seeded } from './coop.js';
+const _tv = new THREE.Vector3(), _down = new THREE.Vector3(0, -1, 0);
 
 const $ = (id) => document.getElementById(id);
 export const weekId = () => { const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return t.getUTCFullYear() + '-' + Math.ceil(((t - y0) / 864e5 + 1) / 7); };
@@ -69,7 +70,7 @@ export const COUP = [
       ['🚙', 'Heute Nacht holen wir sie. Fahr mit einem Auto deiner Wahl zur Landebahn in der Westwüste.'],
       ['✈️', 'Mit Bilals Flugzeug geht es nach Süden übers Meer – Radjs Insel liegt hinter den Docks, wir landen auf seiner Privatpiste.'],
       ['🌲', 'Ein Schlängelweg durch dichten Wald führt zum Anwesen. Die Torwache hat die Torkarte.'],
-      ['🔦', 'Drinnen patrouillieren rund 20 Wachen mit Taschenlampen. Bleib aus den Lichtkegeln. Nur Schalldämpfer, keine Weste.'],
+      ['🔦', 'Am Waldweg stehen 4 Wachtürme: warte, bis der Scheinwerfer weiterschwenkt. Drinnen patrouillieren Wachen mit Taschenlampen. Schalldämpfer-Pistole (Kopfschuss = lautlos, keine Zielhilfe) oder AK (laut → Alarm). Keine Weste.'],
       ['💳', 'Eine Wache trägt die Aufzugkarte. Der Aufzug führt in den Keller zum Glaskasten.'],
       ['👑', 'Schneid das Glas auf, schnapp dir die goldene Bubensahne – und dann ab zum Helikopter!'],
     ],
@@ -398,7 +399,7 @@ export function installHeist(Missions) {
     const j = this.job, G = this.G;
     const n = j.n;
     store.set('dc3d_coup', String(n + 1));
-    if (n === 1) { G.player.has[2] = true; store.set('dc3d_ak', '1'); }
+    if (n === 1) store.set('dc3d_ak', '1'); // the AKs are only handed out in the finale
     this.cleanupCoup(false);
     this.endJob(null);
     G.noPolice = false;
@@ -581,7 +582,9 @@ export function installFinale(Missions) {
     const j = this.job, G = this.G, I = this.isl;
     for (const s of j.sentries || []) if (s.cone) { this.scene.remove(s.cone); s.cone = null; }
     for (const c of j.cards || []) this.scene.remove(c.m);
-    G.walkMul = 0; G.silenced = false; G.noVest = false;
+    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false;
+    G.player.has[2] = false; if (G.player.weapon === 2) G.player.weapon = 1; // the AK stays on the island
+    for (const t of I.roadTowers || []) { t.seen = 0; t.spot.material.color.set('#ffe680'); }
     $('vign').style.boxShadow = '';
     // reset the estate for the next attempt
     I.gateCol.off = false; I.gateMesh.visible = true;
@@ -595,7 +598,7 @@ export function installFinale(Missions) {
   P.arriveIsland = function () {
     const j = this.job, G = this.G, S = ISL.strip;
     if (!j || j.n !== 4) return;
-    const x = S.x0 + 40, z = (S.z0 + S.z1) / 2;
+    const x = S.x1 - 36, z = (S.z0 + S.z1) / 2; // rolls out at the east end, right next to the jeep and the forest road
     this.plane.remove();
     this.plane = new Plane(this.scene, x, z, Math.PI / 2);
     const off = j.coop ? j.coop.idx * 2.2 : 0; // crew members side by side
@@ -621,6 +624,7 @@ export function installFinale(Missions) {
     if (j.alarm) return;
     j.alarm = true;
     if (!fromNet) this.cx({ k: 'alarm', why });
+    for (const t of this.isl.roadTowers || []) t.spot.material.color.set('#ff4a3a');
     for (const s of j.sentries) { if (!s.dead) { s.calm = false; s.post = { x: s.pos.x, z: s.pos.z }; s.walkMul = 1; } if (s.cone) s.cone.material.color.set('#ff3030'); }
     this.G.audio.star();
     this.api.banner('🚨 ALARM!', why || 'Radjs Wachen haben dich entdeckt');
@@ -739,8 +743,25 @@ export function installFinale(Missions) {
     const v = G.player.inVehicle;
     const dist = (t) => Math.round(Math.hypot(pp.x - t.x, pp.z - t.z));
     const T = '👑 FINALE';
-    G.player.weapon = 1; // silenced pistol only
-    G.silenced = true;
+    // weapons: silenced pistol (quiet, no aim assist on the island, head shot = silent kill) or the stolen AK (loud → alarm)
+    const onIsl = !['rs6', 'plane', 'fly'].includes(j.stage);
+    G.player.has[2] = true;
+    if (G.player.weapon === 0) G.player.weapon = 1;
+    G.silenced = G.player.weapon === 1;
+    G.noAssist = onIsl && G.player.weapon === 1;
+    if (onIsl && !j.alarm && G.lastShot && G.lastShot.w === 2 && G.time - G.lastShot.t < 0.3) this.raiseAlarm('Die AK war auf der ganzen Insel zu hören!');
+    // watchtowers at the forest road: the light spot sweeps across the road – wait until it has moved on
+    for (const t of I.roadTowers || []) {
+      const off = Math.sin(G.time * 0.85 + t.k * 1.9) * 13;
+      const sx = t.px + t.nx * off, sz = t.pz + t.nz * off, sy = groundAt(sx, sz, 1e9);
+      t.spot.position.set(sx, sy + 0.2, sz);
+      _tv.set(sx - t.x, sy - t.y, sz - t.z).normalize();
+      t.piv.quaternion.setFromUnitVectors(_down, _tv);
+      if (!onIsl || j.alarm) continue;
+      const pp0 = this.api.playerPos();
+      if (Math.hypot(pp0.x - sx, pp0.z - sz) < t.r + (G.player.inVehicle ? 1.2 : 0)) t.seen += dt * 2.4; else t.seen = Math.max(0, t.seen - dt);
+      if (t.seen > 0.6) this.raiseAlarm('Ein Wachturm hat dich entdeckt – die Wachen wissen, dass du kommst!');
+    }
     I.rotor.rotation.y += dt * (j.stage === 'escape' ? 16 : 0);
     for (const [k, t] of (I.towers || []).entries()) t.rotation.y = Math.sin(G.time * 0.35 + k * 2) * 1.6 + (k ? Math.PI : 0);
     if (j.stage === 'rs6') {

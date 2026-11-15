@@ -381,6 +381,16 @@ function endsAtRing(road, dir) {
   }
   return road[k];
 }
+// is a vehicle moving on the main (prio) road close to the crossing whose side arm ends at e?
+function mainRoadBusy(G, self, e) {
+  for (const o of G.vehicles) {
+    if (o === self || o.removed || o.dead || Math.abs(o.vF) < 1.5) continue;
+    if (Math.hypot(o.pos.x - e.x, o.pos.z - e.z) > 26) continue;
+    const r = o.driver && o.driver.rf ? o.driver.rf.road : (nearestRoad(o.pos.x, o.pos.z, 8, (q) => q.prio) || {}).road;
+    if (r && r.prio) return true;
+  }
+  return false;
+}
 // does this road end at a crossing, i.e. do at least two other traffic roads end there too? (cached)
 function endsAtCrossing(road, dir) {
   const k = dir > 0 ? '_crossE' : '_crossS';
@@ -499,6 +509,16 @@ export class OutDriver {
         if (fromStart < 5 && endsAtRing(R0, -d)) want = Math.min(want, 7.5);
         // normal crossings (Dildi-Kreuz, Hafenkreuzung): roll up slowly, turn, then speed up again
         if (toEnd < 12 && endsAtCrossing(R0, d)) want = Math.min(want, (big ? 4.5 : 5.5) + toEnd * 0.8);
+        // right of way: coming from a side road, wait at the stop line while somebody is moving on the main road
+        // (after 8 s of waiting go anyway, so nothing can lock up for good)
+        if (toEnd < 3 && !R0.prio && endsAtCrossing(R0, d)) {
+          const e = this.rf.endPoint();
+          if (this.yieldGo > 0) this.yieldGo -= dt;
+          else if (mainRoadBusy(G, v, e)) {
+            this.yieldT = (this.yieldT || 0) + dt;
+            if (this.yieldT > 8) { this.yieldT = 0; this.yieldGo = 5; } else want = 0;
+          } else this.yieldT = 0;
+        }
         if (fromStart < 4 && endsAtCrossing(R0, -d)) want = Math.min(want, 7);
       }
     }
