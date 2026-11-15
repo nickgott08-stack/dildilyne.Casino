@@ -208,3 +208,10 @@ Dildi City (Quellcode):
 - Dildi-Kreisel größer (r 22, Fahrbahn 11 m), Arme enden am Außenrand des Rings (vorher fast auf der Ring-Mitte → Autos fuhren in die Insel);
   LKW/Bus (`M.len > 6`) fahren am/im Kreisel noch langsamer. Fern-Modell (`proxy` in vehicles.js) für LKW und Bus in voller Höhe
   (vorher flacher PKW-Klotz). Nicht getestet.
+
+## Keine Kreisel mehr am Dildi-Kreuz und Hafen (15.11., Nick: „damit kommen die nicht klar“)
+- Dildi-Kreisel und Hafenkreisel entfernt → normale Kreuzungen. Je 4 Arme enden am Rand eines 11-m-Asphaltquadrats
+  (`Dildi-Kreuz` / `Hafenkreuzung`, Straßen mit `traffic: false`), OutDriver biegt am Straßenende in einen der anderen Arme ab
+  (`junctionsAt`), rollt langsam heran (`endsAtCrossing` in ai.js). Gebiet/Schilder heißen wieder „Dildi-Kreuz“.
+- Geblieben: Kreisverkehr am Ende der Brückenstraße (`KREISEL`) und Wendeschleife Flughafen (`WENDE`) zum Wenden.
+- Bus-Route (main.js `serviceRoutes`) fährt über die Hafenkreuzung statt durch den Hafenkreisel. Nicht getestet.

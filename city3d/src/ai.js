@@ -381,6 +381,15 @@ function endsAtRing(road, dir) {
   }
   return road[k];
 }
+// does this road end at a crossing, i.e. do at least two other traffic roads end there too? (cached)
+function endsAtCrossing(road, dir) {
+  const k = dir > 0 ? '_crossE' : '_crossS';
+  if (road[k] === undefined) {
+    const e = road.samples[dir > 0 ? road.samples.length - 1 : 0];
+    road[k] = (world.outRoads || []).filter((r) => r !== road && r.traffic && !r.ring && [r.samples[0], r.samples[r.samples.length - 1]].some((q) => Math.hypot(q.x - e.x, q.z - e.z) < 12)).length >= 2;
+  }
+  return road[k];
+}
 const headOf = (S, i, dir) => (dir > 0 ? S[i].h : S[i].h + Math.PI);
 
 // follows a sampled road; shared by out-of-town traffic and police
@@ -488,6 +497,9 @@ export class OutDriver {
         const toEnd = d > 0 ? L - this.rf.idx : this.rf.idx, fromStart = L - toEnd;
         if (toEnd < 14 && endsAtRing(R0, d)) want = Math.min(want, (big ? 4 : 5) + toEnd * 0.75);
         if (fromStart < 5 && endsAtRing(R0, -d)) want = Math.min(want, 7.5);
+        // normal crossings (Dildi-Kreuz, Hafenkreuzung): roll up slowly, turn, then speed up again
+        if (toEnd < 12 && endsAtCrossing(R0, d)) want = Math.min(want, (big ? 4.5 : 5.5) + toEnd * 0.8);
+        if (fromStart < 4 && endsAtCrossing(R0, -d)) want = Math.min(want, 7);
       }
     }
     const free = want;

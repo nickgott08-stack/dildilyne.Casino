@@ -76,26 +76,22 @@ R('Camp-Piste', [[585, -150], [570, -196], [540, -220]], { kind: 'dirt', w: 7, t
 R('Ranch-Weg', [[622, -40], [640, 0], [646, 24], [646, 32]], { kind: 'dirt', w: 7, traffic: false });
 R('Gehöft-Weg', [[480, 240], [502, 256], [516, 262], [520, 266]], { kind: 'dirt', w: 7, traffic: false });
 
-// --- south: harbour road + flat roundabout "Dildi-Kreisel" (replaces the flyover "Dildi-Kreuz", Nick 15.11.) ---
-// Querstraße West/Ost link the two outer south exits of the city (x = ±136) and meet the Hafenstraße at the roundabout.
+// --- south: harbour road + flat crossing "Dildi-Kreuz" (first a flyover, then a roundabout – the AI drivers coped with neither) ---
+// Querstraße West/Ost link the two outer south exits of the city (x = ±136) and cross the Hafenstraße at (0, -322).
 // Buildings around it (Nick's models, dildiKreuz.decor) stand right at these roads with asphalt driveways.
-export const DILDI_KREISEL = { x: 0, z: -322, r: 22, w: 11 };
-R('Hafenstraße', [[0, -236, 0], [0, -270, 0], [0, -296, 0]], { w: 12, lamps: true });
-R('Hafenstraße Süd', [[0, -348, 0], [0, -380, 0], [0, -416, 0]], { w: 12, lamps: true });
-R('Querstraße West', [[-136, -236, 0], [-136, -262, 0], [-131, -292, 0], [-117, -313, 0], [-95, -322, 0], [-60, -322, 0], [-26, -322, 0]], { w: 12, lamps: true });
-R('Querstraße Ost', [[26, -322, 0], [60, -322, 0], [95, -322, 0], [117, -313, 0], [131, -292, 0], [136, -262, 0], [136, -236, 0]], { w: 12, lamps: true });
-// big ring (r 22, lane 11 m) so trucks and buses stay in their lane; the arms end at its outer edge.
-// ring order like the Hafenkreisel (right-hand traffic): north → east → south → west → north
-R('Dildi-Kreisel', Array.from({ length: 21 }, (_, k) => { const t = (k / 20) * Math.PI * 2; return [DILDI_KREISEL.x + DILDI_KREISEL.r * Math.sin(t), DILDI_KREISEL.z + DILDI_KREISEL.r * Math.cos(t), 0]; }), { w: DILDI_KREISEL.w, oneway: true, ring: true });
-// island roads (flat)
-// the Brückenstraße × Kaistraße crossing is a roundabout (HAFENKREISEL); the roads end at its arms
-export const HAFENKREISEL = { x: 0, z: -560, r: 17, w: 9 };
-R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -541, 0]], { w: 12, lamps: true });
-R('Brückenstraße Süd', [[0, -579, 0], [0, -595, 0], [0, -610, 0]], { w: 12, lamps: true });
-R('Kaistraße West', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [-19, -560, 0]], { w: 11, lamps: true });
-R('Kaistraße Ost', [[19, -560, 0], [70, -560, 0], [150, -560, 0], [191, -560, 0]], { w: 11, lamps: true });
-// ring order (right-hand traffic, right turn in first like the other roundabouts): north → east → south → west → north
-R('Hafenkreisel', Array.from({ length: 21 }, (_, k) => { const t = (k / 20) * Math.PI * 2; return [HAFENKREISEL.x + HAFENKREISEL.r * Math.sin(t), HAFENKREISEL.z + HAFENKREISEL.r * Math.cos(t), 0]; }), { w: HAFENKREISEL.w, oneway: true, ring: true });
+// Crossings: the four arms end at the edge of an 11 m asphalt square (short road without traffic), so cars can turn
+// into any arm at the road end (junctionsAt in ai.js) and nothing overlaps.
+R('Hafenstraße', [[0, -236, 0], [0, -270, 0], [0, -316.5, 0]], { w: 12, lamps: true });
+R('Hafenstraße Süd', [[0, -327.5, 0], [0, -380, 0], [0, -416, 0]], { w: 12, lamps: true });
+R('Querstraße West', [[-136, -236, 0], [-136, -262, 0], [-131, -292, 0], [-117, -313, 0], [-95, -322, 0], [-60, -322, 0], [-5.5, -322, 0]], { w: 12, lamps: true });
+R('Querstraße Ost', [[5.5, -322, 0], [60, -322, 0], [95, -322, 0], [117, -313, 0], [131, -292, 0], [136, -262, 0], [136, -236, 0]], { w: 12, lamps: true });
+R('Dildi-Kreuz', [[0, -316.5, 0], [0, -327.5, 0]], { w: 11, traffic: false });
+// island roads (flat); Brückenstraße × Kaistraße is a normal crossing as well
+R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -554.5, 0]], { w: 12, lamps: true });
+R('Brückenstraße Süd', [[0, -565.5, 0], [0, -595, 0], [0, -610, 0]], { w: 12, lamps: true });
+R('Kaistraße West', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [-5.5, -560, 0]], { w: 11, lamps: true });
+R('Kaistraße Ost', [[5.5, -560, 0], [70, -560, 0], [150, -560, 0], [191, -560, 0]], { w: 11, lamps: true });
+R('Hafenkreuzung', [[0, -554.5, 0], [0, -565.5, 0]], { w: 11, traffic: false });
 R('Dockring', [[-60, -560, 0], [-66, -610, 0], [-110, -645, 0], [-170, -640, 0], [-210, -600, 0], [-215, -560, 0]], { w: 10 });
 // roundabout at the end of the Brückenstraße (was a dead end where cars tried to turn on the spot).
 // One-way ring, counter-clockwise from above (right-hand traffic): start at the top, east, south, west, back to the top.

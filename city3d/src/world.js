@@ -1340,7 +1340,7 @@ export function buildWorld(scene, quality) {
   const DCk = globalThis.DildiCars && globalThis.DildiCars.dildiKreuz;
   const kAprons = DCk && DCk.places ? DCk.places().aprons || [] : [];
   const onDrive = (x, z, yy) => {
-    // driveways / parking around the Dildi-Kreisel: no lamp posts there
+    // driveways / parking around the Dildi-Kreuz: no lamp posts there
     if (kAprons.some((a) => x > a[0] - 0.8 && x < a[1] + 0.8 && z > a[2] - 0.8 && z < a[3] + 0.8)) return true;
     for (const st of world.sideStreets) if (x > st.x0 - 0.6 && x < st.x1 + 0.6 && z > st.z0 - 0.6 && z < st.z1 + 0.6) return true;
     for (const e of world.exits) {
