@@ -79,11 +79,12 @@ R('Gehöft-Weg', [[480, 240], [502, 256], [516, 262], [520, 266]], { kind: 'dirt
 // --- south: harbour road + flat roundabout "Dildi-Kreisel" (replaces the flyover "Dildi-Kreuz", Nick 15.11.) ---
 // Querstraße West/Ost link the two outer south exits of the city (x = ±136) and meet the Hafenstraße at the roundabout.
 // Buildings around it (Nick's models, dildiKreuz.decor) stand right at these roads with asphalt driveways.
-export const DILDI_KREISEL = { x: 0, z: -322, r: 17, w: 9 };
-R('Hafenstraße', [[0, -236, 0], [0, -270, 0], [0, -303, 0]], { w: 12, lamps: true });
-R('Hafenstraße Süd', [[0, -341, 0], [0, -380, 0], [0, -416, 0]], { w: 12, lamps: true });
-R('Querstraße West', [[-136, -236, 0], [-136, -262, 0], [-131, -292, 0], [-117, -313, 0], [-95, -322, 0], [-60, -322, 0], [-19, -322, 0]], { w: 12, lamps: true });
-R('Querstraße Ost', [[19, -322, 0], [60, -322, 0], [95, -322, 0], [117, -313, 0], [131, -292, 0], [136, -262, 0], [136, -236, 0]], { w: 12, lamps: true });
+export const DILDI_KREISEL = { x: 0, z: -322, r: 22, w: 11 };
+R('Hafenstraße', [[0, -236, 0], [0, -270, 0], [0, -296, 0]], { w: 12, lamps: true });
+R('Hafenstraße Süd', [[0, -348, 0], [0, -380, 0], [0, -416, 0]], { w: 12, lamps: true });
+R('Querstraße West', [[-136, -236, 0], [-136, -262, 0], [-131, -292, 0], [-117, -313, 0], [-95, -322, 0], [-60, -322, 0], [-26, -322, 0]], { w: 12, lamps: true });
+R('Querstraße Ost', [[26, -322, 0], [60, -322, 0], [95, -322, 0], [117, -313, 0], [131, -292, 0], [136, -262, 0], [136, -236, 0]], { w: 12, lamps: true });
+// big ring (r 22, lane 11 m) so trucks and buses stay in their lane; the arms end at its outer edge.
 // ring order like the Hafenkreisel (right-hand traffic): north → east → south → west → north
 R('Dildi-Kreisel', Array.from({ length: 21 }, (_, k) => { const t = (k / 20) * Math.PI * 2; return [DILDI_KREISEL.x + DILDI_KREISEL.r * Math.sin(t), DILDI_KREISEL.z + DILDI_KREISEL.r * Math.cos(t), 0]; }), { w: DILDI_KREISEL.w, oneway: true, ring: true });
 // island roads (flat)

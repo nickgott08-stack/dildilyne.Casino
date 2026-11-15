@@ -482,10 +482,11 @@ export class OutDriver {
     // (cars used to shoot into the island and, on the way out, into the oncoming lane)
     if (this.panic <= 0) {
       const R0 = this.rf.road, L = R0.samples.length - 1, d = this.rf.dir;
-      if (R0.ring) want = Math.min(want, 6.5);
+      const big = v.M && v.M.len > 6; // trucks + buses take it even slower
+      if (R0.ring) want = Math.min(want, big ? 5 : 6.5);
       else {
         const toEnd = d > 0 ? L - this.rf.idx : this.rf.idx, fromStart = L - toEnd;
-        if (toEnd < 14 && endsAtRing(R0, d)) want = Math.min(want, 5 + toEnd * 0.75);
+        if (toEnd < 14 && endsAtRing(R0, d)) want = Math.min(want, (big ? 4 : 5) + toEnd * 0.75);
         if (fromStart < 5 && endsAtRing(R0, -d)) want = Math.min(want, 7.5);
       }
     }
