@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { torbogen as pc, bogengang as mc, hausblock as gc, torbogenZwischen as Zu, treppe as Ju, gelaender as Er, hecke as _c, heckeGeo as Ku, zypresse as qu, pool as ju,
-  seehaus, mediterranParts, mediterranFinish as gi, mBox as Vt, mScaleUV as cn } from '../src/mediterran.js';
+  seehaus, verbundDach, mediterranParts, mediterranFinish as gi, mBox as Vt, mScaleUV as cn } from '../src/mediterran.js';
 const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.domElement.style.touchAction = 'none';
 R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05;
@@ -53,9 +53,10 @@ wall(-24,-12.2,-19.2,-12.2,H,4); wall(-14.8,-12.2,-10.5,-12.2,H,4);
 An(Zu(4.4,AR),-17,H,-12.2);
 parapet(-24,Z0,-24,-17.7,H); parapet(-24,-14.3,-24,8,H);
 stair(-29.12,0,-16,1,0);
-An(mc({n:5,back:!1}),-12,H,6,PI);
+// Loggia mit Dachterrasse über dem Pool: ENTFERNT (Nicks Wunsch)
 An(gc(6,4.6,5),-19.5,H,-6.5,PI/2);
 rail(8,-20,H,7.83); rail(6,-1,H,7.83); rail(8,6,H,7.83);
+rail(2.4,-14.8,H,7.83); rail(6.4,-7.2,H,7.83);              // NEU: Geländer, wo die Loggia stand (Lücke nur an Treppe 8)
 stair(-12,0,13.12,0,-1);
 stair(-3.12,H,-6,1,0);
 pot(-6,H,-10,1.15); pot(-6,H,-2,1.15); pot(0,H,4,1.15);
@@ -71,11 +72,14 @@ parapet(20,Z0,20,-24.6,2*H); parapet(20,-19.4,20,-14,2*H); parapet(20,-14,26.4,-
 stair(28,H,-8.88,0,-1);
 wall(26.2,-2,X1,-2,H,4); An(Zu(4.4,AR),24,H,-2);
 wall(20,-2,21.8,-2,H,4);
-An(mc({n:3,roof:"shed"}),34.1,H,3.2,-PI/2);
+An(mc({n:3,roof:"none"}),34.1,H,3.2,-PI/2);
 cyp(25.4,H,-8.3,6.5); cyp(30.6,H,-8.3,6.5);
-An(mc({n:6}),34.1,H,19.2,-PI/2);
-An(mc({n:3}),27.5,H,11.15);
-An(mc({n:3}),27.5,H,27.25,PI);
+// NEU: die vier Stücke im Osten (Nordbau + U) haben EIN zusammenhängendes Ziegeldach statt Pultdach/Dachterrassen
+An(mc({n:6,roof:"none"}),34.1,H,19.2,-PI/2);
+An(mc({n:3,roof:"none"}),27.5,H,11.15);
+An(mc({n:3,roof:"none"}),27.5,H,27.25,PI);
+B.stucco.push(Vt(3.8,4.7,1.5,34.1,H+2.35,8.87,4));              // Lücke zwischen Nordbau und U geschlossen
+An(verbundDach([[31.55,36.65,-2.45,29.8],[21.85,34,8.6,13.7],[21.85,34,24.7,29.8]],H+4.7),0,0,0);
 fountain(19,H,19.2);
 parapet(10.2,13.7,10.2,Z1,H); parapet(10.2,8,10.2,10.3,H);    // NEU: Lücke der entfernten Treppe 6 geschlossen
 stair(4.88,0,12,1,0);                                          // Treppe 5 bleibt, Treppe 6 (z = 26) ENTFERNT
@@ -94,7 +98,7 @@ Ce.add(gi(B,"anwesen"));
 }
 const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.3, 600);
 const oc = new OrbitControls(cam, R.domElement); oc.maxPolarAngle = 1.52; oc.enableDamping = true;
-const V = { 'Seehaus': [[-12, 12, 4], [-12, 2, 27]], 'Vom Meer': [[-14, 9, 58], [-12, 3, 28]], 'Ecke West': [[-18, 7, 12], [-33, 2.5, 26]], 'Treppe': [[-8, 3, 16.5], [-8, 2.2, 26]], 'Drinnen': [[-30, 2.7, 27.8], [5, 2.6, 27.9]], 'Ende rechts': [[-2, 6, 15], [8, 2.5, 27]], 'Übersicht': [[-6, 34, 62], [2, 2, 0]], 'Von oben': [[0, 95, 1], [0, 0, 0]] };
+const V = { 'Seehaus': [[-12, 12, 4], [-12, 2, 27]], 'Vom Meer': [[-14, 9, 58], [-12, 3, 28]], 'Ecke West': [[-18, 7, 12], [-33, 2.5, 26]], 'Treppe': [[-8, 3, 16.5], [-8, 2.2, 26]], 'Drinnen': [[-30, 2.7, 27.8], [5, 2.6, 27.9]], 'Ende rechts': [[-2, 6, 15], [8, 2.5, 27]], 'Ost-Dach': [[8, 22, 19], [30, 3, 15]], 'Ost von oben': [[28, 60, 14.01], [28, 0, 14]], 'Mittelhof': [[-12, 9, 24], [-12, 3, 4]], 'Übersicht': [[-6, 34, 62], [2, 2, 0]], 'Von oben': [[0, 95, 1], [0, 0, 0]] };
 window.go = (k) => { const [p, t] = V[k]; cam.position.set(...p); oc.target.set(...t); oc.update(); R.render(Ce, cam); };
 window.views = Object.keys(V);
 const bar = document.createElement('div'); bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;padding:8px;justify-content:center;font:14px sans-serif';

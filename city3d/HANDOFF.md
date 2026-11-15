@@ -254,3 +254,6 @@ Dildi City (Quellcode):
   höheren Ebene (x = 10; Treppe 6 entfernt). Beide Langseiten offen (Bögen + Balustrade), Treppe vom Pool im Bogen bei x ≈ −8.
   Layout (aus `entwurf/mk_entwurf.py` des anderen Chats, lesbar übertragen) in `tests/preview_anwesen.js`;
   `PW=$(npm root -g)/playwright node tests/render_anwesen.mjs <ordner>` baut `Anwesen_Entwurf.html` + Bilder (dauert ~3 Min).
+- Anwesen-Entwurf, weitere Wünsche (15.11. nachts): Loggia mit Dachterrasse im Mittelhof entfernt (Geländer geschlossen, Lücke nur an
+  Treppe 8). Ost-Seite: Nordbau + U-Arkade (4 Stücke, jetzt `roof:'none'`) unter EINEM Ziegeldach (`verbundDach(rects, traufe)`),
+  Lücke zwischen Nordbau und U zugemauert.

@@ -500,7 +500,7 @@ export function torbogen(opts = {}) {
 
 // ---------------------------------------------------------------- 2) Bogengang
 // Arkade: n Bögen vorne, Rückwand mit Bogenfenstern/Türen, Terrakotta-Boden.
-// roof: 'shed' (Pultdach) oder 'terrace' (Flachdach mit Balustrade, wie im Foto)
+// roof: 'shed' (Pultdach), 'terrace' (Flachdach mit Balustrade, wie im Foto) oder 'none' (Dach kommt von verbundDach)
 export function bogengang(opts = {}) {
   const o = { n: 5, span: 2.4, pier: 0.7, spring: 2.6, depth: 3.2, t: 0.6, roof: 'terrace', back: true, ...opts };
   const P_ = P(), r = o.span / 2, L = o.n * o.span + (o.n + 1) * o.pier, H = o.spring + r + 0.9, x0 = -L / 2;
@@ -561,6 +561,9 @@ export function bogengang(opts = {}) {
     balustrade(-zz, zz, H + 0.22, 0, P_.stone, PI / 2, xx, 0);
     // Pfosten an den Ecken
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) P_.stone.push(box(0.42, 1.1, 0.42, sx * xx, H + 0.77, sz * zz, 2));
+    const c = cornice(L, CORNICE, o.t); c.translate(x0, H - 0.34, zf); P_.stone.push(c);
+  } else if (o.roof === 'none') {
+    // ohne eigenes Dach: mehrere Stücke bekommen ein gemeinsames (siehe verbundDach)
     const c = cornice(L, CORNICE, o.t); c.translate(x0, H - 0.34, zf); P_.stone.push(c);
   } else {
     const c = cornice(L, CORNICE, o.t); c.translate(x0, H - 0.34, zf); P_.stone.push(c);
@@ -926,4 +929,13 @@ export function seehaus(opts = {}) {
   grp.userData.stairX = D + stairX;
   grp.userData.colliders = [{ x: o.len / 2, z: -t / 2, w: o.len, d: t }, { x: o.len / 2, z: -D + t / 2, w: o.len, d: t, gapAt: D + stairX, gap: o.span }, { x: t / 2, z: -o.wing / 2, w: t, d: o.wing }];
   return grp;
+}
+
+// ---------------------------------------------------------------- 9) Verbund-Dach
+// Ein zusammenhängendes Ziegeldach über mehrere Gebäudestücke: rects = [[x0, x1, z0, z1], …] (Dachkanten inkl. Überstand),
+// alle mit gleicher Traufhöhe y. Rechtecke gleicher Breite verschneiden sich sauber (gleiche Firsthöhe).
+export function verbundDach(rects, y, pitch = 0.42) {
+  const P_ = P();
+  rects.forEach((r, i) => hipRoof(r[0], r[1], r[2], r[3], y + i * 0.004, pitch, P_.roof, P_.stone));
+  return finish(P_, 'verbundDach');
 }
