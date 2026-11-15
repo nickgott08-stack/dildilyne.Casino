@@ -559,7 +559,7 @@ export function installFinale(Missions) {
     // Radj's jeep at the airstrip + the rally bike in the courtyard
     const jp = new Vehicle(this.scene, 'jeep', ISL.strip.x1 - 4, ISL.strip.z1 + 8, Math.PI / 2, '#111111');
     jp.parked = true; jp.keep = true;
-    const bk = new Vehicle(this.scene, 'bike', I.bike.x, I.bike.z, Math.PI, '#e74c3c');
+    const bk = new Vehicle(this.scene, 'bike', I.bike.x, I.bike.z, Math.PI, '#2e9e44');
     bk.parked = true; bk.keep = true;
     G.vehicles.push(jp, bk);
     j.vehs.push(jp, bk);
@@ -573,6 +573,7 @@ export function installFinale(Missions) {
       p.lookYaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
       p.seen = 0; p.gate = !!gate;
       p.cone = makeCone(this.scene);
+      p.cone.visible = false; // the cones are only drawn on the minimap (Nick)
       G.peds.push(p);
       j.peds.push(p);
       j.sentries.push(p);
@@ -584,9 +585,7 @@ export function installFinale(Missions) {
     const rnd = j.coop ? seeded(j.coop.seed) : Math.random; // same guard on every phone of the crew
     const holder = j.sentries[1 + Math.floor(rnd() * (j.sentries.length - 1))];
     holder.card = true;
-    const badge = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.04), new THREE.MeshBasicMaterial({ color: '#ffd700', toneMapped: false }));
-    badge.position.set(0.18, 1.0, 0.17);
-    holder.h.root.add(badge);
+    // (no gold badge and no marker: you have to find out yourself which guard carries the card)
     j.holder = holder;
     j.alarm = false;
   };
@@ -595,7 +594,8 @@ export function installFinale(Missions) {
     const j = this.job, G = this.G, I = this.isl;
     for (const s of j.sentries || []) if (s.cone) { this.scene.remove(s.cone); s.cone = null; }
     for (const c of j.cards || []) this.scene.remove(c.m);
-    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false; G.coverOK = false;
+    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false; G.coverOK = false; G.forceDay = false;
+    $('money').style.display = $('stars').style.display = '';
     G.player.has[2] = false; if (G.player.weapon === 2) G.player.weapon = 1; // the AK stays on the island
     for (const t of I.roadTowers || []) { t.seen = 0; t.spot.material.color.set('#ffe680'); }
     $('vign').style.boxShadow = '';
@@ -758,6 +758,8 @@ export function installFinale(Missions) {
     const T = '👑 FINALE';
     // weapons: silenced pistol (quiet, no aim assist on the island, head shot = silent kill) or the stolen AK (loud → alarm)
     const onIsl = !['rs6', 'plane', 'fly'].includes(j.stage);
+    $('money').style.display = $('stars').style.display = 'none'; // no money / wanted stars in the finale (Nick)
+    G.forceDay = true; // the finale is only played in daylight (Nick)
     G.player.has[2] = true;
     if (G.player.weapon === 0) G.player.weapon = 1;
     G.silenced = G.player.weapon === 1;
@@ -866,9 +868,9 @@ export function installFinale(Missions) {
     if (j.stage === 'estate') {
       const h = j.holder;
       if (j.hasLift) { j.stage = 'lift'; this.coupTarget(ISL.lift.x, ISL.lift.z, '#ffd700'); return; }
-      if (!h.dead) this.coupTarget(h.pos.x, h.pos.z, '#ffd700');
-      else { const c = (j.cards || []).find((q) => q.kind === 'lift' && !q.taken); if (c) this.coupTarget(c.x, c.z, '#ffd700'); }
-      this.setJobHUD(T, h.dead ? 'Nimm die Aufzugkarte' : 'Schalte die Wache mit der goldenen Karte aus', j.alarm ? '🚨 ALARM – sie schießen!' : `🔦 Wachen: ${j.sentries.filter((q) => !q.dead).length} · schleichen`, j.alarm);
+      const c = h.dead ? (j.cards || []).find((q) => q.kind === 'lift' && !q.taken) : null;
+      if (c) this.coupTarget(c.x, c.z, '#ffd700'); else { j.target = null; this.marker.group.visible = false; G.missionTarget = null; }
+      this.setJobHUD(T, h.dead ? 'Nimm die Aufzugkarte' : 'Eine der Wachen trägt die Aufzugkarte – finde sie', j.alarm ? '🚨 ALARM – sie schießen!' : `🔦 Wachen: ${j.sentries.filter((q) => !q.dead).length} · schleichen`, j.alarm);
       return;
     }
     if (j.stage === 'lift') { this.setJobHUD(T, 'Zum Aufzug: Treppe an der Villa hoch, über den Balkon ins Büro', `📍 ${dist(ISL.lift)} m`, j.alarm); return; }

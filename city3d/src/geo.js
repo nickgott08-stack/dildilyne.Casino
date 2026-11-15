@@ -297,15 +297,21 @@ export const RADJ_CELLAR = { x0: 300, x1: 332, z0: -1252, z1: -1208, y: -40 };
 export function radjE(x, z) { const ex = (x - RADJ.x) / RADJ.rx, ez = (z - RADJ.z) / RADJ.rz; return ex * ex + ez * ez; }
 export const RADJ_STRIP = { x0: -140, x1: 74, z0: -1092, z1: -1066 };
 export const RADJ_ESTATE = { x0: 0, x1: 72, z0: -1400, z1: -1340 }; // Nick's estate module: 72 × 60 m, sea side in the south
-export function radjGround(x, z) {
+// the estate sits in a pit: its gate level (2nd level) is level with the island, the pool level 2.64 m lower.
+// visual = true: height for the island mesh (no pit – the mesh is cut open there by the shader, see radj.js)
+export const RADJ_PIT = 2.64;
+export function radjGround(x, z, visual = false) {
   if (x > RADJ_CELLAR.x0 && x < RADJ_CELLAR.x1 && z > RADJ_CELLAR.z0 && z < RADJ_CELLAR.z1) return RADJ_CELLAR.y;
   const e = radjE(x, z);
   if (e > 1.15) return -6;
   // the airstrip and the estate are perfectly flat, the rest gently rolling
   const S = RADJ_STRIP, E = RADJ_ESTATE;
+  if (!visual && x > E.x0 && x < E.x1 && z > E.z0 && z < E.z1) return 3.2 - RADJ_PIT;
   const ds = Math.max(S.x0 - x, x - S.x1, S.z0 - z, z - S.z1, 0), de = Math.max(E.x0 - x, x - E.x1, E.z0 - z, z - E.z1, 0);
   const flat = Math.min(1, Math.min(ds, de) / 14);
-  const h = 3.2 + flat * (0.7 * Math.sin(x * 0.03) * Math.cos(z * 0.025) + 0.4 * Math.sin(x * 0.07 + z * 0.05));
+  // south of the estate (sea side) the ground goes down to its pool level, so the Seehaus looks out over the beach
+  const sea = z < E.z0 ? Math.max(0, 1 - Math.max(E.x0 - x, x - E.x1, 0) / 12) : 0;
+  const h = 3.2 - RADJ_PIT * sea + flat * (0.7 * Math.sin(x * 0.03) * Math.cos(z * 0.025) + 0.4 * Math.sin(x * 0.07 + z * 0.05));
   return lerp(h, -6, ss(0.86, 1.12, e));
 }
 export function inRadj(x, z) { return z < -930; }

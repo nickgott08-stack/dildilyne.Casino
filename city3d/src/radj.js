@@ -5,7 +5,7 @@ import { RADJ, RADJ_CELLAR, RADJ_STRIP, RADJ_ESTATE, radjGround, radjE } from '.
 import { addBox, addCirc, addFloor, world } from './world.js';
 import { cbox, ccyl, merge, neonSign, srand, srange, canvasTex, colorize } from './util.js';
 import { makeHuman } from './human.js';
-import { anwesen, mediterranMats } from './anwesen.js';
+import { anwesen, mediterranMats, poolOutline } from './anwesen.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
@@ -13,7 +13,7 @@ const H = (x, z) => radjGround(x, z);
 
 export const ISL = {
   strip: RADJ_STRIP,
-  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [92, -1214], [44, -1232], [40, -1258], [30, -1290], [40, -1312], [40, -1326]], // ends at the foot of the ramp up to the main gate
+  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [92, -1214], [44, -1232], [40, -1258], [30, -1290], [40, -1312], [40, -1336]], // ends at the foot of the ramp up to the main gate
   estate: RADJ_ESTATE,
   gate: { x: 40, z: -1340 },
   westGate: { x: 0, z: -1370 },
@@ -165,7 +165,7 @@ export function buildRadjIsland(sceneRoot) {
       for (let a = 0; a < A; a++) {
         const t = r / R * 1.13, an = (a / A) * Math.PI * 2;
         const x = RADJ.x + Math.cos(an) * RADJ.rx * t, z = RADJ.z + Math.sin(an) * RADJ.rz * t;
-        pos.push(x, H(x, z), z);
+        pos.push(x, radjGround(x, z, true), z);
         const e = radjE(x, z);
         c.copy(grass).lerp(sand, Math.min(1, Math.max(0, (e - 0.62) / 0.2)));
         col.push(c.r, c.g, c.b);
@@ -176,7 +176,13 @@ export function buildRadjIsland(sceneRoot) {
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.setIndex(idx);
     g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    // the estate lies in a pit: the island surface is cut open over it (fragments inside the walls are discarded)
+    const gm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), PE = ISL.estate;
+    gm.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('void main() {', `void main() {\n if (vWP.x > ${PE.x0.toFixed(1)} && vWP.x < ${PE.x1.toFixed(1)} && vWP.z > ${PE.z0.toFixed(1)} && vWP.z < ${PE.z1.toFixed(1)}) discard;`);
+    };
+    const m = new THREE.Mesh(g, gm);
     m.receiveShadow = true;
     scene.add(m);
   }
@@ -406,9 +412,10 @@ export function buildRadjIsland(sceneRoot) {
   // thing is mirrored in z. All parts are baked into one mesh per material (few draw calls). Collision comes from the
   // module's own data: platforms/walls (userData.rec), the parts' userData.colliders and every "treppe" (stairs → ramp).
   {
-    const E = ISL.estate, y = H((E.x0 + E.x1) / 2, (E.z0 + E.z1) / 2);
+    // y = pool level (1st level), 2.64 m below the island: the gate level is level with the forest road
+    const E = ISL.estate, LH = 2.64, y = radjGround((E.x0 + E.x1) / 2, (E.z0 + E.z1) / 2, true) - LH;
     E.y = y;
-    const CX = (E.x0 + E.x1) / 2, CZ = (E.z0 + E.z1) / 2, LH = 2.64;
+    const CX = (E.x0 + E.x1) / 2, CZ = (E.z0 + E.z1) / 2;
     const A = anwesen();
     A.scale.z = -1; A.position.set(CX, y, CZ); A.updateMatrixWorld(true);
     const REC = A.userData.rec, V = A.userData.villa;
@@ -430,9 +437,9 @@ export function buildRadjIsland(sceneRoot) {
     // ---------- platforms, walls, ramp, round things ----------
     for (const [x0, x1, z0, z1, y0, y1] of REC.plats) { mbox(x0, x1, z0, z1, y0 - 0.7, y1); mfloor(x0, x1, z0, z1, y1); }
     for (const [x0, z0, x1, z1, yb, h, t] of REC.walls) { const hx = x0 === x1 ? t / 2 : 0, hz = z0 === z1 ? t / 2 : 0; mbox(Math.min(x0, x1) - hx, Math.max(x0, x1) + hx, Math.min(z0, z1) - hz, Math.max(z0, z1) + hz, yb, yb + h + 0.1); }
-    { const [x0, x1, z0, z1, ya, yb] = REC.ramp; mfloor(x0, x1, z0, z1, ya, yb, 'z'); for (let k = 1; k < 4; k++) mbox(x0, x1, z0 + (z1 - z0) * k / 4, z0 + (z1 - z0) * (k + 1) / 4, -0.7, ya + (yb - ya) * k / 4); }
     for (const [x, yy, z, r, h] of REC.round) addCirc(CX + x, CZ - z, r, y + yy + h, y + yy - 0.5);
-    mbox(-12.4, -3.6, 15.4, 22.8, -0.5, 0.5); // pool basin
+    // pool: a ring of posts along its rim (follows the curved shape – you can walk round it closely)
+    { const P0 = poolOutline(0, 9); for (let k = 0; k < P0.length; k++) { const a = P0[k], b = P0[(k + 1) % P0.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.9)); for (let t = 0; t < n; t++) addCirc(CX - 8 + a[0] + (b[0] - a[0]) * t / n, CZ - 19 - (a[1] + (b[1] - a[1]) * t / n), 0.45, y + 1.6, y - 0.5); } }
     // ---------- parts: colliders + stairs ----------
     const HEIGHT = { gelaender: 1.1, hecke: 1.0, torbogen: 5, torbogenZwischen: 5, bogengang: 4.7, hausblock: 9, seehaus: 5.7, pavillon: 6 };
     const gateCols = [];
@@ -508,8 +515,8 @@ export function buildRadjIsland(sceneRoot) {
     out.estateY = y;
     out.levels = { L1: y, L2: y + LH, L3: y + 2 * LH };
     const W = ([x, z]) => [CX + x, CZ - z];
-    out.garageCars = [{ type: 'ferrari', x: CX - 29, z: CZ - 13, h: 0, color: '#111111' }, { type: 'rs6', x: CX - 29, z: CZ - 19.5, h: 0, color: '#d4af37' }];
-    out.bike = { x: CX - 28, z: CZ - 5 };
+    out.garageCars = [];                          // no cars inside the estate (Nick)
+    out.bike = { x: ISL.gate.x - 9, z: ISL.gate.z + 9 };   // green motorbike outside, next to the main gate
     // fixed patrol routes (module coordinates, each on one level) – step 4 will add more and tune them
     const loop = (x0, x1, z0, z1) => [[x0, z1], [x1, z1], [x1, z0], [x0, z0]];
     out.sentryPosts = [
