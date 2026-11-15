@@ -280,3 +280,13 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Leistung: Anwesen ~120k Dreiecke in ~10 Meshes; Schatten werfen nur Putz + Dach; Bäume der Insel werfen keinen Schatten mehr.
 - 9 vorläufige Wachrouten + Torwache auf der Rampe. Getestet: alles vom Waldweg erreichbar (auch Balkon/Büro, Seehaus),
   Wachen laufen auf richtiger Höhe. Offen (3b/4): Wachrouten ausbauen, Finale-Ablauf ab Tor testen, Karte (map.js), FPS am Handy.
+
+## Anwesen-Korrekturen nach Nicks Rundgang (15.11. spät)
+- Anwesen in einer Grube: Ebene 2 (Tor) = Inselhöhe, Pool-Ebene 2,64 m tiefer (`RADJ_PIT` in geo.js, `radjGround(x, z, visual)`).
+  Das Insel-Mesh wird über dem Anwesen per Shader weggeschnitten (discard im Rechteck), südlich (Meerseite) liegt der Boden auf Pool-Höhe.
+  Rampe vor dem Tor entfällt, Waldweg endet direkt am Tor.
+- Pool: Kollision als Pfostenreihe entlang der echten Beckenform (`poolOutline`) statt Rechteck.
+- Wachen-Lichtkegel nur noch auf der Minikarte (`cone.visible = false`), Kartenträger ohne Goldmarke und ohne Zielmarker.
+- Geld + Sterne im Finale ausgeblendet (`#money`/`#stars`, zurück in `cleanupFinale`).
+- Keine Autos/Motorrad im Anwesen; ein grünes Motorrad steht draußen links vor dem Haupttor.
+- Nächster Schritt laut Nick: erst Spielfigur + Wachen (runder, natürlicher), dann die Wachrouten.
