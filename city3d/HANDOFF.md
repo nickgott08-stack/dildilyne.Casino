@@ -205,3 +205,6 @@ Dildi City (Quellcode):
 - Tablets: Tasten unten rechts (`.tb.foot/.car/.plane`) per `zoom:1.4` größer (template.html, gleiche Media-Query wie der Joystick).
 - Jeeps fahren nicht mehr im normalen Verkehr (Stadt + außen), nur noch Radj-Missionen/Insel (heist.js).
 - Nicht getestet (Nick testet selbst).
+- Dildi-Kreisel größer (r 22, Fahrbahn 11 m), Arme enden am Außenrand des Rings (vorher fast auf der Ring-Mitte → Autos fuhren in die Insel);
+  LKW/Bus (`M.len > 6`) fahren am/im Kreisel noch langsamer. Fern-Modell (`proxy` in vehicles.js) für LKW und Bus in voller Höhe
+  (vorher flacher PKW-Klotz). Nicht getestet.

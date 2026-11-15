@@ -87,7 +87,14 @@ function buildCar(type, color, tune) {
   if (DC && DC.types.includes(type)) {
     const m = DC.dildiCityVehicle(THREE, type, color, { body: vehMat, lights: lightMat.clone(), wheel: wheelMat }, tg);
     // low-poly stand-in for cars far away
-    const pg = [cbox(W, 0.62, Ln, 0, 0.62, 0, color), cbox(W * 0.86, type === 'van' ? 0.95 : 0.5, Ln * (type === 'van' ? 0.8 : 0.48), 0, type === 'van' ? 1.35 : 1.15, type === 'van' ? -0.2 : -0.15, '#1a1f26')];
+    let pg;
+    if (type === 'truck') {
+      // tall like the real model: cab in the paint colour at the front, big grey box behind it
+      pg = [cbox(W, 0.5, Ln, 0, 0.75, 0, '#2a2d33'), cbox(W, 2.0, 1.9, 0, 2.0, Ln / 2 - 0.95, color), cbox(W * 0.9, 0.7, 0.06, 0, 2.3, Ln / 2 + 0.01, '#1a1f26'),
+        cbox(W, 2.7, Ln - 2.1, 0, 2.35, -1.05, '#b9bcc2')];
+    } else if (type === 'bus') {
+      pg = [cbox(W, 2.6, Ln, 0, 1.75, 0, color), cbox(W + 0.04, 0.85, Ln - 0.8, 0, 2.15, 0, '#1a1f26'), cbox(W * 0.9, 1.0, 0.06, 0, 2.1, Ln / 2 + 0.01, '#1a1f26')];
+    } else pg = [cbox(W, 0.62, Ln, 0, 0.62, 0, color), cbox(W * 0.86, type === 'van' ? 0.95 : 0.5, Ln * (type === 'van' ? 0.8 : 0.48), 0, type === 'van' ? 1.35 : 1.15, type === 'van' ? -0.2 : -0.15, '#1a1f26')];
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) pg.push(cbox(0.3, 0.6, 0.6, sx * (W / 2 - 0.12), 0.3, sz * (Ln / 2 - 0.85), '#111'));
     m.proxy = new THREE.Mesh(merge(pg), vehMat);
     m.proxy.visible = false;
