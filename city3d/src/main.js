@@ -941,11 +941,29 @@ function updatePlayer(dt) {
     if (G.walkMul) sp *= G.walkMul; // sneaking in Radj's estate
     if (wantAim) sp = Math.min(sp, 3.6);
   }
+  // ---- cover (Radj finale): walk against a wall for a moment → back to the wall. Slide along it slowly, at its end the
+  // camera looks round the corner; push away from the wall (or aim) to step out. Guards see you only from close up.
+  if (player.cover && (!G.coverOK || wantAim || !player.grounded)) player.cover = null;
+  if (player.cover) {
+    const c = player.cover, tgx = -c.nz, tgz = c.nx, py = player.pos.y + 1.0;
+    const wallAt = (ox, oz) => !!rayBoxes(player.pos.x + ox, py, player.pos.z + oz, -c.nx, 0, -c.nz, 1.0);
+    const out = mag > 0.08 ? mx * c.nx + mz * c.nz : 0, along = mag > 0.08 ? mx * tgx + mz * tgz : 0;
+    if ((mag > 0.3 && out > 0.6) || !wallAt(0, 0)) player.cover = null;
+    else {
+      const sg = Math.abs(along) > 0.3 ? Math.sign(along) : 0;
+      const corner = sg !== 0 && !wallAt(tgx * sg * 0.6, tgz * sg * 0.6);
+      c.peek = corner ? sg : 0;
+      mx = tgx * sg; mz = tgz * sg;
+      sp = sg !== 0 && !corner ? 2.3 : 0;
+      player.yaw = dampAngle(player.yaw, Math.atan2(c.nx, c.nz), 14, dt);
+    }
+  }
+  const inCover = !!player.cover;
   if (player.knockT > 0) { player.knockT -= dt; sp = 0; }
   player.speed = damp(player.speed, sp, 10, dt);
   if (wantAim) player.yaw = dampAngle(player.yaw, cam.yaw, 22, dt);
-  else if (sp > 0.1) player.yaw = dampAngle(player.yaw, Math.atan2(mx, mz), 12, dt);
-  const curMx = mag > 0.08 ? mx : 0, curMz = mag > 0.08 ? mz : 0;
+  else if (sp > 0.1 && !inCover) player.yaw = dampAngle(player.yaw, Math.atan2(mx, mz), 12, dt);
+  const curMx = mag > 0.08 && (!inCover || sp > 0) ? mx : 0, curMz = mag > 0.08 && (!inCover || sp > 0) ? mz : 0;
   player.vx = damp(player.vx || 0, curMx * player.speed, 12, dt);
   player.vz = damp(player.vz || 0, curMz * player.speed, 12, dt);
   let nx = player.pos.x + player.vx * dt;
@@ -956,6 +974,16 @@ function updatePlayer(dt) {
   let ny = player.pos.y + player.vy * dt;
   const r = collideCircle(nx, nz, 0.34, player.pos.y + 0.3, 1.6);
   nx = r.x; nz = r.z;
+  // going into cover: pushing straight against a flat, chest-high wall for 0.3 s
+  if (G.coverOK && !inCover && !wantAim && player.grounded && r.hit && mag > 0.5 && (Math.abs(r.nx) > 0.92 || Math.abs(r.nz) > 0.92) && mx * r.nx + mz * r.nz < -0.6) {
+    player.coverT = (player.coverT || 0) + dt;
+    const wnx = Math.round(r.nx), wnz = Math.round(r.nz);
+    if (player.coverT > 0.3 && rayBoxes(nx, player.pos.y + 1.0, nz, -wnx, 0, -wnz, 1.0)) {
+      player.cover = { nx: wnx, nz: wnz, peek: 0 }; player.coverT = 0;
+      if (!G.coverTold) { G.coverTold = true; toast('🧱 In Deckung – an der Wand entlang schleichen, am Rand ums Eck schauen. Weg von der Wand = raus'); }
+    }
+  } else player.coverT = 0;
+  $('coverTag').style.display = player.cover ? 'block' : 'none';
   // mountains too steep to walk up
   if (!(Math.abs(nx) < WALL_OUT && Math.abs(nz) < WALL_OUT) && slopeAt(nx, nz) > 0.85 && groundAt(nx, nz, player.pos.y + 0.6) > player.pos.y + 0.02) { nx = player.pos.x; nz = player.pos.z; }
   // stand on low objects (benches, fountain rim)
@@ -1168,6 +1196,13 @@ function updateCamera(dt) {
     const rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
     tx = player.pos.x + rx * sh; ty = player.pos.y + lerp(1.6, 1.7, a); tz = player.pos.z + rz * sh;
     fovT = lerp(68, 58, a) + (player.speed > 6 ? 4 : 0);
+    // in cover: camera a bit closer and off the wall; at a corner it slides past the edge so you can look round it
+    cam.peekK = damp(cam.peekK || 0, player.cover ? player.cover.peek || 0 : 0, 8, dt);
+    if (player.cover) {
+      const c = player.cover;
+      tx = player.pos.x - c.nz * cam.peekK * 1.7 + c.nx * 0.45; tz = player.pos.z + c.nx * cam.peekK * 1.7 + c.nz * 0.45;
+      dist = Math.min(dist, 3.3);
+    }
   }
   cam.fov = damp(cam.fov, fovT, 5, dt);
   if (Math.abs(camera.fov - cam.fov) > 0.05) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }

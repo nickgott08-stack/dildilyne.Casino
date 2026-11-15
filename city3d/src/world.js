@@ -168,8 +168,27 @@ export function groundY(x, z) {
 export function groundAt(x, z, refY = 1e9) {
   const g = groundY(x, z);
   const d = deckAt(x, z, refY);
-  return d > g ? d : g;
+  let best = d > g ? d : g;
+  if (floors.length && x > floorBB.x0 && x < floorBB.x1 && z > floorBB.z0 && z < floorBB.z1) {
+    for (const f of floors) {
+      if (x < f.x0 || x > f.x1 || z < f.z0 || z > f.z1) continue;
+      const h = f.y2 === f.y ? f.y : f.y + (f.y2 - f.y) * (f.axis === 'x' ? (x - f.x0) / (f.x1 - f.x0) : (z - f.z0) / (f.z1 - f.z0));
+      if (h <= refY && h > best) best = h;
+    }
+  }
+  return best;
 }
+// walkable surfaces above the ground (terraces, balconies, stairs): a rectangle at height y; with y2 it is a ramp that
+// rises from y (at x0 or z0) to y2 (at x1 or z1) along `axis`. groundAt only returns floors below refY (feet + step
+// height), so you can walk underneath a balcony and on top of it. Walls/edges still need addBox with { y0 }.
+const floors = [], floorBB = { x0: 1e9, x1: -1e9, z0: 1e9, z1: -1e9 };
+export function addFloor(x0, x1, z0, z1, y, y2 = y, axis = 'x') {
+  const f = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), y, y2, axis };
+  floors.push(f);
+  floorBB.x0 = Math.min(floorBB.x0, f.x0); floorBB.x1 = Math.max(floorBB.x1, f.x1); floorBB.z0 = Math.min(floorBB.z0, f.z0); floorBB.z1 = Math.max(floorBB.z1, f.z1);
+  return f;
+}
+world.addFloor = addFloor; world.addBox = addBox; world.floors = floors; // also reachable for tests (G.world)
 
 
 // segment vs AABB test for line of sight / bullets (2D slab + height)

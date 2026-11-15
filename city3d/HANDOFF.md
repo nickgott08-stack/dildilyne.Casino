@@ -237,3 +237,17 @@ Dildi City (Quellcode):
 - Wachen: `sentryPosts` sind feste Routen – Rundwege mit 4 Ecken (`loop()`) oder Hin-und-zurück; heist.js läuft beliebig viele Punkte ab.
   Im Vorhof direkt hinter dem Tor steht niemand. 13 Wachen + Torwache.
 - Flucht-Jeeps starten auf dem Heli-Weg außerhalb der Mauer.
+
+## Neues Anwesen – Schritt 1: Technik (15.11.)
+Nick will fürs Finale ein dichtes, GTA-artiges Anwesen auf 3 Ebenen nach seiner Skizze (gespiegelt, Westtor links). Plan in 4 Schritten:
+1 Technik (dieser Stand) · 2 grauer Rohbau nach Skizze · 3 Ausbau (Bögen, Säulen, Dächer, rundere Figuren) · 4 Wachrouten/Feinschliff.
+Ebenen: Pool + Garage/Westtor = unten (Gelände-Höhe), Haupttor/Torhof = Mitte (+3,4 m, Rampe vor dem Tor), Villa + U-Dach = oben.
+Skizze: Torhaus, Torhof, Garten (NO in der Skizze → gespiegelt NW), 2 feste Gebäude neben dem Torhof, Höfe mit 3 Torbögen, Villa mit Aufzug
+in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der Klippe, Garage am Westtor; 7 Treppen, 6 Torbögen,
+9 Wachen + Wachen unter den Dächern. „Grüne Kästen“ = offene Hallen (Stützen + Dach), kein Brunnen.
+- `addFloor(x0, x1, z0, z1, y, y2, axis)` in world.js: begehbare Flächen über dem Boden (Terrasse, Balkon; mit `y2` Rampe/Treppe).
+  `groundAt` nimmt die höchste Fläche unter `refY` → man kann drunter durch und oben drauf laufen. Wände/Körper weiter per `addBox(…, { y0 })`.
+- Deckung (main.js, nur wenn `G.coverOK`, setzt heist.js auf der Insel): 0,3 s gegen eine Wand laufen → `player.cover = { nx, nz, peek }`.
+  An der Wand entlang (2,3 m/s), am Wandende schaut die Kamera ums Eck (`cam.peekK`), weg von der Wand oder Zielen = raus.
+  Wachen sehen einen in Deckung nur bis 7 m (sonst 14). Anzeige `#coverTag`.
+- Getestet (Probestück per `G.world.addFloor/addBox`): Treppe hoch, von der Kante fallen, Terrasse blockt von unten, Deckung rein/entlang/Ecke/raus.
