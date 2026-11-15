@@ -55,7 +55,7 @@ export function rawH(x, z) {
 // kind: road (asphalt), dirt, deck (elevated, own heights)
 // yMode: 'given' uses y from points, 'terrain' follows smoothed terrain, 'pass' climbs from the city over a pass
 export const ROADS = [];
-const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway, ring: !!o.ring }; ROADS.push(r); return r; };
+const R = (name, pts, o = {}) => { const r = { name, pts, w: o.w || 11, kind: o.kind || 'road', yMode: o.yMode || (pts[0].length > 2 ? 'given' : 'terrain'), fall: o.fall || 18, traffic: o.traffic !== false, lamps: o.lamps, bump: o.bump || 7, oneway: !!o.oneway, ring: !!o.ring, prio: !!o.prio }; ROADS.push(r); return r; };
 
 // --- mountain passes from the west/east city exits into the two deserts ---
 R('Pass West-Süd', [[-236, -68], [-264, -69], [-294, -80], [-324, -68], [-352, -82], [-372, -94]], { yMode: 'pass', fall: 30, lamps: true, bump: 7, w: 14 });
@@ -79,19 +79,21 @@ R('Gehöft-Weg', [[480, 240], [502, 256], [516, 262], [520, 266]], { kind: 'dirt
 // --- south: harbour road + flat crossing "Dildi-Kreuz" (first a flyover, then a roundabout – the AI drivers coped with neither) ---
 // Querstraße West/Ost link the two outer south exits of the city (x = ±136) and cross the Hafenstraße at (0, -322).
 // Buildings around it (Nick's models, dildiKreuz.decor) stand right at these roads with asphalt driveways.
+// Right of way: the north–south roads (prio) go first, cars from the side roads wait at the stop line (ai.js, signs in outskirts.js).
 // Crossings: the four arms end at the edge of an 11 m asphalt square (short road without traffic), so cars can turn
 // into any arm at the road end (junctionsAt in ai.js) and nothing overlaps.
-R('Hafenstraße', [[0, -236, 0], [0, -270, 0], [0, -316.5, 0]], { w: 12, lamps: true });
-R('Hafenstraße Süd', [[0, -327.5, 0], [0, -380, 0], [0, -416, 0]], { w: 12, lamps: true });
+R('Hafenstraße', [[0, -236, 0], [0, -270, 0], [0, -316.5, 0]], { w: 12, lamps: true, prio: true });
+R('Hafenstraße Süd', [[0, -327.5, 0], [0, -380, 0], [0, -416, 0]], { w: 12, lamps: true, prio: true });
 R('Querstraße West', [[-136, -236, 0], [-136, -262, 0], [-131, -292, 0], [-117, -313, 0], [-95, -322, 0], [-60, -322, 0], [-5.5, -322, 0]], { w: 12, lamps: true });
 R('Querstraße Ost', [[5.5, -322, 0], [60, -322, 0], [95, -322, 0], [117, -313, 0], [131, -292, 0], [136, -262, 0], [136, -236, 0]], { w: 12, lamps: true });
 R('Dildi-Kreuz', [[0, -316.5, 0], [0, -327.5, 0]], { w: 11, traffic: false });
 // island roads (flat); Brückenstraße × Kaistraße is a normal crossing as well
-R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -554.5, 0]], { w: 12, lamps: true });
-R('Brückenstraße Süd', [[0, -565.5, 0], [0, -595, 0], [0, -610, 0]], { w: 12, lamps: true });
+R('Brückenstraße', [[0, -416, 0], [0, -472, 0], [0, -520, 0], [0, -554.5, 0]], { w: 12, lamps: true, prio: true });
+R('Brückenstraße Süd', [[0, -565.5, 0], [0, -595, 0], [0, -610, 0]], { w: 12, lamps: true, prio: true });
 R('Kaistraße West', [[-215, -560, 0], [-140, -560, 0], [-60, -560, 0], [-5.5, -560, 0]], { w: 11, lamps: true });
 R('Kaistraße Ost', [[5.5, -560, 0], [70, -560, 0], [150, -560, 0], [191, -560, 0]], { w: 11, lamps: true });
 R('Hafenkreuzung', [[0, -554.5, 0], [0, -565.5, 0]], { w: 11, traffic: false });
+export const CROSSINGS = [{ x: 0, z: -322, w: 12 }, { x: 0, z: -560, w: 11 }]; // w: width of the side road
 R('Dockring', [[-60, -560, 0], [-66, -610, 0], [-110, -645, 0], [-170, -640, 0], [-210, -600, 0], [-215, -560, 0]], { w: 10 });
 // roundabout at the end of the Brückenstraße (was a dead end where cars tried to turn on the spot).
 // One-way ring, counter-clockwise from above (right-hand traffic): start at the top, east, south, west, back to the top.

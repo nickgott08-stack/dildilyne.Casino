@@ -1141,7 +1141,6 @@ export function buildWorld(scene, quality) {
       world.signMats.push(sg.material);
       world.parkSpots.push({ x: cx - 3, z: cz - 3, h: 0.0, model: 'rs6' });
       world.landmarks.push({ name: 'Tankstelle', x: cx, z: cz, icon: '⛽', color: '#ffd000' });
-      world.pickups.push({ type: 'ak', x: lx0 + 4, z: lz1 - 12 });
     } else if (type === 'hideout') {
       addBuilding(lx0 + 0.6, cx - 2, lz0 + 0.6, lz1 - 0.6, 21.2, 2, { shops: true });
       // the hideout: old workshop with garage doors and a yard

@@ -215,3 +215,16 @@ Dildi City (Quellcode):
   (`junctionsAt`), rollt langsam heran (`endsAtCrossing` in ai.js). Gebiet/Schilder heißen wieder „Dildi-Kreuz“.
 - Geblieben: Kreisverkehr am Ende der Brückenstraße (`KREISEL`) und Wendeschleife Flughafen (`WENDE`) zum Wenden.
 - Bus-Route (main.js `serviceRoutes`) fährt über die Hafenkreuzung statt durch den Hafenkreisel. Nicht getestet.
+
+## Vorfahrt, Finale Teil 1: Türme, Wald, Waffen (15.11.) – nicht getestet
+- Kreuzungen (`CROSSINGS` in geo.js): Nord-Süd-Straßen haben `prio`. Wer aus der Seitenstraße kommt, wartet an der Haltelinie, solange
+  auf der Hauptstraße im Umkreis von 26 m etwas fährt (`mainRoadBusy` in ai.js, nach 8 s fährt er trotzdem). Schilder (Stopp / gelbe Raute)
+  und Haltelinien in outskirts.js.
+- Finale: Flugzeug hält am Ostende der Piste neben dem Jeep (`arriveIsland`). Baumwand (2 Reihen, Kollision r 1,4) beidseits des Waldwegs
+  und um die Pisten-Lichtung (radj.js) – man muss den Weg nehmen.
+- 4 Wachtürme am Waldweg (`isl.roadTowers`, radj.js): Lichtfleck (r 5,2) schwenkt quer über den Weg (heist.js `updateFinale`),
+  ~0,25 s im Licht → `raiseAlarm` (Wachen wissen Bescheid, Mission läuft weiter). Turmwache ist nur eine Figur (nicht abschießbar).
+- Waffen: AK gibt es nur noch im Finale (`has[2]` wird dort gesetzt, in `cleanupFinale` entfernt; Shop-Eintrag + Pickup entfernt).
+  Pistole mit Schalldämpfer: auf der Insel keine Zielhilfe (`G.noAssist`), Kopfschuss auf Wache = sofort tot und lautlos.
+  AK-Schuss auf der Insel → sofort Alarm (`G.lastShot.w`).
+- Offen (Teil 2): Anwesen vergrößern, Höfe/Gebäude/Pflanzen, feste Wachrouten, keine Wache direkt hinterm Tor.

@@ -3,7 +3,7 @@ import './dildi_cars.js';
 const DC = globalThis.DildiCars;
 import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, lerp, clamp, tiledMeshes } from './util.js';
 import { world, roadC, RW, BOUND, H } from './world.js';
-import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround, KREISEL, WENDE, BUS_STOP } from './geo.js';
+import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround, KREISEL, WENDE, BUS_STOP, CROSSINGS } from './geo.js';
 
 export { LAKE, ISLAND };
 export const DOCKS = { x0: ISLAND.x0, x1: -10, z0: ISLAND.z0, z1: ISLAND.z1, name: 'Docks' };
@@ -655,6 +655,26 @@ export function buildOutskirts(scene, K) {
       for (let f = 0; f < 6; f++) plain.push(cbox(0.45, 0.08, 2.8, x + Math.sin(f) * 1.2, 5.2, z + Math.cos(f) * 1.2, '#2e8b3a', f, -0.35));
     }
     addCirc(K2.x, K2.z, ri + 0.4, 1.4, -1);
+  }
+  // crossings (Dildi-Kreuz, Hafenkreuzung): right-of-way signs + stop lines.
+  // Main road (north–south): yellow diamond. Side roads: stop sign and a white stop line on the right lane.
+  for (const C of CROSSINGS) {
+    const plate = (seg, r, col, x, y, z, yaw, t, th0 = 0) => { const g = new THREE.CylinderGeometry(r, r, t, seg, 1, false, th0); g.rotateX(Math.PI / 2); g.rotateY(yaw); g.translate(x, y, z); colorize(g, col); return g; };
+    for (const [ux, uz, main, hw] of [[0, 1, true, 6], [0, -1, true, 6], [1, 0, false, C.w / 2], [-1, 0, false, C.w / 2]]) {
+      // a driver coming in drives along -u; his right-hand side is (uz, -ux)
+      const rx = uz, rz = -ux, d0 = 9.5;
+      const x = C.x + ux * d0 + rx * (hw + 1.3), z = C.z + uz * d0 + rz * (hw + 1.3), yaw = Math.atan2(ux, uz);
+      metal.push(ccyl(0.05, 0.05, 2.9, 6, x, 1.45, z, '#8d9299'));
+      addCirc(x, z, 0.12, 2.9, -1);
+      const fx = x + ux * 0.05, fz = z + uz * 0.05, f2x = x + ux * 0.075, f2z = z + uz * 0.075;
+      if (main) { plain.push(plate(4, 0.5, '#f5f5f5', fx, 2.55, fz, yaw, 0.04), plate(4, 0.36, '#f7c41f', f2x, 2.55, f2z, yaw, 0.04)); }
+      else {
+        plain.push(plate(8, 0.5, '#f5f5f5', fx, 2.55, fz, yaw, 0.04, Math.PI / 8), plate(8, 0.44, '#c8161d', f2x, 2.55, f2z, yaw, 0.04, Math.PI / 8));
+        plain.push(cbox(Math.abs(rz) * 0.56 + Math.abs(uz) * 0.02 + 0.02, 0.14, Math.abs(rx) * 0.56 + Math.abs(ux) * 0.02 + 0.02, x + ux * 0.1, 2.55, z + uz * 0.1, '#ffffff'));
+        // stop line across the right lane
+        mark.push(cbox(Math.abs(ux) * 0.45 + Math.abs(rx) * (hw - 0.4), 0.02, Math.abs(uz) * 0.45 + Math.abs(rz) * (hw - 0.4), C.x + ux * 7.2 + rx * hw / 2, 0.085, C.z + uz * 7.2 + rz * hw / 2, '#f2f2ee'));
+      }
+    }
   }
   // turning loop at the airport: grass island with kerb + a "Shuttle" sign; bus shelter at the terminal stop
   {
