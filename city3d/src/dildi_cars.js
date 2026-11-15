@@ -1106,7 +1106,7 @@
   }
 
   // --- Einzigartige Gebaeude ---
-  function diner(d, g, x, z) {           // Rasthof-Diner (Retro), Front -z
+  function diner(d, g, x, z, station = true) {           // Rasthof-Diner (Retro), Front -z
     const W = 12, D = 22;
     d.box('Steel', [x - W, 0.2, z - D / 2], [x + W, 4.6, z + D / 2]);
     for (let i = 0; i < 6; i++) d.box(i % 2 ? 'Steel' : 'HangarGrey', [x - W - 0.02, 0.2 + i * 0.6, z - D / 2 - 0.02], [x + W + 0.02, 0.5 + i * 0.6, z + D / 2 + 0.02]);
@@ -1122,13 +1122,22 @@
     g.box('GlowWarm', [x + W + 1.8, 12.4, z - D / 2 - 2.95], [x + W + 7.2, 12.6, z - D / 2 - 2.9]);
     g.hexa('GlowPink', [[x + W + 7.5, 10, z - D / 2 - 2.95], [x + W + 9.5, 11, z - D / 2 - 2.95], [x + W + 9.5, 11, z - D / 2 - 2.85], [x + W + 7.5, 10, z - D / 2 - 2.85],
       [x + W + 7.5, 12, z - D / 2 - 2.95], [x + W + 9.5, 11.01, z - D / 2 - 2.95], [x + W + 9.5, 11.01, z - D / 2 - 2.85], [x + W + 7.5, 12, z - D / 2 - 2.85]]);
-    // Tankstelle daneben
-    const tx = x - W - 16;
+    // Tankstelle daneben (Dildi-Kreuz: eigene Stelle an der Hafenstrasse, siehe petrolStation)
+    if (station) petrolStation(d, g, x - W - 16, z);
+    return [{ x0: x - W, x1: x + W, z0: z - D / 2, z1: z + D / 2, h: 5.3 }, { x0: x + W + 3, x1: x + W + 3.6, z0: z - D / 2 - 3, z1: z - D / 2 - 2.4, h: 14 }];
+  }
+
+  // Tankstellen-Dach mit 2 Zapfsaeulen; apron: Asphaltflaeche [x0, x1, z0, z1] als Zufahrt
+  function petrolStation(d, g, tx, z, apron) {
+    if (apron) d.box('Asphalt', [apron[0], 0, apron[2]], [apron[1], 0.035, apron[3]]);
     d.box('White', [tx - 9, 5.2, z - 8], [tx + 9, 6.0, z + 8]);
     g.box('GlowWhite', [tx - 8.5, 5.1, z - 7.5], [tx + 8.5, 5.2, z + 7.5]);
     for (const [a, b] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) d.box('Steel', [tx + a - 0.25, 0, z + b - 0.25], [tx + a + 0.25, 5.2, z + b + 0.25]);
     for (const a of [-3, 3]) { d.box('ChipRed', [tx + a - 0.5, 0.2, z - 0.35], [tx + a + 0.5, 1.9, z + 0.35]); d.box('Concrete', [tx + a - 1.5, 0.05, z - 1], [tx + a + 1.5, 0.25, z + 1]); }
-    return [{ x0: x - W, x1: x + W, z0: z - D / 2, z1: z + D / 2, h: 5.3 }, { x0: x + W + 3, x1: x + W + 3.6, z0: z - D / 2 - 3, z1: z - D / 2 - 2.4, h: 14 }];
+    const col = [];
+    for (const [a, b] of [[-7, -6], [7, -6], [-7, 6], [7, 6]]) col.push({ x0: tx + a - 0.3, x1: tx + a + 0.3, z0: z + b - 0.3, z1: z + b + 0.3, h: 6 });
+    for (const a of [-3, 3]) col.push({ x0: tx + a - 0.5, x1: tx + a + 0.5, z0: z - 0.35, z1: z + 0.35, h: 1.9 });
+    return col;
   }
 
   function motel(d, g, x, z) {           // 2-stoeckiges Motel mit Laubengang, Front -z
@@ -1257,20 +1266,29 @@
   function kreuzRoads() {
     const R = [];
     R.push({ name: 'Dildi-Kreuz', opts: { kind: 'deck', w: 14, lamps: true }, pts: smoothPts([[-136, -236, 0], [-136, -258, 0], [-140, -280, 1.5], [-128, -302, 5], [-100, -318, 8], [-60, -322, 9], [0, -322, 9], [60, -322, 9], [100, -318, 8], [128, -302, 5], [140, -280, 1.5], [136, -258, 0], [136, -236, 0]], 3) });
-    // Raute statt Kleeblatt: 4 gerade Auf-/Abfahrten. Jede zweigt von der Hochstrasse ab (aeusserer Rand buendig
-    // mit dem Rand der Hochstrasse), faehrt schraeg nach unten und muendet rechtwinklig in die Hafenstrasse.
+    // Raute: 4 Auf-/Abfahrten. Jede beginnt als Einfaedelspur: sie kommt unter der Hochstrasse hervor und laeuft
+    // ~40 m direkt neben ihr her (zusammen 2-spurig, ohne Luecke in der Schutzwand), erst dann trennt sie sich,
+    // faehrt im Bogen nach unten und faedelt schraeg (fast parallel) in die Hafenstrasse ein (z = -258 / -386).
     const D = R[0].pts;
-    const onDeck = (x) => { let b = D[0], bd = 1e9; for (const p of D) { const d = Math.abs(p[0] - x) + (p[1] < -300 ? 0 : 50); if (d < bd) { bd = d; b = p; } } return b; };
+    const deckIdx = (x) => { let b = 0, bd = 1e9; D.forEach((p, i) => { const d = Math.abs(p[0] - x) + (p[1] < -300 ? 0 : 50); if (d < bd) { bd = d; b = i; } }); return b; };
+    const beside = (x, o, sz) => {   // Punkt neben der Hochstrasse: o Meter seitlich (Richtung sz), knapp unter ihrer Fahrbahn
+      const i = deckIdx(x), p = D[i], a = D[Math.max(0, i - 1)], b = D[Math.min(D.length - 1, i + 1)];
+      let nx = -(b[1] - a[1]), nz = b[0] - a[0];
+      const l = Math.hypot(nx, nz) || 1; nx /= l; nz /= l;
+      if (nz * sz < 0) { nx = -nx; nz = -nz; }
+      return [+(p[0] + nx * o).toFixed(2), +(p[1] + nz * o).toFixed(2), +(p[2] - 0.03).toFixed(2)];
+    };
     for (const sx of SIDES) for (const sz of SIDES) {
-      const a = onDeck(sx * 82), b = onDeck(sx * 68);
       const pts = [
-        [a[0], a[1] + sz * 2.5, a[2]],
-        [b[0], b[1] + sz * 3.6, b[2] - 0.15],
-        [sx * 50, -322 + sz * 14, 7.2],
-        [sx * 34, -322 + sz * 28, 4.2],
-        [sx * 21, -322 + sz * 40, 1.6],
-        [sx * 12, -322 + sz * 46, 0.3],
-        [sx * 4, -322 + sz * 48, 0],
+        beside(sx * 100, 4, sz), beside(sx * 90, 8, sz), beside(sx * 80, 10.5, sz), beside(sx * 70, 10.5, sz), beside(sx * 60, 10.5, sz),
+        [sx * 50, -322 + sz * 13, 8.7],
+        [sx * 40, -322 + sz * 17, 7.8],
+        [sx * 31, -322 + sz * 23, 6.4],
+        [sx * 24, -322 + sz * 31, 4.8],
+        [sx * 19, -322 + sz * 40, 3.2],
+        [sx * 14, -322 + sz * 49, 1.5],
+        [sx * 9.5, -322 + sz * 57, 0.3],
+        [sx * 5, -322 + sz * 64, 0],
       ];
       R.push({ name: 'Rampe ' + (sz > 0 ? 'Nord' : 'Sued') + (sx > 0 ? 'ost' : 'west'), opts: { kind: 'deck', w: 9 }, pts: smoothPts(pts, 3) });
     }
@@ -1295,7 +1313,7 @@
     signGantry(mb, 0, -404, 'z', 0.2);
     col = col.concat(
       underBridge(mb, g, 110, -350),            // Skatepark unter der Hochstrasse (Ost)
-      diner(mb, g, -105, -385),                 // Rasthof-Diner + Tankstelle (Suedwest, am Wasser)
+      diner(mb, g, -105, -385, false),          // Rasthof-Diner (Suedwest, am Wasser)
       motel(mb, g, 105, -398),                  // Motel mit Pool (Suedost)
       billboard(mb, g, -96, -262, 0.5),         // Leucht-Plakatwand (Nordwest)
       billboard(mb, g, 96, -262, -0.5),
@@ -1311,7 +1329,7 @@
     group.userData = { colliders: col, glow: glowMat };
     return group;
   }
-  const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor };
+  const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor, places: () => Object.assign({}, KREUZ_EXTRAS) };
 
 
   // --- Weitere Gebaeude rund ums Dildi-Kreuz (sparsam: wenige Flaechen, alles in 1 Mesh) ---
@@ -1324,11 +1342,24 @@
     burger: [112, -282],       // Drive-in Nordost an der Kurve
     waschstrasse: [136, -355], // Ost, neben dem Skatepark
     meisterei: [-125, -350],   // West
-    kiosk: [-14, -406],        // Hafenstrasse Sued, an der Schilderbruecke
+    kiosk: [15, -393],         // Hafenstrasse Ost, gegenueber der Tankstelle (Wartende Leute: Hotspot im Spiel)
+    tankstelle: [-22, -393.5], // direkt an der Hafenstrasse (West), mit Asphalt-Zufahrt
   };
   function kreuzExtras(d, g, P) {
     P = Object.assign({}, KREUZ_EXTRAS, P || {});
     const col = [];
+    // keine Baeume auf Fahrbahnen (Rampen, Hafenstrasse, Tankstellen-Zufahrt)
+    const RP = kreuzRoads().slice(1).flatMap((r) => r.pts);
+    const onRoad = (x, z) => Math.abs(x) < 9 || RP.some((p) => Math.hypot(p[0] - x, p[1] - z) < 8) ||
+      (Math.abs(x - P.tankstelle[0]) < 18 && Math.abs(z - P.tankstelle[1]) < 13);
+    // 0) Tankstelle an der Hafenstrasse: Dach + Zapfsaeulen + Asphalt bis an die Fahrbahn
+    { const [x, z] = P.tankstelle;
+      col.push(...petrolStation(d, g, x, z, [x - 12, -5.8, z - 8.5, z + 8.5]));
+      // Preisschild-Mast an der Strasse
+      d.box('Steel', [-7.6, 0, z + 9.6], [-7.2, 6.5, z + 10]);
+      d.box('ChipRed', [-8.6, 4.2, z + 9.5], [-6.2, 6.6, z + 10.1]);
+      g.box('GlowWarm', [-8.4, 4.5, z + 10.12], [-6.4, 6.2, z + 10.16]);
+      col.push({ x0: -7.6, x1: -7.2, z0: z + 9.6, z1: z + 10, h: 6.6 }); }
     const ring = (x, z, r, y, n) => hexagon(x, z, 0, r, n, Math.PI / n, 1, 1).map(([a, b]) => [a, y, b]);
     const tree = (x, z, h) => { d.box('Wood', [x - 0.15, 0, z - 0.15], [x + 0.15, h * 0.35, z + 0.15]); d.convex('BottleGreen', [ring(x, z, h * 0.3, h * 0.3, 6), [[x, h, z]]].concat(ring(x, z, h * 0.3, h * 0.3, 6).map((p, i, A) => [p, A[(i + 1) % 6], [x, h, z]]))); };
     // 1) Wasserturm (in der Schleife Nordwest)
@@ -1360,7 +1391,7 @@
       d.box('LaneWhite', [cx - 2, 0, cz - 26], [cx + 2, 2.4, cz - 23]); }
     // 4) Park mit Baeumen + DILDI-Buchstaben (Schleife Suedost)
     { const [cx, cz] = P.park, r = rng(5);
-      for (let i = 0; i < 14; i++) { const a = r() * Math.PI * 2, dd = 8 + r() * 15; tree(cx + Math.cos(a) * dd, cz + Math.sin(a) * dd, 5 + r() * 4); }
+      for (let i = 0; i < 14; i++) { const a = r() * Math.PI * 2, dd = 8 + r() * 15, h = 5 + r() * 4, tx = cx + Math.cos(a) * dd, tz = cz + Math.sin(a) * dd; if (!onRoad(tx, tz)) tree(tx, tz, h); }
       // grosse Buchstaben "DILDI" (Block-Schrift aus Quadern), Blick zur Hafenstrasse
       const L = { D: [[0, 0, 0.6, 4], [0.6, 0, 1.8, 0.6], [0.6, 3.4, 1.8, 4], [1.8, 0.5, 2.4, 3.5]], I: [[0.9, 0, 1.5, 4]], L: [[0, 0, 0.6, 4], [0.6, 0, 2.2, 0.6]] };
       let ox = cz - 6;
@@ -1392,27 +1423,25 @@
       for (const k of [-1, 1]) { d.prism('ChipBlue', ring(x - 2.6, z + k * 9.3, 0.6, 0.2, 8), [0, 3.6, 0]); d.prism('FlagPink', ring(x + 2.6, z + k * 9.3, 0.6, 0.2, 8), [0, 3.6, 0]); }
       g.box('GlowCyan', [x - 4.62, 5.0, z - 9.12], [x + 4.62, 5.1, z + 9.12]);
       col.push({ x0: x - 4.5, x1: x + 4.5, z0: z - 9, z1: z + 9, h: 5.3 }); }
-    // 7) Autobahnmeisterei mit Salzkuppel (West)
+    // 7) Autobahnmeisterei (West) – die braune Salzkuppel daneben ist entfernt (Nicks Wunsch)
     { const [x, z] = P.meisterei;
       d.box('Hazard', [x - 10, 0.2, z - 6], [x + 10, 6, z + 6]);
       d.box('Concrete', [x - 10.3, 6, z - 6.3], [x + 10.3, 6.5, z + 6.3]);
       for (let i = 0; i < 3; i++) d.box('DarkSteel', [x - 8 + i * 6, 0.2, z - 6.05], [x - 3.5 + i * 6, 4.6, z - 6.0]);
-      const dz = z + 22, dx = x - 4;
-      d.convex('Wood', [ring(dx, dz, 8, 0, 8), ring(dx, dz, 5, 5.5, 8), [[dx, 8, dz]]].concat(
-        ring(dx, dz, 8, 0, 8).map((p, i, A) => [p, A[(i + 1) % 8], ring(dx, dz, 5, 5.5, 8)[(i + 1) % 8], ring(dx, dz, 5, 5.5, 8)[i]]),
-        ring(dx, dz, 5, 5.5, 8).map((p, i, A) => [p, A[(i + 1) % 8], [dx, 8, dz]])));
-      d.box('DarkSteel', [dx - 2, 0, dz - 8.05], [dx + 2, 3.5, dz - 7.6]);
       g.box('GlowWarm', [x - 0.6, 5, z - 6.3], [x + 0.6, 5.3, z - 6.05]);
-      col.push({ x0: x - 10, x1: x + 10, z0: z - 6, z1: z + 6, h: 6.5 }, { x0: dx - 7, x1: dx + 7, z0: dz - 7, z1: dz + 7, h: 8 }); }
-    // 8) Kiosk + Bushaltestelle an der Hafenstrasse (Sued)
-    { const [x, z] = P.kiosk;
-      d.box('ChipRed', [x - 3, 0.2, z - 2], [x + 3, 3, z + 2]); d.box('LaneWhite', [x - 3.3, 3, z - 2.3], [x + 3.3, 3.3, z + 2.3]);
-      g.box('GlowWin', [x - 2, 1.0, z + 2.0], [x + 2, 2.2, z + 2.05]);
-      const bx = -9;
-      d.box('Steel', [bx - 0.05, 0.2, z - 2.5], [bx + 0.05, 2.8, z - 2.4]); d.box('Steel', [bx - 0.05, 0.2, z + 2.4], [bx + 0.05, 2.8, z + 2.5]);
-      d.box('Glass', [bx - 0.03, 0.4, z - 2.4], [bx + 0.03, 2.6, z + 2.4]); d.box('DarkSteel', [bx - 1.6, 2.8, z - 2.6], [bx + 0.1, 3.0, z + 2.6]);
-      d.box('Hazard', [bx - 0.4, 0.2, z + 3], [bx - 0.3, 3.4, z + 3.1]); d.box('BottleGreen', [bx - 0.6, 3.0, z + 2.8], [bx - 0.1, 3.5, z + 3.3]);
-      col.push({ x0: x - 3, x1: x + 3, z0: z - 2, z1: z + 2, h: 3.3 }); }
+      col.push({ x0: x - 10, x1: x + 10, z0: z - 6, z1: z + 6, h: 6.5 }); }
+    // 8) Kiosk + Bushaltestelle an der Hafenstrasse (Seite s: -1 West, +1 Ost); Wartehaeuschen am Strassenrand,
+    //    Kiosk dahinter mit Fenster zur Haltestelle, Haltestellen-Schild davor
+    { const [x, z] = P.kiosk, s = x < 0 ? -1 : 1, bx = s * 9.5, kx = x + s * 2;
+      d.box('ChipRed', [kx - 3, 0.2, z - 2], [kx + 3, 3, z + 2]); d.box('LaneWhite', [kx - 3.3, 3, z - 2.3], [kx + 3.3, 3.3, z + 2.3]);
+      g.box('GlowWin', [kx - s * 3.05 - 0.03, 1.0, z - 1.6], [kx - s * 3.05 + 0.03, 2.2, z + 1.6]);
+      d.box('Concrete', [Math.min(bx, bx + s * 2.2) - 0.2, 0, z - 3.2], [Math.max(bx, bx + s * 2.2) + 0.2, 0.15, z + 3.2]);
+      d.box('Steel', [bx + s * 1.6 - 0.05, 0.15, z - 2.5], [bx + s * 1.6 + 0.05, 2.8, z - 2.4]); d.box('Steel', [bx + s * 1.6 - 0.05, 0.15, z + 2.4], [bx + s * 1.6 + 0.05, 2.8, z + 2.5]);
+      d.box('Glass', [bx + s * 1.6 - 0.03, 0.4, z - 2.4], [bx + s * 1.6 + 0.03, 2.6, z + 2.4]);
+      d.box('DarkSteel', [Math.min(bx, bx + s * 1.7) - 0.1, 2.8, z - 2.6], [Math.max(bx, bx + s * 1.7) + 0.1, 3.0, z + 2.6]);
+      d.box('Wood', [Math.min(bx + s * 0.9, bx + s * 1.5), 0.15, z - 1.6], [Math.max(bx + s * 0.9, bx + s * 1.5), 0.6, z + 1.6]);   // Bank
+      d.box('Hazard', [bx - 0.05, 0.15, z + 3.4], [bx + 0.05, 3.4, z + 3.5]); d.box('BottleGreen', [bx - 0.3, 3.0, z + 3.2], [bx + 0.3, 3.5, z + 3.7]);
+      col.push({ x0: kx - 3, x1: kx + 3, z0: z - 2, z1: z + 2, h: 3.3 }, { x0: bx + s * 1.6 - 0.1, x1: bx + s * 1.6 + 0.1, z0: z - 2.5, z1: z + 2.5, h: 2.8 }); }
     return col;
   }
 
@@ -1489,7 +1518,7 @@
       const K = KINDS[k], I = { body: new THREE.InstancedMesh(K.parts[0], mat, o.max), list: [] };
       I.body.castShadow = true; I.body.count = 0; root.add(I.body);
       if (K.parts[1]) { I.glow = new THREE.InstancedMesh(K.parts[1], glowMat, o.max); I.glow.count = 0; root.add(I.glow); }
-      if (K.stub) { I.stub = new THREE.InstancedMesh(K.stub, mat, o.max); I.stub.count = 0; I.stub.castShadow = true; root.add(I.stub); }
+      if (K.stub) { I.stub = new THREE.InstancedMesh(K.stub, mat, o.max); I.stub.count = 0; root.add(I.stub); } // Sockel: zu flach fuer Schatten
       if (K.lid) { I.lid = new THREE.InstancedMesh(K.lid, mat, o.max); I.lid.count = 0; root.add(I.lid); }
       return I;
     };
@@ -1599,11 +1628,12 @@
     }
     // Nur Objekte im Umkreis R um (cx, cz) zeichnen: Instanzen werden nach vorn umsortiert, count = sichtbare.
     // (Spiel ruft das alle paar Frames auf – vorher wurden immer alle Laternen der Karte gezeichnet.)
+    // Muelleimer/Tonnen sind klein: nur bis 60 % des Radius zeichnen
     function cull(cx, cz, R) {
       const R2 = R * R, n = {};
       for (const it of items) {
         const dx = it.x - cx, dz = it.z - cz;
-        if (dx * dx + dz * dz > R2) { it.idx = -1; continue; }
+        if (dx * dx + dz * dz > (it.kind === 'lamp' ? R2 : R2 * 0.36)) { it.idx = -1; continue; }
         const I = inst[it.kind];
         it.idx = n[it.kind] = (n[it.kind] || 0);
         n[it.kind]++;
@@ -1615,7 +1645,9 @@
         for (const m of [I.body, I.glow, I.stub, I.lid]) if (m) { m.count = c; m.instanceMatrix.needsUpdate = true; m.boundingSphere = null; }
       }
     }
-    return { group: root, add, update, scatterAlong, items, glow: glowMat, cull };
+    // Schatten der stehenden Objekte an/aus (Spiel: nur auf Grafikstufe "hoch")
+    function setShadows(on) { for (const k in inst) inst[k].body.castShadow = !!on; }
+    return { group: root, add, update, scatterAlong, items, glow: glowMat, cull, setShadows };
   }
 
   // ======================================================================

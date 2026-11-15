@@ -455,7 +455,10 @@ export class OutDriver {
       const prev = this.rf.road;
       const opts = junctionsAt(e.x, e.z, this.rf.road).filter((o) => o.road.traffic && o.dirs.length);
       if (opts.length) {
-        const o = pick(opts), myH = Math.atan2(v.fwd.x, v.fwd.z);
+        const myH = Math.atan2(v.fwd.x, v.fwd.z);
+        // prefer roads that go on in the direction of travel (no U-turn across the deck into a ramp next door)
+        const fits = (o) => o.dirs.some((d) => Math.abs(angleWrap(headOf(o.road.samples, o.idx, d) - myH)) < 1.75);
+        const good = opts.filter(fits), o = pick(good.length ? good : opts);
         // merging (e.g. a ramp onto the Hochstraße): go with the flow, not against it
         const dirs = o.dirs.filter((d) => Math.abs(angleWrap(headOf(o.road.samples, o.idx, d) - myH)) < 1.75);
         this.rf = new RoadFollow(o.road, o.idx, pick(dirs.length ? dirs : o.dirs)); if (o.road.ring) this.cameFrom = prev;

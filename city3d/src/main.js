@@ -6,7 +6,7 @@ import { buildMapCanvas, drawMinimap, BigMap, Waypoint } from './map.js';
 import { Missions } from './missions.js';
 import { findRoute } from './route.js';
 import { isLand, inCity, areaName } from './outskirts.js';
-import { makeHuman, animateHuman, nickLook, humanMat } from './human.js';
+import { makeHuman, animateHuman, nickLook, humanMat, setHumanLod } from './human.js';
 import { Vehicle, collideVehicles, MODELS } from './vehicles.js';
 import { TrafficDriver, PoliceDriver, OutDriver, Ped, randomSidewalkPoint, randomRoadSpawn, randomOutRoadSpawn, LoopDriver, buildRoute } from './ai.js';
 import { BUS_STOP, TRUCK_STOP } from './geo.js';
@@ -27,9 +27,9 @@ const QUALITY = {
   // shadowR: half size of the shadow area (m), shadowEvery: redraw shadows every n-th frame,
   // fxLights: point lights for muzzle flash / explosions, headLight: car headlight at night.
   // Every extra light is computed for every pixel, even at intensity 0 – so they are dropped on weaker settings.
-  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, traffic: 26, peds: 48, lod: 70 },
-  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 35, traffic: 21, peds: 40, lod: 50 },
-  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, traffic: 15, peds: 26, lod: 35 },
+  hoch: { pr: Math.min(window.devicePixelRatio || 1, 1.6), shadow: 2048, shadows: true, shadowR: 90, shadowEvery: 1, fxLights: true, headLight: true, pedShadow: 70, pedLimbs: true, pedLod: 60, pedFar: 140, propR: 170, propShadow: true, traffic: 26, peds: 48, lod: 70 },
+  mittel: { pr: Math.min(window.devicePixelRatio || 1, 1.2), shadow: 1024, shadows: true, shadowR: 62, shadowEvery: 2, fxLights: false, headLight: true, pedShadow: 30, pedLimbs: false, pedLod: 35, pedFar: 115, propR: 140, propShadow: false, traffic: 21, peds: 40, lod: 50 },
+  niedrig: { pr: 1, shadow: 512, shadows: false, shadowR: 62, shadowEvery: 1, fxLights: false, headLight: false, pedShadow: 0, pedLimbs: false, pedLod: 25, pedFar: 100, propR: 120, propShadow: false, traffic: 15, peds: 26, lod: 35 },
 };
 let qName = store.get('dc3d_q') || 'hoch';
 let Q = QUALITY[qName];
@@ -1639,11 +1639,13 @@ G.renderer = renderer;
 G.camera = camera;
 G.groundAt = groundAt;
 let shadowFrame = 0;
-function pedShadow(h, on) {
-  if (h._sh === on) return;
+// mode 0: no shadow, 1: only the body (1 draw call instead of 5 – "mittel"), 2: body + arms + legs
+function pedShadow(h, mode) {
+  if (h._sh === mode) return;
   if (!h._casters) { h._casters = []; h.root.traverse((o) => { if (o.isMesh && o.castShadow) h._casters.push(o); }); }
-  for (const m of h._casters) m.castShadow = on;
-  h._sh = on;
+  h._casters.forEach((m, i) => { m.castShadow = mode === 2 || (mode === 1 && i === 0); });
+  if (h.lod) h.lod.castShadow = mode > 0;
+  h._sh = mode;
 }
 // optional FPS counter (pause menu)
 let fpsOn = store.get('dc3d_fps') === '1', fpsT = 0, fpsFrames = 0;
@@ -1665,6 +1667,7 @@ function tickFps(dt) {
 // behind the fog are invisible anyway, so they are not drawn at all (big saving outside the city)
 let cullList = null, cullT = 0;
 const propCull = { x: 1e9, z: 1e9 };
+var propQ = null;
 function distCull() {
   if (!cullList) {
     cullList = [];
@@ -1676,8 +1679,10 @@ function distCull() {
   }
   const far = (scene.fog ? scene.fog.far : 700) + 40, cx = camera.position.x, cz = camera.position.z;
   for (const c of cullList) c.m.visible = Math.hypot(c.x - cx, c.z - cz) - c.r < far;
+  // quality changed: lamp/bin shadows only on "hoch" (many small casters in the shadow pass), new radius
+  if (propQ !== qName && world.props) { propQ = qName; if (world.props.setShadows) world.props.setShadows(Q.propShadow); propCull.x = 1e9; }
   // street furniture: redraw the instance list when the camera moved (lamps are small – 170 m is plenty)
-  if (world.props && world.props.cull && (Math.abs(cx - propCull.x) > 15 || Math.abs(cz - propCull.z) > 15)) { propCull.x = cx; propCull.z = cz; world.props.cull(cx, cz, 170); }
+  if (world.props && world.props.cull && (Math.abs(cx - propCull.x) > 15 || Math.abs(cz - propCull.z) > 15)) { propCull.x = cx; propCull.z = cz; world.props.cull(cx, cz, Q.propR); }
 }
 function render(dt) {
   tickFps(dt);
@@ -1691,8 +1696,10 @@ function render(dt) {
   // cull far humans; only nearby passers-by cast shadows (saves many draw calls in the shadow pass)
   for (const p of G.peds) {
     const d = Math.hypot(p.pos.x - camera.position.x, p.pos.z - camera.position.z);
-    p.h.root.visible = p.h.root.visible ? d < 140 : d < 125; // hysteresis: no blinking at the edge
-    pedShadow(p.h, d < Q.pedShadow);
+    p.h.root.visible = p.h.root.visible ? d < Q.pedFar : d < Q.pedFar - 15; // hysteresis: no blinking at the edge
+    // far away: 1 merged mesh instead of 5 parts (walking animation isn't visible there anyway)
+    setHumanLod(p.h, d > Q.pedLod && !p.dead);
+    pedShadow(p.h, d < Q.pedShadow ? (Q.pedLimbs ? 2 : 1) : 0);
   }
   // weaker settings: redraw the shadow map only every n-th frame (the sun barely moves)
   if (Q.shadows && Q.shadowEvery > 1 && ++shadowFrame >= Q.shadowEvery) { shadowFrame = 0; renderer.shadowMap.needsUpdate = true; }

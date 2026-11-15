@@ -171,3 +171,20 @@ Dildi City (Quellcode):
   `KREUZ_EXTRAS` (passend zur Raute statt zu den alten Kleeblatt-Schleifen), Kollision über `userData.colliders` wie die übrige Deko.
   Unsere Änderungen an der Datei (Raute in `kreuzRoads`, `glowMat`/`cull` bei den Laternen) bleiben – bei einer neuen Version von Nick
   wieder nur die neuen Teile übernehmen.
+
+## Nicks Fotos vom 15.11. (FPS, Kreuz-Rampen, Tankstelle)
+- **FPS**: Messung (Mittel) zeigte: Spiellogik unkritisch (~1 ms), aber Draw-Calls in der Stadt 237 → 415 seit „Mehr Leben“ + Laternen
+  (Passanten je 5 Teile + Schatten, mehr Verkehr). Jetzt:
+  - Passanten-LOD: ab `Q.pedLod` (hoch 60 / mittel 35 / niedrig 25 m) ein zusammengefügtes Modell statt 5 Teile (`setHumanLod` in human.js).
+  - Passanten-Schatten auf Mittel nur noch Rumpf (`pedLimbs`), bis 30 m; Sichtweite Passanten `pedFar` 140/115/100 m.
+  - Laternen/Mülleimer: Radius `propR` 170/140/120 m, Eimer/Tonnen nur bis 60 % davon, Schatten nur auf „Hoch“ (`props.setShadows`),
+    Laternen-Sockel ohne Schatten. Lichtkegel am Boden (`world.pools`) werden tagsüber nicht gezeichnet.
+  - Ergebnis Headless (Mittel): Stadtmitte 415 → ~370 Draw-Calls, 342k → 245k Dreiecke; Kreuz 150k → 112–128k Dreiecke.
+- **Rampen**: beginnen als Einfädelspur unter der Hochstraße (`beside()` in `kreuzRoads`), laufen ~40 m 2-spurig daneben her, dann im Bogen
+  runter und fädeln schräg in die Hafenstraße ein (z = −258 / −386). Schutzwand: Lücke nur noch, wo der Punkt wirklich auf der anderen
+  Fahrbahn liegt (`coveredByOtherDeck`, outskirts.js) – keine Löcher mehr.
+- KI: am Straßenende werden Anschlüsse in Fahrtrichtung bevorzugt (vorher wendete ein Auto quer in die Nachbar-Rampe → Stau oben).
+  Test: 4800 Schritte am Kreuz ohne stehende Autos.
+- Tankstelle steht jetzt allein an der Hafenstraße (West, `KREUZ_EXTRAS.tankstelle`, `petrolStation()` mit Asphalt-Zufahrt + Preisschild),
+  der Diner bleibt am Wasser. Kiosk + Bushaltestelle auf der Ostseite gegenüber (`kiosk`), mit Wartenden (Hotspot in outskirts.js);
+  standen vorher im Pfeiler der Schilderbrücke. Salzkuppel (brauner Klotz) entfernt. Parkbäume nicht mehr auf Fahrbahnen.

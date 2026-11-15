@@ -124,6 +124,7 @@ export function updateSky(S, t, focus, dt, quality) {
   const n2 = clamp((night - 0.15) / 0.6, 0, 1);
   for (const m of world.windowMats) m.emissiveIntensity = m.map && m.map.image.height < 200 ? lerp(0.2, 0.85, n2) : lerp(0.0, 1.25, n2);
   world.poolMat.opacity = n2 * 0.75;
+  if (world.pools) world.pools.visible = world.poolMat.opacity > 0.01; // daytime: don't draw the (invisible) light pools at all
   world.lampHeadMat.color.setScalar(lerp(0.55, 1.6, n2));
   for (const m of world.signMats) m.color.setScalar(lerp(0.75, 1.25, n2));
   S.n2 = n2;
