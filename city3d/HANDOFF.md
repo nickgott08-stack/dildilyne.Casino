@@ -251,3 +251,16 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   An der Wand entlang (2,3 m/s), am Wandende schaut die Kamera ums Eck (`cam.peekK`), weg von der Wand oder Zielen = raus.
   Wachen sehen einen in Deckung nur bis 7 m (sonst 14). Anzeige `#coverTag`.
 - Getestet (Probestück per `G.world.addFloor/addBox`): Treppe hoch, von der Kante fallen, Terrasse blockt von unten, Deckung rein/entlang/Ecke/raus.
+
+## Neues Anwesen – Schritt 2: grauer Rohbau nach Nicks Skizze (15.11.)
+- Estate-Block in radj.js komplett ersetzt (altes Anwesen mit Villa/Brunnen/Pool ist raus). Alles grau, nur Aufteilung.
+  Helfer im Block: `plat` (Plattform mit begehbarer Oberseite), `stairs` (Rampe + Stufen + Wangen), `line`/`rail` (Mauer/Geländer mit Lücken,
+  optional Torbogen-Sturz), `hall` (Stützen + Dach), `block` (festes Gebäude).
+- Ebenen: L1 = Gelände (Poolterrasse x −36…46 / z −1400…−1329, Weststreifen x −60…−36 mit Garage + Westtor),
+  L2 = +3,4 (Torhof, Garten, Mittelhof: x −36…66 / z −1329…−1240; Ostgasse, Osthöfe, U-Hof, Südosthof: x 46…120 / z −1400…−1297;
+  Ausguck SW; Podest vor dem Tor), L3 = +6,8 (Villa-Podest x 30…64 / z −1324…−1290; Nordost-Terrasse x 66…120 / z −1297…−1240).
+- 8 Treppen (eine mehr als in der Skizze: Nordost-Terrasse ↔ Osthöfe) + Rampe vom Waldweg (endet jetzt bei 74/−1234) aufs Podest vor dem Tor.
+  6 Torbögen (gelber Sturz). Aufzug: `ISL.lift` = Westseite der Villa auf dem Podest; `ISL.mansion` angepasst.
+- 15 Wachen auf festen Routen je Ebene + Torwache. `out.levels`, `out.towers = []` (Eck-Türme entfallen).
+- Getestet: alle 16 Bereiche zu Fuß vom Waldweg erreichbar (Flood-Fill mit echter Kollision), Wachen laufen auf richtiger Höhe ohne Alarm,
+  Jeep fährt die Rampe hoch. Nicht getestet: Finale-Ablauf ab Tor (Karten, Aufzug, Flucht), Karte (map.js zeichnet noch das alte Anwesen).
