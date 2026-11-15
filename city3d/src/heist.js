@@ -582,7 +582,7 @@ export function installFinale(Missions) {
     const j = this.job, G = this.G, I = this.isl;
     for (const s of j.sentries || []) if (s.cone) { this.scene.remove(s.cone); s.cone = null; }
     for (const c of j.cards || []) this.scene.remove(c.m);
-    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false;
+    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false; G.coverOK = false;
     G.player.has[2] = false; if (G.player.weapon === 2) G.player.weapon = 1; // the AK stays on the island
     for (const t of I.roadTowers || []) { t.seen = 0; t.spot.material.color.set('#ffe680'); }
     $('vign').style.boxShadow = '';
@@ -749,6 +749,7 @@ export function installFinale(Missions) {
     if (G.player.weapon === 0) G.player.weapon = 1;
     G.silenced = G.player.weapon === 1;
     G.noAssist = onIsl && G.player.weapon === 1;
+    G.coverOK = onIsl && !G.player.inVehicle; // taking cover at walls (main.js)
     if (onIsl && !j.alarm && G.lastShot && G.lastShot.w === 2 && G.time - G.lastShot.t < 0.3) this.raiseAlarm('Die AK war auf der ganzen Insel zu hören!');
     // watchtowers at the forest road: the light spot sweeps across the road – wait until it has moved on
     for (const t of I.roadTowers || []) {
@@ -815,7 +816,7 @@ export function installFinale(Missions) {
       }
       // can he see you?
       const dx = pp.x - s.pos.x, dz = pp.z - s.pos.z, d = Math.hypot(dx, dz);
-      const range = v ? 24 : 14;
+      const range = v ? 24 : G.player.cover ? 7 : 14; // pressed against a wall: only seen from close up
       if (d < range && G.lastShot && G.time - G.lastShot.t < 0.1 && d < 7) { this.raiseAlarm('Ein Schuss wurde gehört!'); continue; }
       let see = false;
       if (d < range) {
