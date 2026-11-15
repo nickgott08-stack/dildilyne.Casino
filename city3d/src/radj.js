@@ -11,14 +11,14 @@ const H = (x, z) => radjGround(x, z);
 
 export const ISL = {
   strip: RADJ_STRIP,
-  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [92, -1214], [44, -1232], [40, -1258]],
+  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [90, -1206], [54, -1214], [40, -1228]],
   estate: RADJ_ESTATE,
-  gate: { x: 40, z: -1270 },
-  westGate: { x: -40, z: -1335 },
+  gate: { x: 40, z: -1240 },
+  westGate: { x: -60, z: -1335 },
   mansion: { x0: 10, x1: 74, z0: -1366, z1: -1322 },
   lift: { x: 42, z: -1320 },
   helipad: { x: -186, z: -1332 },
-  helRoad: [[-40, -1335], [-80, -1340], [-120, -1326], [-160, -1334], [-186, -1332]],
+  helRoad: [[-60, -1335], [-80, -1340], [-120, -1326], [-160, -1334], [-186, -1332]],
   cellarLift: { x: 316, z: -1212 },
   glass: { x: 316, z: -1240 },
 };
@@ -489,6 +489,71 @@ export function buildRadjIsland(sceneRoot) {
       glow.push(cbox(gx1 - gx0 - 2, 0.08, 0.3, (gx0 + gx1) / 2, y + 4.55, (gz0 + gz1) / 2, '#ffffff'));
       out.garageCars = [{ type: 'ferrari', x: -25, z: -1288.5, h: Math.PI / 2, color: '#111111' }, { type: 'rs6', x: -25, z: -1297, h: Math.PI / 2, color: '#d4af37' }];
     }
+    // ---- bigger estate (15.11.): forecourt, inner wall, arcades at the fountain, guest house, gate house, store, pavilion, plants ----
+    {
+      const ROOF2 = '#b4552d', STONE = '#d9cdb4';
+      // the old outer wall line is now the inner wall between forecourt and courts: three open passages
+      for (const [a, b] of [[E.x0, -50], [-44, 33], [47, 98], [104, E.x1]]) wall(a, b, -1270.4, -1269.6);
+      for (const x of [-50, -44, 33, 47, 98, 104]) plain.push(cbox(1.3, wh + 0.9, 1.3, x, y + (wh + 0.9) / 2 - 0.5, -1270, '#d8cfbd'), cbox(1.6, 0.25, 1.6, x, y + wh + 0.5, -1270, ROOF2));
+      plain.push(cbox(14, 0.9, 1.0, 40, y + wh + 0.3, -1270, '#d8cfbd'), hipRoof(33, 47, -1270.6, -1269.4, y + wh + 0.75, 1.0, ROOF2, 0.5)); // arch over the main passage
+      const cypress = (x, z, h = 8) => { plain.push(ccyl(0.05, 1.0, h, 7, x, y + h / 2 + 0.4, z, '#1f4a2a'), ccyl(0.16, 0.2, 0.8, 5, x, y + 0.4, z, '#4d3522')); addCirc(x, z, 0.6, y + h, y - 1); };
+      const palm = (x, z, h = 6.5) => {
+        plain.push(ccyl(0.2, 0.32, h, 6, x, y + h / 2, z, '#8a6a45'));
+        for (let a = 0; a < 6; a++) plain.push(cbox(0.5, 0.08, 3.2, x + Math.sin(a) * 1.4, y + h, z + Math.cos(a) * 1.4, '#2e8b3a', a, -0.35));
+        addCirc(x, z, 0.35, y + h, y - 1);
+      };
+      const planter = (x, z, col = '#d94f8a') => { plain.push(cbox(2.6, 0.6, 1.2, x, y + 0.3, z, '#e8e0cf'), cbox(2.3, 0.35, 0.9, x, y + 0.72, z, '#2f6b2c'), cbox(1.9, 0.14, 0.6, x, y + 0.95, z, col)); addBox(x - 1.3, x + 1.3, z - 0.6, z + 0.6, y + 0.9, { y0: y - 1 }); };
+      const bed = (x, z, w, d, col) => plain.push(cbox(w + 0.5, 0.16, d + 0.5, x, y + 0.1, z, '#8a7a5c'), cbox(w, 0.3, d, x, y + 0.2, z, '#2f6b2c'), cbox(w - 0.8, 0.12, d - 0.8, x, y + 0.4, z, col));
+      const house = (x0, x1, z0, z1, h, col, roofH, doorSide) => {
+        plain.push(cbox(x1 - x0, h, z1 - z0, (x0 + x1) / 2, y + h / 2, (z0 + z1) / 2, col), cbox(x1 - x0 + 0.3, 0.5, z1 - z0 + 0.3, (x0 + x1) / 2, y + 0.25, (z0 + z1) / 2, STONE));
+        plain.push(hipRoof(x0, x1, z0, z1, y + h, roofH, ROOF2, 0.9));
+        addBox(x0, x1, z0, z1, y + h + roofH * 0.5, { y0: y - 1 });
+        // windows (glow at night like the garden lamps) + a door on the given side (+1: south face z0, -1: north face z1)
+        const fz = doorSide > 0 ? z0 - 0.03 : z1 + 0.03;
+        for (let x = x0 + 2.2; x < x1 - 1.6; x += 3.6) { plain.push(cbox(1.5, 1.7, 0.08, x, y + 2.2, fz, '#f5f2ea')); glow.push(cbox(1.2, 1.4, 0.1, x, y + 2.2, fz + (doorSide > 0 ? -0.02 : 0.02), '#ffd890')); }
+        plain.push(cbox(1.4, 2.4, 0.1, (x0 + x1) / 2 + 1.8, y + 1.2, fz, '#5a3a22'));
+      };
+      // forecourt: cypress alley at the drive, planters, gate house (west) and store house (east)
+      for (let z = -1246; z >= -1266; z -= 5) for (const sx of [-1, 1]) cypress(g.x + sx * 7.5, z);
+      for (const z of [-1250, -1260]) for (const sx of [-1, 1]) planter(g.x + sx * 11.5, z, sx > 0 ? '#d94f8a' : '#f2c230');
+      house(-30, -14, -1264, -1252, 4.2, '#e9dcc3', 2.6, 1);
+      house(72, 96, -1264, -1250, 5.0, '#d9b58a', 3.2, 1);
+      for (const [x, z] of [[-40, -1246], [-6, -1246], [62, -1246], [108, -1246], [-54, -1258], [112, -1262]]) cypress(x, z, 7);
+      bed(8, -1258, 12, 6, '#f2c230'); bed(60, -1244.5, 10, 3, '#d94f8a');
+      for (const [x, z] of [[14, -1250], [14, -1266], [66, -1266]]) { plain.push(cbox(0.12, 2.2, 0.12, x, y + 1.1, z, '#2b2b2b')); glow.push(cbox(0.36, 0.36, 0.36, x, y + 2.3, z, '#ffe2b0')); }
+      // fountain court: colonnades with terracotta roofs on both sides, paved cross paths to garage and pool
+      for (const cx of [20, 60]) {
+        for (let z = -1314; z <= -1286; z += 4) { plain.push(ccyl(0.28, 0.34, 3.6, 8, cx, y + 1.8, z, STONE), cbox(0.9, 0.25, 0.9, cx, y + 3.7, z, STONE)); addCirc(cx, z, 0.4, y + 3.8, y - 1); }
+        plain.push(cbox(1.2, 0.35, 30, cx, y + 4.0, -1300, STONE), hipRoof(cx - 1.6, cx + 1.6, -1315, -1285, y + 4.15, 1.1, ROOF2, 0.4));
+      }
+      plain.push(cbox(48, 0.06, 3, 10, y + 0.065, -1295, '#b9a98a'), cbox(22, 0.06, 3, 70, y + 0.065, -1295, '#b9a98a'), cbox(3, 0.06, 20, -6, y + 0.065, -1282, '#b9a98a'));
+      // pergola at the pool loungers, palms, flower beds
+      for (let x = 84; x <= 106; x += 5.5) plain.push(cbox(0.14, 2.6, 0.14, x, y + 1.3, -1286.8, '#f5f2ea'), cbox(0.14, 2.6, 0.14, x, y + 1.3, -1283.4, '#f5f2ea'), cbox(0.16, 0.14, 4.2, x, y + 2.65, -1285.1, '#f5f2ea'));
+      plain.push(cbox(23, 0.12, 0.16, 95, y + 2.75, -1286.8, '#f5f2ea'), cbox(23, 0.12, 0.16, 95, y + 2.75, -1283.4, '#f5f2ea'));
+      for (const [x, z] of [[-4, -1296], [70, -1300], [116, -1300], [116, -1340], [116, -1390], [-56, -1300], [-56, -1326], [-56, -1346], [2, -1385], [84, -1385], [-36, -1385]]) palm(x, z, 5.5 + ((x * 7 + z * 3) % 5 + 5) % 5 * 0.4);
+      bed(-20, -1338, 8, 4, '#d94f8a'); bed(104, -1332, 6, 6, '#f2c230'); bed(40, -1386, 14, 4, '#b06ad9'); bed(-50, -1340, 4, 4, '#f2c230');
+      for (const x of [0, 80]) for (const z of [-1326, -1360]) cypress(x, z, 7.5);
+      // guest house in the west strip: two storeys in terracotta red with arches, balcony and hip roof
+      {
+        const x0 = -58, x1 = -46, z0 = -1390, z1 = -1360, h = 7.4;
+        plain.push(cbox(x1 - x0, h, z1 - z0, (x0 + x1) / 2, y + h / 2, (z0 + z1) / 2, '#b5533c'), cbox(x1 - x0 + 0.3, 0.6, z1 - z0 + 0.3, (x0 + x1) / 2, y + 0.3, (z0 + z1) / 2, STONE));
+        plain.push(hipRoof(x0, x1, z0, z1, y + h, 3.4, ROOF2, 1.0));
+        addBox(x0, x1, z0, z1, y + h + 1.5, { y0: y - 1 });
+        plain.push(cbox(1.3, 0.25, z1 - z0 - 2, x1 + 0.65, y + 3.7, (z0 + z1) / 2, STONE), cbox(0.1, 0.9, z1 - z0 - 2, x1 + 1.25, y + 4.25, (z0 + z1) / 2, '#f5f2ea'));
+        for (let z = z0 + 3; z < z1 - 2; z += 4.2) {
+          plain.push(cbox(0.08, 2.6, 2.4, x1 + 0.03, y + 1.5, z, '#3a2418'), ccyl(1.2, 1.2, 0.08, 10, x1 + 0.03, y + 2.8, z, '#3a2418'));   // arch (dark)
+          plain.push(cbox(0.08, 1.9, 1.5, x1 + 0.03, y + 5.2, z, '#f5f2ea')); glow.push(cbox(0.1, 1.6, 1.2, x1 + 0.05, y + 5.2, z, '#ffd890'));
+        }
+      }
+      // pavilion in the south-east garden
+      {
+        const px = 108, pz = -1385;
+        plain.push(cbox(8.6, 0.3, 8.6, px, y + 0.15, pz, STONE));
+        for (const [a, b] of [[-3.6, -3.6], [3.6, -3.6], [-3.6, 3.6], [3.6, 3.6]]) { plain.push(ccyl(0.26, 0.32, 3.4, 8, px + a, y + 2.0, pz + b, '#f5f2ea')); addCirc(px + a, pz + b, 0.4, y + 3.6, y - 1); }
+        plain.push(cbox(8.2, 0.3, 8.2, px, y + 3.85, pz, STONE), hipRoof(px - 4.1, px + 4.1, pz - 4.1, pz + 4.1, y + 4.0, 2.4, ROOF2, 0.6));
+        plain.push(cbox(2.2, 0.5, 0.8, px, y + 0.55, pz, '#5a3a22'));
+      }
+    }
     // watchtowers in the north-east and south-west corners with searchlights
     out.towers = [];
     for (const [tx, tz] of [[E.x1 - 4, E.z1 - 4], [E.x0 + 4, E.z0 + 4]]) {
@@ -601,12 +666,18 @@ export function buildRadjIsland(sceneRoot) {
       plain.push(ccyl(0.3, 4.2, 1.6, 8, gx, y + 4.1, gz, '#b03a2e'));
     }
     out.estateY = y;
+    // fixed patrol routes (closed loops or there-and-back); nobody stands in the forecourt right behind the gate.
+    // All lines keep clear of walls, hedges, statues, columns and palms.
+    const loop = (x0, x1, z0, z1, start = 0) => { const P = [[x0, z1], [x1, z1], [x1, z0], [x0, z0]]; return P.slice(start).concat(P.slice(0, start)); };
     out.sentryPosts = [
-      [[-30, -1305], [-30, -1330]], [[112, -1310], [112, -1345]], [[18, -1290], [28, -1290]], [[52, -1290], [62, -1290]],
-      [[-30, -1345], [-30, -1392]], [[112, -1355], [112, -1392]], [[-10, -1394], [30, -1394]], [[54, -1394], [96, -1394]],
-      [[-12, -1318], [-12, -1362]], [[96, -1318], [96, -1362]], [[20, -1372], [30, -1372]], [[-20, -1340], [-20, -1340]],
-      [[100, -1325], [100, -1325]], [[30, -1278], [50, -1278]], [[70, -1316], [70, -1316]], [[10, -1316], [10, -1316]],
-      [[-34, -1372], [-14, -1372]], [[78, -1282], [104, -1282]],
+      loop(24, 56, -1316, -1284), loop(24, 56, -1316, -1284, 2),     // fountain court, two guards opposite each other
+      loop(-38, -10, -1306, -1280),                                    // round the garage
+      loop(78, 112, -1308, -1281),                                     // round the pool
+      loop(96, 112, -1364, -1320), loop(-28, -12, -1364, -1320),       // east / west of the mansion
+      loop(-10, 96, -1394, -1373), loop(-10, 96, -1394, -1373, 2),     // behind the mansion
+      [[-50, -1280], [-50, -1326]], [[-43, -1344], [-43, -1394]],      // west strip, guest house
+      [[0, -1318], [18, -1318]], [[66, -1318], [84, -1318]],           // in front of the mansion
+      [[100, -1376], [114, -1376]],                                    // pavilion
     ];
   }
   // ---- helipad + helicopter ----

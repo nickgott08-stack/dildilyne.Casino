@@ -702,7 +702,7 @@ export function installFinale(Missions) {
     this.raiseAlarm('Radj weiß Bescheid – ab zum Helikopter!', fromNet);
     I.westGateCol.off = true; I.westGateMesh.visible = false;
     // two jeeps full of Radj's men come after you
-    for (const [x, z] of [[-60, -1300], [-80, -1380]]) {
+    for (const [x, z] of [[-84, -1341], [-118, -1327]]) { // on the helipad road, outside the (now bigger) estate
       const v = new Vehicle(this.scene, 'jeep', x, z, Math.PI / 2, '#111111');
       v.keep = true;
       v.driver = new ChaseDriver(v);
@@ -808,8 +808,10 @@ export function installFinale(Missions) {
       const tgt = s.route[s.leg];
       if (Math.hypot(s.pos.x - tgt[0], s.pos.z - tgt[1]) < 0.9) {
         s.waitT = (s.waitT || 0) + dt;
-        s.lookYaw = Math.atan2(tgt[0] - s.route[1 - s.leg][0], tgt[1] - s.route[1 - s.leg][1]) + Math.sin(G.time * 0.9 + s.id) * 1.1;
-        if (s.waitT > 3.5) { s.waitT = 0; s.leg = 1 - s.leg; const n2 = s.route[s.leg]; s.post = { x: n2[0], z: n2[1] }; }
+        // fixed routes: loops with several corners (short look-around at each) or there-and-back (longer stop at the ends)
+        const nR = s.route.length, prev = s.route[(s.leg - 1 + nR) % nR];
+        s.lookYaw = Math.atan2(tgt[0] - prev[0], tgt[1] - prev[1]) + Math.sin(G.time * 0.9 + s.id) * 1.1;
+        if (s.waitT > (nR > 2 ? 1.6 : 3.5)) { s.waitT = 0; s.leg = (s.leg + 1) % nR; const n2 = s.route[s.leg]; s.post = { x: n2[0], z: n2[1] }; }
       }
       // can he see you?
       const dx = pp.x - s.pos.x, dz = pp.z - s.pos.z, d = Math.hypot(dx, dz);
