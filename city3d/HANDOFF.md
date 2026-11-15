@@ -249,3 +249,8 @@ Dildi City (Quellcode):
   `hecke()`, `pool()` (Form aus Nicks Zeichnung, 5,0 × 3,9 m mit Steinrand; `depth > 0` braucht ein Loch im Boden in Form von
   `poolOutline(0.3)`, `depth: 0` = flach aufliegend).
 - Offen: wo im Spiel (Nick fragen), dann einbauen + Kollision über `addBox`.
+- **Seehaus** (`seehaus()` in mediterran.js, 15.11. abends): L-förmige, um 6 Stufen erhöhte Arkadenhalle mit Ziegeldach für die Meerkante
+  des Anwesen-Entwurfs. Ersetzt dort das lange Gebäude mit Dachterrasse + das Geländer, geht um die Westecke bis zur Garage, endet an der
+  höheren Ebene (x = 10; Treppe 6 entfernt). Beide Langseiten offen (Bögen + Balustrade), Treppe vom Pool im Bogen bei x ≈ −8.
+  Layout (aus `entwurf/mk_entwurf.py` des anderen Chats, lesbar übertragen) in `tests/preview_anwesen.js`;
+  `PW=$(npm root -g)/playwright node tests/render_anwesen.mjs <ordner>` baut `Anwesen_Entwurf.html` + Bilder (dauert ~3 Min).

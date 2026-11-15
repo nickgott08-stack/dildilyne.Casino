@@ -855,3 +855,75 @@ export function pool(opts = {}) {
   grp.userData.water = inner;
   return grp;
 }
+
+// Bausteine für eigene Zusammenstellungen (Anwesen-Entwurf)
+export { P as mediterranParts, finish as mediterranFinish, box as mBox, scaleUV as mScaleUV };
+
+// ---------------------------------------------------------------- 8) Seehaus (Nicks Wunsch, Meerseite des Anwesens)
+// L-förmige, erhöhte Arkadenhalle mit Ziegeldach. Lokal: Außenecke = 0/0, langer Flügel läuft nach +x (Länge len),
+// Meerseite bei z = 0 (schaut nach +z), Hofseite bei z = −depth. Der kurze Flügel läuft von der Ecke nach −z (Länge wing).
+// Beide Langseiten offene Rundbögen mit Balustrade; im Bogen bei x ≈ stairAt führt eine Treppe vom Hof hinauf.
+export function seehaus(opts = {}) {
+  const o = { len: 46, wing: 7.45, depth: 4.5, steps: 6, rise: 0.165, span: 2.4, spring: 2.6, t: 0.6, stairAt: 28, ...opts };
+  const P_ = P(), pod = o.steps * o.rise, r = o.span / 2, H = o.spring + r + 0.9, t = o.t, D = o.depth;
+  let stairX = null;
+  // Bogenwand entlang lokal +x (0..L), dann um ry gedreht und nach (ax, az) geschoben
+  const run = (L, ax, az, ry, mode, stairLocal = null, e0 = 0, e1 = 0) => {
+    const put = (g, into) => { g.rotateY(ry); g.translate(ax, pod, az); into.push(g); };
+    if (mode === 'closed') { put(box(L, H, t, L / 2, H / 2, 0, 4), P_.stucco); }
+    else {
+      // e0/e1 = breitere Endpfeiler (wo eine Querwand anschließt)
+      const n = Math.max(1, Math.floor((L - e0 - e1 - 0.7) / (o.span + 0.7))), pier = (L - e0 - e1 - n * o.span) / (n + 1), ops = [];
+      for (let i = 0; i < n; i++) ops.push({ c: e0 + pier + r + i * (o.span + pier), w: o.span, s: o.spring });
+      let skip = -1;
+      if (stairLocal !== null) { let best = 1e9; ops.forEach((op, i) => { const d = Math.abs(op.c - stairLocal); if (d < best) { best = d; skip = i; } }); stairX = ops[skip].c; }
+      put(archWall(L, H, t, ops), P_.stucco);
+      let edge = 0;
+      ops.forEach((op, i) => {
+        put(archRing(op.c, o.spring, r, 0.24, t + 0.06), P_.stone);
+        put(keystone(op.c, o.spring + r, t + 0.1), P_.stone);
+        if (i !== skip) { const parts = []; balustrade(op.c - r, op.c + r, 0, 0, parts); for (const g of parts) put(g, P_.stone); }
+      });
+      for (let i = 0; i <= n; i++) {
+        const e2 = i < n ? ops[i].c - r : L, c = (edge + e2) / 2, w = e2 - edge;
+        put(box(w + 0.1, 0.14, t + 0.12, c, o.spring - 0.07, 0, 2), P_.stone);
+        put(box(w + 0.1, 0.4, t + 0.14, c, 0.2, 0, 2), P_.stone);
+        if (i < n) edge = ops[i].c + r;
+      }
+    }
+    const c = cornice(L, CORNICE, t); c.translate(0, H - 0.34, 0); put(c, P_.stone);
+    const im = cornice(L, IMPOST, t); im.translate(0, H - 0.75, 0); put(im, P_.stone);
+  };
+  // Sockel (erhöhte Ebene) + Böden
+  const slab = (x0, x1, z0, z1) => {
+    P_.stucco.push(box(x1 - x0, pod, z1 - z0, (x0 + x1) / 2, pod / 2, (z0 + z1) / 2, 4));
+    P_.stone.push(box(x1 - x0 + 0.12, 0.12, z1 - z0 + 0.12, (x0 + x1) / 2, pod - 0.06, (z0 + z1) / 2, 2));
+    const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0); g.rotateX(-PI / 2);
+    const p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (p.getX(i) + (x0 + x1) / 2) / 2, (p.getZ(i) + (z0 + z1) / 2) / 2);
+    g.translate((x0 + x1) / 2, pod + 0.012, (z0 + z1) / 2); P_.floor.push(g);
+  };
+  slab(0, o.len, -D, 0);
+  slab(0, D, -o.wing, -D);
+  run(o.len, 0, -t / 2, 0, 'open', null, 0.5, 0.5);                        // Meerseite
+  run(o.len - D, D, -D + t / 2, 0, 'open', o.stairAt - D, 0.5, 0.5);       // Hofseite (zum Pool)
+  run(o.wing, t / 2, 0, PI / 2, 'open', null, 0.5, 0.5);                   // kurzer Flügel, Außenseite
+  if (o.wing - D > 2.2) run(o.wing - D, D - t / 2, -D, PI / 2, 'open', null, 0.4, 0.4); // kurzer Flügel, Hofseite
+  run(D, 0, -o.wing + t / 2, 0, 'closed');                                 // Abschluss am Nachbargebäude
+  run(D, o.len - t / 2, 0, PI / 2, 'closed');                              // Abschluss an der höheren Ebene
+  // Dachbalken + Ziegeldach (zwei Walmdächer, die sich über der Ecke verschneiden)
+  const eave = pod + H;
+  for (let x = D + 1.5; x < o.len - 0.5; x += 1.55) P_.wood.push(box(0.16, 0.2, D - 0.3, x, eave - 0.12, -D / 2, 1));
+  for (let z = -D - 0.8; z > -o.wing + 0.5; z -= 1.55) P_.wood.push(box(D - 0.3, 0.2, 0.16, D / 2, eave - 0.12, z, 1));
+  hipRoof(-0.65, o.len + 0.65, -D - 0.65, 0.65, eave, 0.42, P_.roof, P_.stone);
+  hipRoof(-0.65, D + 0.65, -o.wing - 0.65, 0.65, eave + 0.004, 0.42, P_.roof, P_.stone);
+  const grp = finish(P_, 'seehaus');
+  // Treppe vom Hof
+  const st = treppe({ steps: o.steps, rise: o.rise, w: o.span });
+  st.position.set(D + stairX, 0, -D - o.steps * 0.32); st.rotation.y = PI;
+  grp.add(st);
+  grp.userData.podium = pod;
+  grp.userData.stairX = D + stairX;
+  grp.userData.colliders = [{ x: o.len / 2, z: -t / 2, w: o.len, d: t }, { x: o.len / 2, z: -D + t / 2, w: o.len, d: t, gapAt: D + stairX, gap: o.span }, { x: t / 2, z: -o.wing / 2, w: t, d: o.wing }];
+  return grp;
+}
