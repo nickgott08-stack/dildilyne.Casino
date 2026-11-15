@@ -194,7 +194,7 @@ export function buildOutskirts(scene, K) {
   const coveredByOtherDeck = (x, z, y, own) => {
     for (const r of deckRoads) {
       if (r === own) continue;
-      for (const s of r.samples) if (Math.abs(s.y - y) < 1.5 && Math.hypot(s.x - x, s.z - z) < r.w / 2 + 1.5) return true;
+      for (const s of r.samples) if (Math.abs(s.y - y) < 1.5 && Math.hypot(s.x - x, s.z - z) < r.w / 2 - 0.3) return true; // point lies on the other deck (no gap without a wall)
     }
     return false;
   };
@@ -710,6 +710,9 @@ export function buildOutskirts(scene, K) {
     { x: POI.tanke.x, z: POI.tanke.z, r: 14, n: 2 },
     { x: POI.camp.x, z: POI.camp.z, r: 16, n: 3 },
   ];
+  // people waiting at the bus stop + kiosk on the Hafenstraße (Dildi-Kreuz)
+  { const kp = globalThis.DildiCars && globalThis.DildiCars.dildiKreuz.places ? globalThis.DildiCars.dildiKreuz.places().kiosk : null;
+    if (kp) world.hotspots.push({ x: Math.sign(kp[0]) * 11, z: kp[1], r: 5, n: 4 }); }
   if (world.marketHotspot) world.hotspots.push(world.marketHotspot);
   if (world.extraHotspots) world.hotspots.push(...world.extraHotspots);
   if (world.bankHotspot) world.hotspots.push(world.bankHotspot);

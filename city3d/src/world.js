@@ -1337,7 +1337,12 @@ export function buildWorld(scene, quality) {
   const headGeo = [];
   const poolGeo = [];
   // no lamp may stand on a driveable surface (side streets, other roads at junctions, gates)
+  const DCk = globalThis.DildiCars && globalThis.DildiCars.dildiKreuz;
   const onDrive = (x, z, yy) => {
+    { // driveway of the petrol station at the Dildi-Kreuz
+      const tp = DCk && DCk.places ? DCk.places().tankstelle : null;
+      if (tp && x > tp[0] - 13 && x < -5 && Math.abs(z - tp[1]) < 10) return true;
+    }
     for (const st of world.sideStreets) if (x > st.x0 - 0.6 && x < st.x1 + 0.6 && z > st.z0 - 0.6 && z < st.z1 + 0.6) return true;
     for (const e of world.exits) {
       const along = e.axis === 'z' ? z * e.dir : x * e.dir, across = e.axis === 'z' ? x - e.c : z - e.c;
@@ -1419,6 +1424,7 @@ export function buildWorld(scene, quality) {
   world.poolMat = poolMat;
   const pools = new THREE.Mesh(merge(poolGeo, true), poolMat);
   pools.renderOrder = 2;
+  world.pools = pools;
   scene.add(pools);
 
   // ---------- traffic lights ----------

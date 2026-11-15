@@ -141,3 +141,21 @@ export function setMask(h, on) {
   }
   if (h.mask) h.mask.visible = !!on;
 }
+
+// far away: one merged mesh in rest pose instead of torso + 4 limbs (1 draw call instead of 5)
+export function setHumanLod(h, far) {
+  if (h._far === far) return;
+  if (far && !h.lod) {
+    const gs = [h.torso.geometry.clone()];
+    for (const p of [h.armL, h.armR, h.legL, h.legR]) {
+      const m = p.children.find((c) => c.isMesh);
+      if (m) gs.push(m.geometry.clone().translate(p.position.x, p.position.y, p.position.z));
+    }
+    h.lod = new THREE.Mesh(merge(gs), humanMat);
+    h.lod.castShadow = false;
+    h.body.add(h.lod);
+  }
+  h._far = far;
+  h.torso.visible = h.armL.visible = h.armR.visible = h.legL.visible = h.legR.visible = !far;
+  if (h.lod) h.lod.visible = far;
+}
