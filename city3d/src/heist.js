@@ -559,7 +559,7 @@ export function installFinale(Missions) {
     // Radj's jeep at the airstrip + the rally bike in the courtyard
     const jp = new Vehicle(this.scene, 'jeep', ISL.strip.x1 - 4, ISL.strip.z1 + 8, Math.PI / 2, '#111111');
     jp.parked = true; jp.keep = true;
-    const bk = new Vehicle(this.scene, 'bike', -42, -1340, Math.PI, '#e74c3c');
+    const bk = new Vehicle(this.scene, 'bike', I.bike.x, I.bike.z, Math.PI, '#e74c3c');
     bk.parked = true; bk.keep = true;
     G.vehicles.push(jp, bk);
     j.vehs.push(jp, bk);
@@ -578,7 +578,7 @@ export function installFinale(Missions) {
       j.sentries.push(p);
       return p;
     };
-    j.gateGuard = mk([[ISL.gate.x - 14, ISL.gate.z + 5], [ISL.gate.x + 14, ISL.gate.z + 5]], true);
+    j.gateGuard = mk([[ISL.gate.x, ISL.gate.z + 12], [ISL.gate.x, ISL.gate.z + 3]], true); // up and down the ramp in front of the gate
     for (const r of I.sentryPosts) mk(r);
     // one of them carries the lift card (gold badge)
     const rnd = j.coop ? seeded(j.coop.seed) : Math.random; // same guard on every phone of the crew
@@ -662,7 +662,7 @@ export function installFinale(Missions) {
       }
     }
     if (j.stage === 'gate' && j.hasGate && Math.hypot(pp.x - ISL.gate.x, pp.z - ISL.gate.z) < 7) return { text: '🔓 Tor öffnen (Torkarte)', run: () => { I.gateCol.off = true; I.gateMesh.visible = false; j.stage = 'estate'; G.audio.pickup(); this.cx({ k: 'gate' }); this.api.banner('🔓 TOR OFFEN', 'Finde die Wache mit der Aufzugkarte (gold)'); } };
-    if (j.stage === 'lift' && Math.hypot(pp.x - ISL.lift.x, pp.z - (ISL.lift.z + 1)) < 3.5) return { text: '▼ Aufzug in den Keller', run: () => this.rideLift(true) };
+    if (j.stage === 'lift' && Math.hypot(pp.x - ISL.lift.x, pp.z - ISL.lift.z) < 2.6 && Math.abs(pp.y - ISL.lift.y) < 1.5) return { text: '▼ Aufzug in den Keller', run: () => this.rideLift(true) };
     if (j.stage === 'cellar' && Math.hypot(pp.x - ISL.glass.x, pp.z - ISL.glass.z) < 3) {
       if (!j.drilled) return { text: '💎 Glas aufschneiden', run: () => this.openCutter() };
       return { text: '👑 Goldene Bubensahne nehmen', run: () => this.takePrize() };
@@ -691,7 +691,7 @@ export function installFinale(Missions) {
         j.stage = 'cellar';
         this.coupTarget(ISL.glass.x, ISL.glass.z, '#ffd700');
       } else {
-        G.player.pos.set(ISL.lift.x - 1, groundAt(ISL.lift.x - 1, ISL.lift.z + 3, 1e9) + 0.1, ISL.lift.z + 3);
+        G.player.pos.set(ISL.liftOut.x, ISL.liftOut.y + 0.1, ISL.liftOut.z);
         this.startEscape();
       }
     }, 1800);
@@ -715,7 +715,7 @@ export function installFinale(Missions) {
     this.raiseAlarm('Radj weiß Bescheid – ab zum Helikopter!', fromNet);
     I.westGateCol.off = true; I.westGateMesh.visible = false;
     // two jeeps full of Radj's men come after you
-    for (const [x, z] of [[-84, -1341], [-118, -1327]]) { // on the helipad road, outside the (now bigger) estate
+    for (const [x, z] of [[-40, -1366], [-80, -1348]]) { // on the helipad road outside the west gate
       const v = new Vehicle(this.scene, 'jeep', x, z, Math.PI / 2, '#111111');
       v.keep = true;
       v.driver = new ChaseDriver(v);
@@ -865,13 +865,13 @@ export function installFinale(Missions) {
     }
     if (j.stage === 'estate') {
       const h = j.holder;
-      if (j.hasLift) { j.stage = 'lift'; this.coupTarget(ISL.lift.x, ISL.lift.z + 2, '#ffd700'); return; }
+      if (j.hasLift) { j.stage = 'lift'; this.coupTarget(ISL.lift.x, ISL.lift.z, '#ffd700'); return; }
       if (!h.dead) this.coupTarget(h.pos.x, h.pos.z, '#ffd700');
       else { const c = (j.cards || []).find((q) => q.kind === 'lift' && !q.taken); if (c) this.coupTarget(c.x, c.z, '#ffd700'); }
       this.setJobHUD(T, h.dead ? 'Nimm die Aufzugkarte' : 'Schalte die Wache mit der goldenen Karte aus', j.alarm ? '🚨 ALARM – sie schießen!' : `🔦 Wachen: ${j.sentries.filter((q) => !q.dead).length} · schleichen`, j.alarm);
       return;
     }
-    if (j.stage === 'lift') { this.setJobHUD(T, 'Zum Aufzug am Haupthaus', `📍 ${dist(ISL.lift)} m`, j.alarm); return; }
+    if (j.stage === 'lift') { this.setJobHUD(T, 'Zum Aufzug: Treppe an der Villa hoch, über den Balkon ins Büro', `📍 ${dist(ISL.lift)} m`, j.alarm); return; }
     if (j.stage === 'cellar') {
       this.setJobHUD(T, j.drilled ? 'Nimm die goldene Bubensahne' : 'Schneid den Glaskasten auf', j.drilled ? 'EIN am Glaskasten' : `💎 EIN am Glaskasten · Fehlversuche ${j.cutFails || 0}/3`, false);
       return;

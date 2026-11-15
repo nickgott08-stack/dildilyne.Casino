@@ -5,20 +5,22 @@ import { RADJ, RADJ_CELLAR, RADJ_STRIP, RADJ_ESTATE, radjGround, radjE } from '.
 import { addBox, addCirc, addFloor, world } from './world.js';
 import { cbox, ccyl, merge, neonSign, srand, srange, canvasTex, colorize } from './util.js';
 import { makeHuman } from './human.js';
+import { anwesen, mediterranMats } from './anwesen.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
 const H = (x, z) => radjGround(x, z);
 
 export const ISL = {
   strip: RADJ_STRIP,
-  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [92, -1206], [86, -1222], [74, -1234]], // ends at the foot of the ramp up to the main gate
+  road: [[80, -1079], [100, -1096], [96, -1112], [40, -1124], [-6, -1140], [30, -1166], [96, -1186], [92, -1214], [44, -1232], [40, -1258], [30, -1290], [40, -1312], [40, -1326]], // ends at the foot of the ramp up to the main gate
   estate: RADJ_ESTATE,
-  gate: { x: 40, z: -1240 },
-  westGate: { x: -60, z: -1335 },
-  mansion: { x0: 37, x1: 60, z0: -1320, z1: -1296 },
-  lift: { x: 34.5, z: -1307 }, // lift door on the west face of the villa (podium, level 3)
+  gate: { x: 40, z: -1340 },
+  westGate: { x: 0, z: -1370 },
+  mansion: { x0: 43, x1: 54, z0: -1367.5, z1: -1359.5 },
+  lift: { x: 49, z: -1362, y: 0 }, // set exactly from the villa model (office on the upper floor) in buildRadjIsland
   helipad: { x: -186, z: -1332 },
-  helRoad: [[-60, -1335], [-80, -1340], [-120, -1326], [-160, -1334], [-186, -1332]],
+  helRoad: [[0, -1370], [-40, -1366], [-80, -1348], [-120, -1326], [-160, -1334], [-186, -1332]],
   cellarLift: { x: 316, z: -1212 },
   glass: { x: 316, z: -1240 },
 };
@@ -307,7 +309,7 @@ export function buildRadjIsland(sceneRoot) {
       const wall = (x, z) => {
         if (radjE(x, z) > 1.0) return;
         if (x > E.x0 - 3 && x < E.x1 + 3 && z > E.z0 - 3 && z < E.z1 + 3) return;
-        if (x > 20 && x < 75 && z > E.z1 - 1 && z < E.z1 + 13) return; // ramp + landing in front of the gate
+        if (x > 34 && x < 46 && z > E.z1 - 1 && z < E.z1 + 15) return; // ramp in front of the gate
         if (Math.hypot(x - out.clearing.x, z - out.clearing.z) < out.clearing.r + 0.5) return;
         if (out.roadTowers.some((t) => Math.hypot(t.x - x, t.z - z) < 3.6)) return;
         const y = H(x, z);
@@ -339,7 +341,7 @@ export function buildRadjIsland(sceneRoot) {
       if (e > 0.78) continue;
       if (x > ISL.strip.x0 - 10 && x < ISL.strip.x1 + 14 && z > ISL.strip.z0 - 12 && z < ISL.strip.z1 + 22) continue;
       if (x > E.x0 - 6 && x < E.x1 + 6 && z > E.z0 - 6 && z < E.z1 + 9) continue;
-      if (x > 18 && x < 78 && z > E.z1 - 2 && z < E.z1 + 16) continue; // ramp + landing in front of the gate
+      if (x > 31 && x < 49 && z > E.z1 - 2 && z < E.z1 + 17) continue; // ramp in front of the gate
       if (nearPts(road.samples, x, z, 7.5) || nearPts(hel.samples, x, z, 7)) continue;
       if (out.creek && nearPts(out.creek, x, z, 4)) continue;
       if (Math.hypot(x - out.clearing.x, z - out.clearing.z) < out.clearing.r) continue;
@@ -394,164 +396,133 @@ export function buildRadjIsland(sceneRoot) {
       return m;
     };
     inst(trunkG, bark, pines.concat(leafy), false, true);
-    inst(pineG, foliage, pines, true, true);
-    inst(leafG, foliage, leafy, true, true, 1.3);
+    // foliage without shadows: ~120k triangles less in the shadow pass (the estate is detailed enough already)
+    inst(pineG, foliage, pines, true, false);
+    inst(leafG, foliage, leafy, true, false, 1.3);
     inst(bushG, foliage, bushes, true, false);
   }
-  // ---- the estate: SHELL ("Rohbau") after Nick's sketch (mirrored, west gate on the left), 15.11. ----
-  // Three levels: L1 = terrain (pool terrace, west strip with garage + west gate), L2 = +3.4 m (main gate, gate court,
-  // garden, middle court, east courts, U-hall court), L3 = +6.8 m (villa podium, north-east terrace).
-  // Everything is grey on purpose – layout first, looks later (step 3). Green boxes of the sketch = open halls (posts + roof).
+  // ---- the estate: Nick's "anwesen" module (src/anwesen.js – 72 × 60 m, mediterranean, three levels of 2.64 m) ----
+  // The module has its gate at −z and the west gate at −x; on the island the gate has to face north (+z), so the whole
+  // thing is mirrored in z. All parts are baked into one mesh per material (few draw calls). Collision comes from the
+  // module's own data: platforms/walls (userData.rec), the parts' userData.colliders and every "treppe" (stairs → ramp).
   {
     const E = ISL.estate, y = H((E.x0 + E.x1) / 2, (E.z0 + E.z1) / 2);
     E.y = y;
-    const L1 = y, L2 = y + 3.4, L3 = y + 6.8;
-    const g = ISL.gate, wg = ISL.westGate;
-    const C1 = '#7f8f78', C2 = '#a3a39c', C3 = '#c4bfb2', WALLC = '#d7d2c6', RAILC = '#8d8f93', ROOFC = '#5b5f66', POSTC = '#b9b6ad', SOLID = '#8a8479';
-    // solid raised platform with a walkable top
-    const plat = (x0, x1, z0, z1, top, col) => { plain.push(cbox(x1 - x0, top - L1 + 0.5, z1 - z0, (x0 + x1) / 2, (top + L1 - 0.5) / 2, (z0 + z1) / 2, col)); addBox(x0, x1, z0, z1, top, { y0: L1 - 1 }); addFloor(x0, x1, z0, z1, top); };
-    // wall / railing standing on `base`
-    const wallOn = (x0, x1, z0, z1, base, h = 3.2, col = WALLC) => { plain.push(cbox(Math.abs(x1 - x0) || 0.5, h + 0.5, Math.abs(z1 - z0) || 0.5, (x0 + x1) / 2, base + h / 2 - 0.25, (z0 + z1) / 2, col)); addBox(Math.min(x0, x1) - (x0 === x1 ? 0.25 : 0), Math.max(x0, x1) + (x0 === x1 ? 0.25 : 0), Math.min(z0, z1) - (z0 === z1 ? 0.25 : 0), Math.max(z0, z1) + (z0 === z1 ? 0.25 : 0), base + h, { y0: base - 0.5 }); };
-    // wall along a line with openings: line 'x' = runs along x at fixed z (c), 'z' = runs along z at fixed x (c)
-    const line = (dir, c, a, b, base, h, gaps = [], arch = false) => {
-      let from = a;
-      for (const [g0, g1] of gaps.slice().sort((p, q) => p[0] - q[0]).concat([[b, b]])) {
-        if (g0 > from) { if (dir === 'x') wallOn(from, g0, c, c, base, h, h < 1.5 ? RAILC : WALLC); else wallOn(c, c, from, g0, base, h, h < 1.5 ? RAILC : WALLC); }
-        if (arch && g1 > g0) { const m = (g0 + g1) / 2, w = g1 - g0 + 1.2; plain.push(dir === 'x' ? cbox(w, 1.0, 0.9, m, base + h + 0.2, c, '#e8c66a') : cbox(0.9, 1.0, w, c, base + h + 0.2, m, '#e8c66a')); }
-        from = g1;
+    const CX = (E.x0 + E.x1) / 2, CZ = (E.z0 + E.z1) / 2, LH = 2.64;
+    const A = anwesen();
+    A.scale.z = -1; A.position.set(CX, y, CZ); A.updateMatrixWorld(true);
+    const REC = A.userData.rec, V = A.userData.villa;
+    // module coordinates → world
+    const mbox = (x0, x1, z0, z1, y0, y1, extra) => addBox(CX + x0, CX + x1, CZ - z0, CZ - z1, y + y1, { y0: y + y0 - 0.3, ...extra });
+    const mfloor = (x0, x1, z0, z1, ya, yb = ya, axis = 'x') => (axis === 'z' ? addFloor(CX + x0, CX + x1, CZ - z1, CZ - z0, y + yb, y + ya, 'z') : addFloor(CX + x0, CX + x1, CZ - z1, CZ - z0, y + ya, y + yb, 'x'));
+    // a box given in the local coordinates of a part → world AABB
+    const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+    const lbox = (o, x0, x1, z0, z1) => { _a.set(x0, 0, z0); _b.set(x1, 0, z1); o.localToWorld(_a); o.localToWorld(_b); return [Math.min(_a.x, _b.x), Math.max(_a.x, _b.x), Math.min(_a.z, _b.z), Math.max(_a.z, _b.z), _a.y]; };
+    const pbox = (o, x0, x1, z0, z1, y0, y1, extra) => { const [a, b, c, d, by] = lbox(o, x0, x1, z0, z1); return addBox(a, b, c, d, by + y1, { y0: by + y0 - 0.3, ...extra }); };
+    const pfloor = (o, x0, x1, z0, z1, ya, yb = ya, axisLocal = 'x') => {
+      const [a, b, c, d, by] = lbox(o, x0, x1, z0, z1);
+      if (ya === yb) return addFloor(a, b, c, d, by + ya);
+      // which world axis does the local axis map to, and does the low end sit at the min coordinate?
+      _a.set(axisLocal === 'x' ? x0 : 0, 0, axisLocal === 'z' ? z0 : 0); _b.set(axisLocal === 'x' ? x1 : 0, 0, axisLocal === 'z' ? z1 : 0); o.localToWorld(_a); o.localToWorld(_b);
+      const ax = Math.abs(_b.x - _a.x) > Math.abs(_b.z - _a.z) ? 'x' : 'z', lowFirst = ax === 'x' ? _a.x < _b.x : _a.z < _b.z;
+      return addFloor(a, b, c, d, by + (lowFirst ? ya : yb), by + (lowFirst ? yb : ya), ax);
+    };
+    // ---------- platforms, walls, ramp, round things ----------
+    for (const [x0, x1, z0, z1, y0, y1] of REC.plats) { mbox(x0, x1, z0, z1, y0 - 0.7, y1); mfloor(x0, x1, z0, z1, y1); }
+    for (const [x0, z0, x1, z1, yb, h, t] of REC.walls) { const hx = x0 === x1 ? t / 2 : 0, hz = z0 === z1 ? t / 2 : 0; mbox(Math.min(x0, x1) - hx, Math.max(x0, x1) + hx, Math.min(z0, z1) - hz, Math.max(z0, z1) + hz, yb, yb + h + 0.1); }
+    { const [x0, x1, z0, z1, ya, yb] = REC.ramp; mfloor(x0, x1, z0, z1, ya, yb, 'z'); for (let k = 1; k < 4; k++) mbox(x0, x1, z0 + (z1 - z0) * k / 4, z0 + (z1 - z0) * (k + 1) / 4, -0.7, ya + (yb - ya) * k / 4); }
+    for (const [x, yy, z, r, h] of REC.round) addCirc(CX + x, CZ - z, r, y + yy + h, y + yy - 0.5);
+    mbox(-12.4, -3.6, 15.4, 22.8, -0.5, 0.5); // pool basin
+    // ---------- parts: colliders + stairs ----------
+    const HEIGHT = { gelaender: 1.1, hecke: 1.0, torbogen: 5, torbogenZwischen: 5, bogengang: 4.7, hausblock: 9, seehaus: 5.7, pavillon: 6 };
+    const gateCols = [];
+    A.traverse((o) => {
+      if (o.name === 'treppe' && o.userData.stairs) {
+        const st = o.userData.stairs;
+        pfloor(o, -st.w / 2, st.w / 2, -st.length, 0, st.height, 0, 'z');    // local: foot at z = 0, top at z = −length
       }
-    };
-    const rail = (dir, c, a, b, base, gaps) => line(dir, c, a, b, base, 1.1, gaps);
-    // stairs: ramp for the feet + visible steps + side walls. yA at the low coordinate end, yB at the high end.
-    const stairs = (x0, x1, z0, z1, yA, yB, axis) => {
-      addFloor(x0, x1, z0, z1, yA, yB, axis);
-      const n = 12, lo = Math.min(yA, yB), hi = Math.max(yA, yB);
-      for (let k = 0; k < n; k++) {
-        const t = (k + 0.5) / n, top = yA + (yB - yA) * ((k + 1) / n > 1 ? 1 : (yB > yA ? (k + 1) / n : k / n));
-        if (axis === 'x') plain.push(cbox((x1 - x0) / n, top - lo + 0.4, z1 - z0, x0 + (x1 - x0) * t, (top + lo - 0.4) / 2, (z0 + z1) / 2, '#e0dccf'));
-        else plain.push(cbox(x1 - x0, top - lo + 0.4, (z1 - z0) / n, (x0 + x1) / 2, (top + lo - 0.4) / 2, z0 + (z1 - z0) * t, '#e0dccf'));
+      if (!o.userData.colliders || o === V) return;
+      const h = o.name === 'treppe' ? o.userData.stairs.height + 1.0 : HEIGHT[o.name] || 4;
+      for (const c of o.userData.colliders) {
+        if (c.gate) { gateCols.push(pbox(o, c.x - c.w / 2, c.x + c.w / 2, c.z - 0.3, c.z + 0.3, -0.5, 4)); continue; }
+        if (c.gapAt !== undefined) {       // wall with a doorway (stairs of the Seehaus)
+          pbox(o, 4.5, c.gapAt - c.gap / 2, c.z - c.d / 2, c.z + c.d / 2, 0, h);   // (the court-side wall starts behind the short wing)
+          pbox(o, c.gapAt + c.gap / 2, c.x + c.w / 2, c.z - c.d / 2, c.z + c.d / 2, 0, h);
+          continue;
+        }
+        pbox(o, c.x - c.w / 2, c.x + c.w / 2, c.z - c.d / 2, c.z + c.d / 2, 0, h);
       }
-      if (axis === 'x') { wallOn(x0, x1, z0, z0, lo, hi - lo + 1.1, RAILC); wallOn(x0, x1, z1, z1, lo, hi - lo + 1.1, RAILC); }
-      else { wallOn(x0, x0, z0, z1, lo, hi - lo + 1.1, RAILC); wallOn(x1, x1, z0, z1, lo, hi - lo + 1.1, RAILC); }
-    };
-    // open hall: posts + roof (you can walk through and hide behind the posts)
-    const hall = (x0, x1, z0, z1, base, h = 3.6) => {
-      const xs = x1 - x0 > 14 ? [x0, (x0 + x1) / 2, x1] : [x0, x1], zs = z1 - z0 > 14 ? [z0, (z0 + z1) / 2, z1] : [z0, z1];
-      for (const x of xs) for (const z of zs) { if (x !== x0 && x !== x1 && z !== z0 && z !== z1) continue; plain.push(cbox(0.7, h, 0.7, x, base + h / 2, z, POSTC)); addBox(x - 0.35, x + 0.35, z - 0.35, z + 0.35, base + h, { y0: base - 0.5 }); }
-      plain.push(cbox(x1 - x0 + 1.6, 0.45, z1 - z0 + 1.6, (x0 + x1) / 2, base + h + 0.22, (z0 + z1) / 2, ROOFC));
-    };
-    // solid building (cannot be entered)
-    const block = (x0, x1, z0, z1, base, h) => { plain.push(cbox(x1 - x0, h, z1 - z0, (x0 + x1) / 2, base + h / 2, (z0 + z1) / 2, SOLID), cbox(x1 - x0 + 1, 0.4, z1 - z0 + 1, (x0 + x1) / 2, base + h + 0.2, (z0 + z1) / 2, ROOFC)); addBox(x0, x1, z0, z1, base + h, { y0: base - 0.5 }); };
-
-    // ---------- ground + platforms ----------
-    plain.push(cbox(E.x1 - E.x0 - 1, 0.06, E.z1 - E.z0 - 1, (E.x0 + E.x1) / 2, L1 + 0.03, (E.z0 + E.z1) / 2, C1)); // L1 floor
-    plat(-36, 66, -1329, E.z1, L2, C2);          // gate court, garden, middle court
-    plat(46, E.x1, E.z0, -1297, L2, C2);         // east corridor, east courts, U-hall court, south-east court
-    plat(30, 64, -1324, -1290, L3, C3);          // villa podium
-    plat(66, E.x1, -1297, E.z1, L3, C3);         // north-east terrace
-    plat(-60, -46, E.z0, -1384, L2, C2);         // look-out in the south-west corner
-    plat(22, 50, E.z1, E.z1 + 10, L2, C2);       // landing in front of the main gate (outside)
-    // ---------- 8 stairs + the ramp from the forest road ----------
-    stairs(50, 72, E.z1 + 2, E.z1 + 10, L2, L1, 'x');   // ramp: forest road → landing
-    stairs(58, 66, -1272, -1267, L2, L3, 'x');           // 1 gate court → north-east terrace
-    stairs(41, 46, -1290, -1282, L3, L2, 'z');           // 2 gate court → villa podium
-    stairs(22, 30, -1310, -1305, L2, L3, 'x');           // 3 middle court → villa podium (at the lift)
-    stairs(-44, -36, -1285, -1280, L1, L2, 'x');         // 4 west strip → garden
-    stairs(38, 46, -1336, -1331, L1, L2, 'x');           // 5 pool terrace → U-hall court (north arm)
-    stairs(38, 46, -1367, -1362, L1, L2, 'x');           // 6 pool terrace → U-hall court (south arm)
-    stairs(95, 100, -1305, -1297, L2, L3, 'z');          // 7 east courts → north-east terrace
-    stairs(-46, -38, -1396, -1391, L2, L1, 'x');         // 8 pool terrace → look-out
-    // ---------- railings at the drops ----------
-    rail('z', -36, -1329, E.z1, L2, [[-1285, -1280]]);
-    rail('x', -1329, -36, 46, L2, []);
-    rail('z', 46, E.z0, -1329, L2, [[-1367, -1362], [-1336, -1331]]);
-    rail('x', -1290, 30, 64, L3, [[41, 46]]); rail('z', 30, -1324, -1290, L3, [[-1310, -1305]]); rail('x', -1324, 30, 64, L3, []); rail('z', 64, -1324, -1290, L3, []);
-    rail('z', 66, -1297, E.z1, L3, [[-1272, -1267]]); rail('x', -1297, 66, E.x1, L3, [[95, 100]]);
-    rail('z', -46, E.z0, -1384, L2, [[-1396, -1391]]); rail('x', -1384, -60, -46, L2, []);
-    rail('x', E.z1 + 10, 22, 50, L2, []); rail('z', 22, E.z1, E.z1 + 10, L2, []); rail('z', 50, E.z1, E.z1 + 2, L2, []);
-    // ---------- outer wall ----------
-    line('x', E.z1, E.x0, -36, L1, 4.2); line('x', E.z1, -36, 66, L2, 3.2, [[g.x - 6, g.x + 6]]); line('x', E.z1, 66, E.x1, L3, 3.2);
-    line('z', E.x1, -1297, E.z1, L3, 3.2); line('z', E.x1, E.z0, -1297, L2, 3.2);
-    line('x', E.z0, E.x0, 46, L1, 1.2); line('x', E.z0, 46, E.x1, L2, 1.2);              // cliff side: low, view of the sea
-    line('z', E.x0, E.z0, E.z1, L1, 4.2, [[wg.z - 6, wg.z + 6]]);
-    // gates
-    const gateM = new THREE.Mesh(new THREE.BoxGeometry(12, 3.6, 0.25), new THREE.MeshStandardMaterial({ color: '#2b2b2b', metalness: 0.7, roughness: 0.4 }));
-    gateM.position.set(g.x, L2 + 1.8, E.z1);
-    scene.add(gateM);
-    out.gateMesh = gateM;
-    out.gateCol = addBox(g.x - 6, g.x + 6, E.z1 - 0.3, E.z1 + 0.3, L2 + 3.8, { y0: L2 - 0.5 });
-    const wgM = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.4, 12), gateM.material);
-    wgM.position.set(wg.x, y + 1.7, wg.z);
-    scene.add(wgM);
-    out.westGateMesh = wgM;
-    out.westGateCol = addBox(wg.x - 0.3, wg.x + 0.3, wg.z - 6, wg.z + 6, y + 3.6, { y0: y - 2 });
-    const sg = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.6), new THREE.MeshBasicMaterial({ map: neonSign('ANWESEN RADJ', '#ffd700', { size: 100, bg: '#1a1408' }), toneMapped: false }));
-    sg.position.set(g.x, L2 + 5.2, E.z1 + 0.5);
-    scene.add(sg);
-    world.signMats.push(sg.material);
-    // ---------- gate court (L2) ----------
-    hall(30, 56, -1257, -1243, L2, 4.2);                 // gate house (roofed passage behind the gate)
-    block(13, 25, -1282, -1244, L2, 5.5);                // building between gate court and garden
-    wallOn(13, 25, -1242, -1242, L2);
-    // ---------- garden (L2, north-west) ----------
-    for (const [x, z, w, d] of [[-22, -1262, 10, 1.4], [-4, -1276, 1.4, 10], [-26, -1290, 8, 1.4], [2, -1254, 8, 1.4]]) { plain.push(cbox(w, 1.5, d, x, L2 + 0.75, z, '#3d6b3a')); addBox(x - w / 2, x + w / 2, z - d / 2, z + d / 2, L2 + 1.5, { y0: L2 - 0.5 }); }
-    line('x', -1300, -36, 25, L2, 3.2, [[-12, -8]], true);       // wall garden | middle court, archway 5
-    // ---------- middle court (L2, west of the villa) ----------
-    hall(3, 16, -1329, -1308, L2); hall(-25, -12, -1312, -1302, L2); hall(-35, -27, -1326, -1302, L2);
-    // ---------- villa on its podium (L3) ----------
-    block(37, 60, -1320, -1296, L3, 8); block(50, 58, -1296, -1292, L3, 4);
-    const L = ISL.lift;
-    plain.push(cbox(0.2, 3.6, 3.2, 36.9, L3 + 1.8, L.z, '#c9a227'));
-    const ls = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.9), new THREE.MeshBasicMaterial({ map: neonSign('▼ AUFZUG', '#ffd700', { size: 90 }), toneMapped: false }));
-    ls.position.set(36.75, L3 + 4.2, L.z); ls.rotation.y = -Math.PI / 2;
-    scene.add(ls);
-    world.signMats.push(ls.material);
-    // ---------- north-east terrace (L3) ----------
-    hall(68, 100, -1256, -1244, L3); block(80, 90, -1284, -1272, L3, 4.5); block(70, 78, -1296, -1286, L3, 4.5);
-    // ---------- east corridor + east courts (L2) ----------
-    line('x', -1305, 78, E.x1, L2, 3.2, [[95, 100]], true);      // archway 1 (at the foot of stairs 7)
-    line('z', 78, -1345, -1305, L2, 3.2, [[-1323, -1319]], true); // archway 2 corridor ↔ east court
-    line('x', -1345, 78, E.x1, L2, 3.2, [[82, 86]], true);       // archway 3 east court ↔ south-east court
-    line('z', 78, E.z0, -1345, L2, 3.2);
-    hall(104, 118, -1318, -1307, L2); hall(92, 104, -1336, -1322, L2); hall(80, 90, -1326, -1311, L2);
-    // ---------- U-shaped hall above the pool (L2) ----------
-    hall(60, 77, -1369, -1329, L2); hall(47, 60, -1336, -1330, L2); hall(47, 60, -1368, -1362, L2);
-    plain.push(cbox(0.9, 1.0, 7, 46, L2 + 3.4, -1333.5, '#e8c66a'));                      // archway 4 over stairs 5
-    plain.push(cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1337, WALLC), cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1330, WALLC));
-    plain.push(cbox(0.9, 1.0, 7, 46, L2 + 3.4, -1364.5, '#e8c66a'));                      // archway 6 over stairs 6
-    plain.push(cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1368, WALLC), cbox(0.7, 3.2, 0.7, 46, L2 + 1.6, -1361, WALLC));
-    // ---------- pool terrace (L1) ----------
+      if (o.name === 'seehaus') {          // raised hall: podium of 0.99 m under both wings (len 46, depth 4.5, wing 7.45)
+        const pod = o.userData.podium;
+        for (const [x0, x1, z0, z1] of [[0, 46, -4.5, 0], [0, 4.5, -7.45, -4.5]]) { pbox(o, x0, x1, z0, z1, -0.5, pod); pfloor(o, x0, x1, z0, z1, pod); }
+        pbox(o, 45.4, 46, -4.5, 0, 0, 5.7); pbox(o, 0, 4.5, -7.45, -6.85, 0, 5.7);   // closed ends
+        pbox(o, 4.2, 4.5, -7.45, -4.5, 0, 5.7);                                       // short wing, court side (arches with balustrades)
+      }
+    });
+    // ---------- villa: ground floor solid, stairs along the north wall → balcony → office with the lift ----------
     {
-      const px0 = -14, px1 = 10, pz0 = -1376, pz1 = -1356;
-      plain.push(cbox(px1 - px0 + 2, 0.25, pz1 - pz0 + 2, (px0 + px1) / 2, L1 + 0.12, (pz0 + pz1) / 2, '#e6e2d8'));
-      const pool = new THREE.Mesh(new THREE.BoxGeometry(px1 - px0, 0.1, pz1 - pz0), new THREE.MeshStandardMaterial({ color: '#2fb6d8', roughness: 0.05, metalness: 0.2, emissive: '#06303c' }));
-      pool.position.set((px0 + px1) / 2, L1 + 0.27, (pz0 + pz1) / 2);
-      scene.add(pool);
-      addBox(px0, px1, pz0, pz1, L1 + 0.4, { y0: L1 - 1 });
+      const U = V.userData, F = U.floorY, S = U.stairs, Bc = U.balcony, O = U.office, top = 9;
+      pbox(V, -5.5, 5.5, -4, 4, -0.5, F);                                   // main block, ground floor
+      pbox(V, Bc.x0, Bc.x1, Bc.z0, Bc.z1, -0.5, F);                         // annex under the balcony
+      pfloor(V, Bc.x0, Bc.x1, Bc.z0, Bc.z1, F);
+      pfloor(V, O.x0, O.x1, -4, O.z1, F);                                   // office floor (incl. the door sill)
+      pfloor(V, S.x0, S.x1, S.z - S.w / 2, S.z + S.w / 2, 0, F, 'x');       // stairs
+      pbox(V, S.x0, S.x1, S.z - S.w / 2 - 0.2, S.z - S.w / 2, 0, F + 1.1);  // stair railing (outer side)
+      pbox(V, Bc.x0, Bc.x1, Bc.z0 - 0.15, Bc.z0 + 0.1, F, F + 1.1); pbox(V, Bc.x1 - 0.1, Bc.x1 + 0.15, Bc.z0, Bc.z1, F, F + 1.1);   // balcony railing
+      // upper floor: everything outside the office is solid, door from the balcony
+      pbox(V, -5.5, O.x0, -4, 4, F, top); pbox(V, O.x0, 5.5, O.z1, 4, F, top); pbox(V, O.x1, 5.5, -4, O.z1, F, top);
+      pbox(V, O.x0, U.door.x - 0.6, -4, O.z0, F, top); pbox(V, U.door.x + 0.6, 5.5, -4, O.z0, F, top);
+      const p = new THREE.Vector3(U.lift.x, F, U.lift.z); V.localToWorld(p);
+      ISL.lift.x = p.x; ISL.lift.z = p.z; ISL.lift.y = p.y;
+      p.set(U.lift.x + 1.6, F, U.lift.z); V.localToWorld(p);
+      ISL.liftOut = { x: p.x, z: p.z, y: p.y };
     }
-    hall(17, 25, -1341, -1333, L1);
-    // ---------- west strip (L1): garage hall, hall in the north ----------
-    hall(-58, -46, -1380, -1346, L1, 4); hall(-58, -44, -1275, -1250, L1, 4);
-    plain.push(cbox(12, 0.05, 34, -52, L1 + 0.07, -1363, '#5a5d62'));
-    out.garageCars = [{ type: 'ferrari', x: -52, z: -1356, h: 0, color: '#111111' }, { type: 'rs6', x: -52, z: -1368, h: 0, color: '#d4af37' }];
+    // ---------- one mesh per material (baked + mirrored), the two gate grilles stay separate so they can open ----------
+    {
+      const M = mediterranMats(), cast = new Set([M.stucco, M.roof]); // (stone = balustrades: 77k triangles, no shadows)
+      const byMat = new Map(), grilles = [];
+      A.traverse((o) => {
+        if (!o.isMesh) return;
+        let gq = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        for (const a of Object.keys(gq.attributes)) if (a !== 'position' && a !== 'normal' && a !== 'uv') gq.deleteAttribute(a);
+        if (!gq.attributes.uv) gq.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(gq.attributes.position.count * 2), 2));
+        if (!gq.attributes.normal) gq.computeVertexNormals();
+        gq.applyMatrix4(o.matrixWorld);
+        for (const at of Object.values(gq.attributes)) { const n = at.itemSize, ar = at.array; for (let v = 0; v < at.count; v += 3) for (let k = 0; k < n; k++) { const t = ar[(v + 1) * n + k]; ar[(v + 1) * n + k] = ar[(v + 2) * n + k]; ar[(v + 2) * n + k] = t; } }   // mirrored → flip the winding
+        if (o.name === 'torbogen_iron') { const m = new THREE.Mesh(gq, o.material); scene.add(m); grilles.push(m); return; }
+        if (!byMat.has(o.material)) byMat.set(o.material, []);
+        byMat.get(o.material).push(gq);
+      });
+      for (const [mat, list] of byMat) {
+        const m = new THREE.Mesh(mergeGeometries(list, false), mat);
+        m.castShadow = cast.has(mat); m.receiveShadow = true;
+        if (mat === M.water) m.renderOrder = 2;
+        scene.add(m);
+      }
+      out.gateMesh = grilles[0]; out.westGateMesh = grilles[1];
+      out.gateCol = gateCols[0]; out.westGateCol = gateCols[1];
+    }
+    // foundation: the terrain mesh is coarse and falls away toward the beach – a stone plinth closes the gap under the estate
+    plain.push(cbox(E.x1 - E.x0 + 1.2, 9, E.z1 - E.z0 + 1.2, CX, y - 4.52, CZ, '#b3a07c'));
     out.towers = [];
     out.estateY = y;
-    out.levels = { L1, L2, L3 };
-    // fixed patrol routes, each on one level (see the sketch: 9 guards + guards under the roofs)
-    const loop = (x0, x1, z0, z1, start = 0) => { const P = [[x0, z1], [x1, z1], [x1, z0], [x0, z0]]; return P.slice(start).concat(P.slice(0, start)); };
+    out.levels = { L1: y, L2: y + LH, L3: y + 2 * LH };
+    const W = ([x, z]) => [CX + x, CZ - z];
+    out.garageCars = [{ type: 'ferrari', x: CX - 29, z: CZ - 13, h: 0, color: '#111111' }, { type: 'rs6', x: CX - 29, z: CZ - 19.5, h: 0, color: '#d4af37' }];
+    out.bike = { x: CX - 28, z: CZ - 5 };
+    // fixed patrol routes (module coordinates, each on one level) – step 4 will add more and tune them
+    const loop = (x0, x1, z0, z1) => [[x0, z1], [x1, z1], [x1, z0], [x0, z0]];
     out.sentryPosts = [
-      [[30, -1276], [54, -1276]],                                      // gate court (not right behind the gate)
-      loop(-30, 6, -1294, -1248),                                      // garden
-      [[70, -1264], [116, -1264]], [[96, -1270], [96, -1292]],         // north-east terrace
-      [[71, -1302], [71, -1326]],                                      // east corridor
-      [[108, -1322], [108, -1342]], [[85, -1309], [85, -1342]],        // east court
-      [[84, -1356], [114, -1356]],                                     // south-east court
-      [[50, -1352], [72, -1352]],                                      // under the U-hall
-      [[-22, -1323], [20, -1323]],                                     // middle court
-      [[33.5, -1294], [33.5, -1320]], [[40, -1322], [60, -1322]],      // villa podium (lift side, south side)
-      loop(-30, 30, -1392, -1346),                                     // round the pool
-      [[-52, -1290], [-52, -1328]], [[-42, -1348], [-42, -1380]],      // west strip, garage
-    ];
+      [[-7, -24], [2, -24]],                 // gate court
+      [[-22, -25.25], [-12, -25.25]],        // garden, between the rows of pots
+      [[-14, 2], [-3, 2]],                   // middle court
+      [[4, -0.4], [18, -0.4]],               // villa podium, south side
+      [[22.5, -27], [22.5, -16]],            // north-east terrace
+      [[23, -5.5], [33, -5.5]],              // east court
+      loop(14, 24, 14.3, 24.2),              // round the fountain in the U court
+      [[-19, 11.5], [-19, 22]],              // pool terrace
+      [[-30, -12], [-30, 10]],               // west strip
+    ].map((r) => r.map(W));
   }
   // ---- helipad + helicopter ----
   {

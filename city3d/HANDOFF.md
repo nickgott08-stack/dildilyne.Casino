@@ -266,3 +266,17 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   Jeep fährt die Rampe hoch. Nicht getestet: Finale-Ablauf ab Tor (Karten, Aufzug, Flucht), Karte (map.js zeichnet noch das alte Anwesen).
 - Rundgang zum Anschauen: `…/city3d/dist/dildi_city_3d.html?test=anwesen` (oder `window.DC_TEST = 'anwesen'`) → `missions.estateTour()`:
   direkt vors offene Haupttor, Wachen laufen, sehen einen aber nicht (`job.tour`), keine Auszahlung.
+
+## Neues Anwesen – Schritt 3a: Nicks Modul `anwesen.js` im Spiel (15.11.)
+- Der graue Rohbau ist ersetzt durch `src/anwesen.js` (aus Nicks anderem Chat, basiert auf meinem Entwurf `city3d/entwurf/`):
+  72 × 60 m, Ebenen je 2,64 m, Villa mit Treppe → Balkon → Büro mit Fahrstuhl, Seehaus an der Meerseite, U-Bau mit Verbunddach.
+  Unsere Anpassungen in der Datei (bei neuer Version von Nick wieder übernehmen!): sparsame Baluster (5 Seiten, Abstand 0,34),
+  `curveSegments` 10, kein PointLight im Büro, `root.userData.rec` (plats/walls/round/ramp) in `anwesen()`.
+- radj.js Estate-Block: Modul wird in z gespiegelt (Tor nach Norden, Westtor nach Westen), alle Teile pro Material zu einem Mesh
+  gebacken (Wicklung gedreht), die zwei Tor-Gitter bleiben einzeln (`out.gateMesh`/`westGateMesh`). Kollision automatisch aus
+  `rec`, den `userData.colliders` der Bauteile und jeder `treppe` (→ `addFloor`-Rampe); Villa und Seehaus von Hand (Büro oben begehbar).
+- `RADJ_ESTATE` = x 0…72 / z −1400…−1340, Tor (40/−1340) auf Ebene 2 mit Rampe, Waldweg verlängert bis (40/−1326), Westtor (0/−1370),
+  `ISL.lift`/`ISL.liftOut` werden aus dem Villa-Modell gesetzt (Büro, Ebene 3 + 3,4 m). Steinsockel unter dem Anwesen.
+- Leistung: Anwesen ~120k Dreiecke in ~10 Meshes; Schatten werfen nur Putz + Dach; Bäume der Insel werfen keinen Schatten mehr.
+- 9 vorläufige Wachrouten + Torwache auf der Rampe. Getestet: alles vom Waldweg erreichbar (auch Balkon/Büro, Seehaus),
+  Wachen laufen auf richtiger Höhe. Offen (3b/4): Wachrouten ausbauen, Finale-Ablauf ab Tor testen, Karte (map.js), FPS am Handy.
