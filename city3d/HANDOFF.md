@@ -290,3 +290,4 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Geld + Sterne im Finale ausgeblendet (`#money`/`#stars`, zurück in `cleanupFinale`).
 - Keine Autos/Motorrad im Anwesen; ein grünes Motorrad steht draußen links vor dem Haupttor.
 - Nächster Schritt laut Nick: erst Spielfigur + Wachen (runder, natürlicher), dann die Wachrouten.
+- Finale immer bei Tag: `G.forceDay` (heist.js setzt es im Finale, `cleanupFinale` nimmt es zurück) → `G.cycle = 0.22` (Mittag) in simStep.

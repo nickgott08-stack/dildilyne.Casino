@@ -1632,6 +1632,7 @@ function simStep(dt) {
     G.time += dt;
     // day & night run on their own, tied to the real clock (same time for everybody)
     G.cycle = ((Date.now() / 1000) / DAY_LEN) % 1;
+    if (G.forceDay) G.cycle = 0.22; // Radj finale: always bright daylight (heist.js)
     updatePlayer(dt);
     for (const v of G.vehicles) {
       if (v.removed) continue;

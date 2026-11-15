@@ -594,7 +594,7 @@ export function installFinale(Missions) {
     const j = this.job, G = this.G, I = this.isl;
     for (const s of j.sentries || []) if (s.cone) { this.scene.remove(s.cone); s.cone = null; }
     for (const c of j.cards || []) this.scene.remove(c.m);
-    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false; G.coverOK = false;
+    G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false; G.coverOK = false; G.forceDay = false;
     $('money').style.display = $('stars').style.display = '';
     G.player.has[2] = false; if (G.player.weapon === 2) G.player.weapon = 1; // the AK stays on the island
     for (const t of I.roadTowers || []) { t.seen = 0; t.spot.material.color.set('#ffe680'); }
@@ -759,6 +759,7 @@ export function installFinale(Missions) {
     // weapons: silenced pistol (quiet, no aim assist on the island, head shot = silent kill) or the stolen AK (loud → alarm)
     const onIsl = !['rs6', 'plane', 'fly'].includes(j.stage);
     $('money').style.display = $('stars').style.display = 'none'; // no money / wanted stars in the finale (Nick)
+    G.forceDay = true; // the finale is only played in daylight (Nick)
     G.player.has[2] = true;
     if (G.player.weapon === 0) G.player.weapon = 1;
     G.silenced = G.player.weapon === 1;
