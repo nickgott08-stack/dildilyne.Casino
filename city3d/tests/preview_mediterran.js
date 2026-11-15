@@ -1,0 +1,30 @@
+// Vorschau der mediterranen Bauteile (nicht im Spiel): node build in tests/render_mediterran.mjs
+import * as THREE from 'three';
+import { torbogen, bogengang, pavillon, zypresse, mediterranMats } from '../src/mediterran.js';
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+R.setSize(innerWidth, innerHeight); R.setPixelRatio(1);
+R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(R.domElement);
+const S = new THREE.Scene();
+S.background = new THREE.Color('#9fc4e8'); S.fog = new THREE.Fog('#b9d3ea', 60, 160);
+S.add(new THREE.HemisphereLight('#bcd7ff', '#6b5a40', 1.1));
+const sun = new THREE.DirectionalLight('#fff1d6', 3.2); sun.position.set(-18, 26, 20);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, far: 90 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+S.add(sun);
+const M = mediterranMats();
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: '#7d8a4a', roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; S.add(ground);
+const plaza = new THREE.Mesh(new THREE.PlaneGeometry(44, 22), M.floor.clone());
+plaza.material.map = M.floor.map.clone(); plaza.material.map.repeat.set(22, 11); plaza.material.normalMap = M.floor.normalMap.clone(); plaza.material.normalMap.repeat.set(22, 11);
+plaza.rotation.x = -Math.PI / 2; plaza.position.set(0, 0.01, 2); plaza.receiveShadow = true; S.add(plaza);
+const t = torbogen(); t.position.set(-13, 0, 6); S.add(t);
+const b = bogengang(); b.position.set(2, 0, -4); S.add(b);
+const p = pavillon(); p.position.set(14, 0, 4); p.rotation.y = -0.3; S.add(p);
+const b2 = bogengang({ n: 3, roof: 'shed' }); b2.position.set(-12, 0, -6); S.add(b2);
+for (const [x, z, h] of [[-17, 3, 8], [-9, 3, 7], [8, -9, 9], [-4, -9, 8], [20, -4, 7]]) { const c = zypresse(h); c.position.set(x, 0, z); S.add(c); }
+const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.3, 400);
+window.shot = (x, y, z, tx, ty, tz) => { cam.position.set(x, y, z); cam.lookAt(tx, ty, tz); R.render(S, cam); };
+let tris = 0; S.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+window.info = { tris: Math.round(tris), meshes: [t, b, p, b2].map((g) => g.children.length) };
+window.ready = true;

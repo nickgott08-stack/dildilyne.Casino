@@ -237,3 +237,11 @@ Dildi City (Quellcode):
 - Wachen: `sentryPosts` sind feste Routen – Rundwege mit 4 Ecken (`loop()`) oder Hin-und-zurück; heist.js läuft beliebig viele Punkte ab.
   Im Vorhof direkt hinter dem Tor steht niemand. 13 Wachen + Torwache.
 - Flucht-Jeeps starten auf dem Heli-Weg außerhalb der Mauer.
+
+## Mediterrane Torbögen (15.11., Nicks Foto Villa an der Steilküste) – noch NICHT im Spiel
+- `src/mediterran.js`: `torbogen()`, `bogengang({n, roof:'terrace'|'shed'})`, `pavillon()`, `zypresse()`. Realistischer Stil:
+  Canvas-Texturen mit Normal-Maps (Ocker-Kalkputz, Travertin, Mönch-Nonne-Ziegel, Terrakotta-Boden), Rundbögen als echte
+  Extrude-Formen mit Bogenstein-Ring + Schlussstein, Gesimse, Balustraden (gedrechselte Baluster), toskanische Säulen, Walmdach.
+  Pro Bauteil ein Mesh pro Material (4–6 Draw-Calls), `userData.colliders` = Grundriss-Kästen. Alles zusammen ~65k Dreiecke.
+- Vorschau: `PW=$(npm root -g)/playwright node tests/render_mediterran.mjs <ordner>` → `med_*.png`.
+- Offen: wo im Spiel (Nick fragen), dann einbauen + Kollision über `addBox`.
