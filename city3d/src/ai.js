@@ -372,6 +372,15 @@ function branchesOf(road) {
   road._br = br;
   return br;
 }
+// does this road end (dir > 0: last sample, dir < 0: first sample) at a roundabout? (cached)
+function endsAtRing(road, dir) {
+  const k = dir > 0 ? '_ringE' : '_ringS';
+  if (road[k] === undefined) {
+    const e = road.samples[dir > 0 ? road.samples.length - 1 : 0];
+    road[k] = (world.outRoads || []).some((r) => r.ring && r !== road && r.samples.some((q) => Math.hypot(q.x - e.x, q.z - e.z) < 12));
+  }
+  return road[k];
+}
 const headOf = (S, i, dir) => (dir > 0 ? S[i].h : S[i].h + Math.PI);
 
 // follows a sampled road; shared by out-of-town traffic and police
@@ -469,6 +478,17 @@ export class OutDriver {
     if (st.dev > 25) { const n = nearestRoad(v.pos.x, v.pos.z, 60); if (n) this.rf = new RoadFollow(n.road, n.idx, this.rf.dir); }
     let want = this.panic > 0 ? 26 : this.base;
     want = Math.min(want, lerpN(want, 7, clamp(st.turn / 1.2, 0, 1)));
+    // roundabouts: slow down before the ring, drive slowly in it and leave it gently
+    // (cars used to shoot into the island and, on the way out, into the oncoming lane)
+    if (this.panic <= 0) {
+      const R0 = this.rf.road, L = R0.samples.length - 1, d = this.rf.dir;
+      if (R0.ring) want = Math.min(want, 6.5);
+      else {
+        const toEnd = d > 0 ? L - this.rf.idx : this.rf.idx, fromStart = L - toEnd;
+        if (toEnd < 14 && endsAtRing(R0, d)) want = Math.min(want, 5 + toEnd * 0.75);
+        if (fromStart < 5 && endsAtRing(R0, -d)) want = Math.min(want, 7.5);
+      }
+    }
     const free = want;
     if (this.ignoreT > 0) this.ignoreT -= dt;
     const ob = obstacleDist(v, G, this.ignoreT > 0 ? 4 : 22, true);

@@ -196,7 +196,7 @@ function spawnOutTraffic(initial) {
   for (const v of G.vehicles) if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 12) return;
   if (!initial && isVisible(p.x, 1, p.z, 6)) return;
   const desert = p.z > 0;
-  const type = pick(desert ? ['skoda', 'van', 'van', 'rs6', 'ferrari', 'taxi', 'skoda', 'jeep', 'jeep', 'truck'] : ['van', 'van', 'skoda', 'taxi', 'truck', 'truck', 'bus', 'jeep']);
+  const type = pick(desert ? ['skoda', 'van', 'van', 'rs6', 'ferrari', 'taxi', 'skoda', 'truck'] : ['van', 'van', 'skoda', 'taxi', 'truck', 'truck', 'bus']);
   const v = new Vehicle(scene, type, p.x, p.z, p.h);
   v.driver = new OutDriver(v, p.road, p.idx, p.dir);
   v.vel.set(Math.sin(p.h) * 10, Math.cos(p.h) * 10);
@@ -307,8 +307,8 @@ function spawnTraffic(initial) {
   // avoid spawning on other cars
   for (const v of G.vehicles) if (Math.hypot(v.pos.x - p.x, v.pos.z - p.z) < 9) return;
   if (!initial && isVisible(p.x, 1, p.z, 6)) return;
-  // now and then a city bus, a delivery truck or a jeep between the cars
-  const type = pick(['skoda', 'skoda', 'skoda', 'van', 'van', 'rs6', 'taxi', 'taxi', 'skoda', 'van', 'truck', 'jeep', 'skoda', 'taxi', 'van', 'bus']);
+  // now and then a city bus or a delivery truck between the cars (jeeps only belong to Radj: missions + island)
+  const type = pick(['skoda', 'skoda', 'skoda', 'van', 'van', 'rs6', 'taxi', 'taxi', 'skoda', 'van', 'truck', 'skoda', 'taxi', 'van', 'bus']);
   const v = new Vehicle(scene, type, p.x, p.z, p.h);
   v.driver = new TrafficDriver(v);
   v.driverLook = true;
