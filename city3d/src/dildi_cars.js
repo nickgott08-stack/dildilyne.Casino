@@ -1311,13 +1311,16 @@
     }
     signGantry(mb, 0, -252, 'z', 0.2);
     signGantry(mb, 0, -404, 'z', 0.2);
+    // Dildi-Kreisel (flach, seit 15.11.): alle Gebaeude stehen an der Querstrasse (z = -322) bzw. Hafenstrasse,
+    // mit Asphalt-Zufahrt (kreuzAprons). Kein Skatepark mehr (lag unter der Hochstrasse).
+    const P = Object.assign({}, KREUZ_EXTRAS, opts && opts.extrasPos);
+    for (const a of kreuzAprons(P)) mb.box('Asphalt', [a[0], 0, a[2]], [a[1], 0.035, a[3]]);
     col = col.concat(
-      underBridge(mb, g, 110, -350),            // Skatepark unter der Hochstrasse (Ost)
-      diner(mb, g, -105, -385, false),          // Rasthof-Diner (Suedwest, am Wasser)
-      motel(mb, g, 105, -398),                  // Motel mit Pool (Suedost)
+      diner(mb, g, P.diner[0], P.diner[1], false),          // Rasthof-Diner (Nordwest, Front zur Querstrasse)
+      facingNorth([mb, g], P.motel[1], () => motel(mb, g, P.motel[0], P.motel[1])),   // Motel mit Pool (Suedost, gespiegelt)
       billboard(mb, g, -96, -262, 0.5),         // Leucht-Plakatwand (Nordwest)
       billboard(mb, g, 96, -262, -0.5),
-      opts && opts.extras === false ? [] : kreuzExtras(mb, g, opts && opts.extrasPos));
+      opts && opts.extras === false ? [] : kreuzExtras(mb, g, P));
     const cache = {};
     const colorOf = (m) => cache[m] || (cache[m] = new THREE.Color().setRGB(...(BPAL[m] || SRGB[m] || [0.5, 0.5, 0.5]), THREE.SRGBColorSpace));
     const group = new THREE.Group();
@@ -1329,37 +1332,66 @@
     group.userData = { colliders: col, glow: glowMat };
     return group;
   }
-  const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor, places: () => Object.assign({}, KREUZ_EXTRAS) };
+  const dildiKreuz = { roads: kreuzRoads, decor: kreuzDecor, places: () => Object.assign({ aprons: kreuzAprons(KREUZ_EXTRAS) }, KREUZ_EXTRAS) };
+
+  // Gebaeude-Funktionen bauen ihre Front Richtung -z. Fuer Gebaeude suedlich der Strasse: alles, was fn() neu
+  // in die MBs schreibt, an z = zc spiegeln (Dreiecke umdrehen, damit die Normalen stimmen); Kollisionsboxen mit.
+  function facingNorth(mbs, zc, fn) {
+    const before = mbs.map((m) => { const o = {}; for (const k in m.t) o[k] = m.t[k].length; return o; });
+    const col = fn() || [];
+    const fz = (p) => [p[0], p[1], 2 * zc - p[2]];
+    mbs.forEach((m, j) => {
+      for (const k in m.t) {
+        const A = m.t[k];
+        for (let i = before[j][k] || 0; i < A.length; i += 3) { const a = A[i], b = A[i + 1], c = A[i + 2]; A[i] = fz(a); A[i + 1] = fz(c); A[i + 2] = fz(b); }
+      }
+    });
+    return col.map((c) => Object.assign({}, c, { z0: 2 * zc - c.z1, z1: 2 * zc - c.z0 }));
+  }
+  // Asphalt-Zufahrten [x0, x1, z0, z1] von der Strasse (Querstrasse-Rand z = -316 / -328, Hafenstrasse-Rand x = +-6) bis zum Gebaeude
+  function kreuzAprons(P) {
+    const N = -316, S = -328;
+    return [
+      [P.diner[0] - 14, P.diner[0] + 16, N - 0.5, P.diner[1] - 11],
+      [P.meisterei[0] - 12, P.meisterei[0] + 12, N - 0.5, P.meisterei[1] - 6],
+      [P.burger[0] - 16, P.burger[0] + 14, N - 0.5, P.burger[1] - 6],
+      [P.tankstelle[0] - 12, P.tankstelle[0] + 12, P.tankstelle[1] - 10, S + 0.5],
+      [P.waschstrasse[0] - 6, P.waschstrasse[0] + 6, P.waschstrasse[1] + 9, S + 0.5],
+      [P.motel[0] - 24, P.motel[0] + 24, P.motel[1] + 16, S + 0.5],
+      [5.5, 9.3, P.kiosk[1] - 4, P.kiosk[1] + 4],   // Bushaltebucht
+    ];
+  }
 
 
   // --- Weitere Gebaeude rund ums Dildi-Kreuz (sparsam: wenige Flaechen, alles in 1 Mesh) ---
   // Positionen fuer die Raute (statt Kleeblatt); per decor(THREE, { extrasPos: {...} }) aenderbar.
+  // Positionen fuer den flachen Dildi-Kreisel (Querstrasse z = -322, Hafenstrasse x = 0)
   const KREUZ_EXTRAS = {
-    wasserturm: [-72, -270],   // Nordwest, zwischen Hochstrassen-Kurve und Rampe
-    funkmast: [68, -270],      // Nordost
-    solarpark: [-60, -378],    // Suedwest, unter der Rampe Richtung Diner
-    park: [52, -380],          // Suedost, DILDI-Buchstaben mit Blick zur Hafenstrasse
-    burger: [112, -282],       // Drive-in Nordost an der Kurve
-    waschstrasse: [136, -355], // Ost, neben dem Skatepark
-    meisterei: [-125, -350],   // West
-    kiosk: [15, -393],         // Hafenstrasse Ost, gegenueber der Tankstelle (Wartende Leute: Hotspot im Spiel)
-    tankstelle: [-22, -393.5], // direkt an der Hafenstrasse (West), mit Asphalt-Zufahrt
+    wasserturm: [-72, -270],   // Nordwest, hinter dem Diner (Deko)
+    funkmast: [68, -270],      // Nordost, hinter dem Drive-in (Deko)
+    solarpark: [-60, -378],    // Suedwest, hinter der Tankstelle (Deko)
+    park: [40, -390],          // Suedost, DILDI-Buchstaben mit Blick zur Hafenstrasse (Deko)
+    diner: [-55, -297],        // Nordwest an der Querstrasse, Parkplatz davor
+    meisterei: [-100, -300],   // Nordwest an der Querstrasse
+    burger: [60, -302],        // Nordost an der Querstrasse
+    tankstelle: [-42, -340],   // Suedwest an der Querstrasse
+    waschstrasse: [35, -342],  // Suedost an der Querstrasse (Einfahrt von der Strasse)
+    motel: [95, -360],         // Suedost an der Querstrasse (gespiegelt: Pool + Parkplatz zur Strasse)
+    kiosk: [15, -280],         // Hafenstrasse Nord, Ostseite, mit Bushaltestelle (Wartende Leute: Hotspot im Spiel)
   };
   function kreuzExtras(d, g, P) {
     P = Object.assign({}, KREUZ_EXTRAS, P || {});
     const col = [];
-    // keine Baeume auf Fahrbahnen (Rampen, Hafenstrasse, Tankstellen-Zufahrt)
-    const RP = kreuzRoads().slice(1).flatMap((r) => r.pts);
-    const onRoad = (x, z) => Math.abs(x) < 9 || RP.some((p) => Math.hypot(p[0] - x, p[1] - z) < 8) ||
-      (Math.abs(x - P.tankstelle[0]) < 18 && Math.abs(z - P.tankstelle[1]) < 13);
-    // 0) Tankstelle an der Hafenstrasse: Dach + Zapfsaeulen + Asphalt bis an die Fahrbahn
-    { const [x, z] = P.tankstelle;
-      col.push(...petrolStation(d, g, x, z, [x - 12, -5.8, z - 8.5, z + 8.5]));
-      // Preisschild-Mast an der Strasse
-      d.box('Steel', [-7.6, 0, z + 9.6], [-7.2, 6.5, z + 10]);
-      d.box('ChipRed', [-8.6, 4.2, z + 9.5], [-6.2, 6.6, z + 10.1]);
-      g.box('GlowWarm', [-8.4, 4.5, z + 10.12], [-6.4, 6.2, z + 10.16]);
-      col.push({ x0: -7.6, x1: -7.2, z0: z + 9.6, z1: z + 10, h: 6.6 }); }
+    // keine Baeume auf Fahrbahnen (Hafenstrasse, Querstrasse, Zufahrten)
+    const AP = kreuzAprons(P);
+    const onRoad = (x, z) => Math.abs(x) < 9 || Math.abs(z + 322) < 10 || AP.some((a) => x > a[0] - 3 && x < a[1] + 3 && z > a[2] - 3 && z < a[3] + 3);
+    // 0) Tankstelle an der Querstrasse (Suedwest): Dach + Zapfsaeulen (Asphalt: kreuzAprons) + Preisschild an der Strasse
+    { const [x, z] = P.tankstelle, sx = x + 13.5, sz = -330;
+      col.push(...petrolStation(d, g, x, z));
+      d.box('Steel', [sx - 0.2, 0, sz - 0.2], [sx + 0.2, 6.5, sz + 0.2]);
+      d.box('ChipRed', [sx - 0.3, 4.2, sz - 1.2], [sx + 0.3, 6.6, sz + 1.2]);
+      for (const k of [-1, 1]) g.box('GlowWarm', [sx + k * 0.3 - 0.03, 4.5, sz - 1.0], [sx + k * 0.3 + 0.03, 6.2, sz + 1.0]);
+      col.push({ x0: sx - 0.3, x1: sx + 0.3, z0: sz - 0.3, z1: sz + 0.3, h: 6.6 }); }
     const ring = (x, z, r, y, n) => hexagon(x, z, 0, r, n, Math.PI / n, 1, 1).map(([a, b]) => [a, y, b]);
     const tree = (x, z, h) => { d.box('Wood', [x - 0.15, 0, z - 0.15], [x + 0.15, h * 0.35, z + 0.15]); d.convex('BottleGreen', [ring(x, z, h * 0.3, h * 0.3, 6), [[x, h, z]]].concat(ring(x, z, h * 0.3, h * 0.3, 6).map((p, i, A) => [p, A[(i + 1) % 6], [x, h, z]]))); };
     // 1) Wasserturm (in der Schleife Nordwest)

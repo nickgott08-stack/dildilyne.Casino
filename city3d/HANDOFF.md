@@ -188,3 +188,14 @@ Dildi City (Quellcode):
 - Tankstelle steht jetzt allein an der Hafenstraße (West, `KREUZ_EXTRAS.tankstelle`, `petrolStation()` mit Asphalt-Zufahrt + Preisschild),
   der Diner bleibt am Wasser. Kiosk + Bushaltestelle auf der Ostseite gegenüber (`kiosk`), mit Wartenden (Hotspot in outskirts.js);
   standen vorher im Pfeiler der Schilderbrücke. Salzkuppel (brauner Klotz) entfernt. Parkbäume nicht mehr auf Fahrbahnen.
+
+## Dildi-Kreisel statt Dildi-Kreuz (15.11., Nicks Wunsch)
+- Hochstraße + Rampen entfernt. Flach: `Querstraße West/Ost` (von den Stadtausfahrten x = ±136 nach z = −322) treffen die
+  `Hafenstraße` (Nord bis −303) / `Hafenstraße Süd` (ab −341) am Kreisverkehr `DILDI_KREISEL` (geo.js, wie der Hafenkreisel;
+  Insel mit pink-weißer Säule in outskirts.js, Karte in map.js). Schilder/Gebietsname „Dildi-Kreisel“.
+- `kreuzRoads()` (Hochstraße/Rampen) bleibt in dildi_cars.js, wird vom Spiel aber nicht mehr benutzt.
+- Gebäude an den Straßen mit Asphalt-Zufahrten (`kreuzAprons`, dort auch keine Laternen – `places().aprons` in world.js):
+  Diner + Meisterei (NW), Burger-Drive-in (NO), Tankstelle (SW), Waschstraße + Motel (SO), Kiosk + Bushaltebucht (Hafenstraße Nord, Ost).
+  Gebäude südlich der Straße werden mit `facingNorth()` an z gespiegelt (Front zur Straße). Deko ohne Zufahrt: Wasserturm, Funkmast,
+  Solarpark, Park mit DILDI-Buchstaben, Plakate. Skatepark entfernt. Positionen in `KREUZ_EXTRAS`.
+- **Nicht getestet** (Nick testet selbst, Tokens sparen) – nur gebaut.
