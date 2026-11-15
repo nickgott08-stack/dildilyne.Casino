@@ -407,11 +407,11 @@ function hipRoof(x0, x1, z0, z1, y, pitch, roofOut, stoneOut) {
   const ridge = (a, b) => {
     const v = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = v.length();
     if (L < 0.01) return;
-    const c = new THREE.CylinderGeometry(0.11, 0.11, L, 8, 1, false, -PI / 2, PI);
+    const c = new THREE.CylinderGeometry(0.1, 0.1, L, 8, 1, false); // ganzes Rohr: sitzt bei jeder Richtung sauber auf dem Grat
     scaleUV(c, 0.5);
     c.translate(0, L / 2, 0);
     c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.normalize()));
-    c.translate(a[0], a[1] + 0.03, a[2]);
+    c.translate(a[0], a[1] - 0.01, a[2]);
     roofOut.push(c);
   };
   ridge(R1, R2);
@@ -938,4 +938,98 @@ export function verbundDach(rects, y, pitch = 0.42) {
   const P_ = P();
   rects.forEach((r, i) => hipRoof(r[0], r[1], r[2], r[3], y + i * 0.004, pitch, P_.roof, P_.stone));
   return finish(P_, 'verbundDach');
+}
+
+// ---------------------------------------------------------------- 10) Villa / Haupthaus (Nicks Wunsch 15.11.)
+// Lokal: Mitte des Hauptblocks = 0/0, Boden y = 0. Hauptblock 11 × 8 m (x ±5,5 / z ±4), 2 Stockwerke, Walmdach.
+//  - Südseite (+z) und Westseite (−x): auf beiden Stockwerken Bogenfenster (keine Tür mehr im Westen)
+//  - Nordseite (−z): Treppe an der Hauswand entlang hinauf in den 1. Stock, endet im Anbau (x 1,5…6,5 / z −6,95…−4)
+//  - Anbau: unten geschlossen, oben offener Balkon mit Säulen, Geländer und Pultdach
+//  - vom Balkon Bogentür ins Büro (Schreibtisch, Stuhl, Regal); im Büro die goldene Fahrstuhltür
+// userData: floorY (Höhe 1. Stock), stairs, office {x0,x1,z0,z1}, lift {x,z}, door {x,z}
+export function villa(opts = {}) {
+  const o = { w: 11, d: 8, h: 6.8, ...opts };
+  const P_ = P(), hw = o.w / 2, hd = o.d / 2, F = o.h / 2, t = 0.35, UH = o.h - F;
+  // Fensterreihe auf einer Wand: put() dreht/verschiebt von "Wand entlang x, Außenseite +z bei z = 0"
+  const windows = (len, floors, put, skip = () => false) => {
+    const n = Math.max(1, Math.floor(len / 2.6));
+    for (const y0 of floors)
+      for (let i = 0; i < n; i++) {
+        if (skip(i, y0)) continue;
+        const cx = -len / 2 + (i + 0.5) * (len / n), sp = y0 + 1.25;
+        const pane = new THREE.PlaneGeometry(1.0, 1.25); pane.translate(cx, y0 + 0.625, 0.02); put(pane, P_.iron);
+        const top = new THREE.CircleGeometry(0.5, 14, 0, PI); top.translate(cx, sp, 0.02); put(top, P_.iron);
+        const ring = archRing(cx, sp, 0.5, 0.13, 0.1); ring.translate(0, 0, 0.05); put(ring, P_.stone);
+        put(box(1.3, 0.09, 0.22, cx, y0 - 0.045, 0.07, 2), P_.stone);
+        // Sprossen
+        put(box(0.04, 1.7, 0.03, cx, y0 + 0.85, 0.035, 2), P_.stone); put(box(1.0, 0.04, 0.03, cx, sp, 0.035, 2), P_.stone);
+      }
+  };
+  const face = (ry, ox, oz) => (g, into) => { g.rotateY(ry); g.translate(ox, 0, oz); into.push(g); };
+  // --- Hauptblock: Erdgeschoss massiv, Obergeschoss als Wände (damit das Büro begehbar ist)
+  P_.stucco.push(box(o.w, F, o.d, 0, F / 2, 0, 4));
+  P_.stone.push(box(o.w + 0.16, 0.5, o.d + 0.16, 0, 0.25, 0, 2), box(o.w + 0.12, 0.14, o.d + 0.12, 0, F, 0, 2), box(o.w + 0.3, 0.3, o.d + 0.3, 0, o.h - 0.15, 0, 2));
+  P_.stucco.push(box(o.w, UH, t, 0, F + UH / 2, hd - t / 2, 4), box(t, UH, o.d, -hw + t / 2, F + UH / 2, 0, 4), box(t, UH, o.d, hw - t / 2, F + UH / 2, 0, 4));
+  const doorX = 4.0;                                               // Bogentür Balkon → Büro
+  { const g = archWall(o.w, UH, t, [{ c: doorX + hw, w: 1.3, s: 1.55 }]); g.translate(-hw, F, -hd + t / 2); P_.stucco.push(g);
+    const r = archRing(doorX, F + 1.55, 0.65, 0.16, t + 0.08); r.translate(0, 0, -hd + t / 2); P_.stone.push(r); }
+  windows(o.w, [1.0, F + 0.9], face(0, 0, hd));                    // Süd
+  windows(o.d, [1.0, F + 0.9], face(-PI / 2, -hw, 0));             // West: komplett Fenster, keine Tür
+  hipRoof(-hw - 0.6, hw + 0.6, -hd - 0.6, hd + 0.6, o.h, 0.42, P_.roof, P_.stone);
+  // --- Büro im 1. Stock (Nordost-Ecke)
+  const ox0 = 0.5, ox1 = hw - t, oz0 = -hd + t, oz1 = 0.2;
+  P_.stucco.push(box(0.2, UH, oz1 - oz0 + 0.2, ox0 - 0.1, F + UH / 2, (oz0 + oz1) / 2, 4), box(ox1 - ox0, UH, 0.2, (ox0 + ox1) / 2, F + UH / 2, oz1 + 0.1, 4));
+  { const g = new THREE.PlaneGeometry(ox1 - ox0, oz1 - oz0); g.rotateX(-PI / 2); scaleUV(g, 0.5); g.translate((ox0 + ox1) / 2, F + 0.08, (oz0 + oz1) / 2); P_.floor.push(g); }
+  { const dx = 2.9, dz = -1.5, y = F;                               // Schreibtisch, Stuhl, Regal
+    P_.wood.push(box(1.9, 0.07, 0.9, dx, y + 0.78, dz, 1), box(0.06, 0.75, 0.82, dx - 0.9, y + 0.375, dz, 1), box(0.06, 0.75, 0.82, dx + 0.9, y + 0.375, dz, 1), box(1.8, 0.5, 0.04, dx, y + 0.5, dz - 0.38, 1));
+    P_.wood.push(box(0.5, 0.07, 0.5, dx, y + 0.46, dz + 0.85, 1), box(0.5, 0.6, 0.06, dx, y + 0.8, dz + 1.1, 1));
+    for (const [ax, az] of [[-0.21, 0.64], [0.21, 0.64], [-0.21, 1.06], [0.21, 1.06]]) P_.iron.push(box(0.05, 0.44, 0.05, dx + ax, y + 0.22, dz + az, 1));
+    P_.iron.push(box(0.45, 0.3, 0.03, dx + 0.3, y + 0.98, dz - 0.15, 1), box(0.12, 0.04, 0.12, dx + 0.3, y + 0.83, dz - 0.15, 1));   // Bildschirm
+    const bx = (ox0 + ox1) / 2 + 0.6, bz = oz1 - 0.2;
+    P_.wood.push(box(2.6, 2.1, 0.06, bx, y + 1.05, bz + 0.14, 1), box(0.06, 2.1, 0.36, bx - 1.3, y + 1.05, bz, 1), box(0.06, 2.1, 0.36, bx + 1.3, y + 1.05, bz, 1));
+    for (let i = 0; i < 5; i++) P_.wood.push(box(2.6, 0.05, 0.36, bx, y + 0.05 + i * 0.5, bz, 1));
+    for (let i = 0; i < 4; i++) P_.stucco.push(box(2.2 - (i % 2) * 0.5, 0.3, 0.22, bx - 0.1 + (i % 2) * 0.2, y + 0.24 + i * 0.5, bz - 0.03, 0.3)); // Bücher/Akten
+  }
+  const liftZ = -1.8;
+  P_.stone.push(box(0.1, 2.5, 0.16, ox0 + 0.05, F + 1.25, liftZ - 0.8, 2), box(0.1, 2.5, 0.16, ox0 + 0.05, F + 1.25, liftZ + 0.8, 2), box(0.1, 0.18, 1.76, ox0 + 0.05, F + 2.5, liftZ, 2));
+  // --- Anbau: unten massiv mit Fenstern, oben Balkon mit Säulen
+  const ax0 = 1.5, ax1 = 6.5, az0 = -6.95, az1 = -hd, aw = ax1 - ax0, ad = az1 - az0, acx = (ax0 + ax1) / 2, acz = (az0 + az1) / 2;
+  P_.stucco.push(box(aw, F, ad, acx, F / 2, acz, 4));
+  P_.stone.push(box(aw + 0.16, 0.5, ad + 0.16, acx, 0.25, acz, 2), box(aw + 0.14, 0.14, ad + 0.14, acx, F, acz, 2));
+  windows(aw, [1.0], face(PI, acx, az0));
+  windows(ad, [1.0], face(PI / 2, ax1, acz));
+  { const g = new THREE.PlaneGeometry(aw - 0.1, ad - 0.05); g.rotateX(-PI / 2); scaleUV(g, 0.5); g.translate(acx, F + 0.075, acz); P_.floor.push(g); }
+  const ch = 2.3, pz = az0 + 0.25, yb = F + 0.07;
+  for (const [x, z] of [[ax0 + 0.25, pz], [ax1 - 0.25, pz], [ax0 + 0.25, az1 - 0.2], [ax1 - 0.25, az1 - 0.2]]) P_.stucco.push(box(0.5, ch, 0.5, x, yb + ch / 2, z, 4));
+  for (const x of [ax0 + aw / 3, ax0 + (2 * aw) / 3]) P_.stone.push(...column(x, yb, pz, ch, 0.15));
+  P_.stone.push(...column(ax1 - 0.25, yb, acz + 0.02, ch, 0.15));
+  balustrade(ax0 + 0.5, ax0 + aw / 3 - 0.17, yb, pz, P_.stone); balustrade(ax0 + aw / 3 + 0.17, ax0 + (2 * aw) / 3 - 0.17, yb, pz, P_.stone); balustrade(ax0 + (2 * aw) / 3 + 0.17, ax1 - 0.5, yb, pz, P_.stone);
+  for (const [za, zb] of [[az0 + 0.5, acz - 0.15], [acz + 0.19, az1 - 0.45]]) balustrade(-(zb - za) / 2, (zb - za) / 2, yb, 0, P_.stone, PI / 2, ax1 - 0.25, (za + zb) / 2);
+  // Treppe an der Nordwand (steigt nach +x), 20 Stufen bis zum Balkon
+  const sw = 1.3, steps = 20, rise = F / steps, sz = -hd - 0.32 - sw / 2;
+  balustrade(-0.3, 0.3, yb, 0, P_.stone, PI / 2, ax0 + 0.25, (az0 + 0.5 + sz - sw / 2 - 0.34) / 2);
+  const top = yb + ch;
+  P_.stucco.push(box(aw, 0.36, 0.5, acx, top + 0.18, pz, 4), box(0.5, 0.36, ad, ax0 + 0.25, top + 0.18, acz, 4), box(0.5, 0.36, ad, ax1 - 0.25, top + 0.18, acz, 4));
+  P_.stone.push(box(aw + 0.12, 0.08, 0.6, acx, top + 0.4, pz, 2), box(0.6, 0.08, ad + 0.06, ax0 + 0.25, top + 0.4, acz, 2), box(0.6, 0.08, ad + 0.06, ax1 - 0.25, top + 0.4, acz, 2));
+  P_.stucco.push(box(aw - 0.2, 0.06, ad, acx, top + 0.33, acz, 4));                                    // Decke
+  for (let x = ax0 + 0.9; x < ax1 - 0.5; x += 0.8) P_.wood.push(box(0.12, 0.14, ad - 0.3, x, top + 0.24, acz, 1));
+  { const tmp = [], e = top + 0.46, bk = o.h - 0.32;                                                       // Pultdach, fällt nach Norden
+    shedRoof(-ax1 - 0.4, -ax0 + 0.4, -az1, -az0 + 0.5, bk, e - 0.08, tmp);
+    for (const g of tmp) { g.rotateY(PI); P_.roof.push(g); }
+    for (const x of [ax0, ax1 - 0.5]) {                                                                    // Giebel-Dreiecke an den Seiten
+      const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.lineTo(ad, 0); sh.lineTo(ad, bk - e - 0.02); sh.lineTo(0, 0.02); sh.lineTo(0, 0);
+      const g = scaleUV(new THREE.ExtrudeGeometry(sh, { depth: 0.5, bevelEnabled: false }), 4); g.rotateY(-PI / 2); g.translate(x + 0.5, e - 0.02, az0); P_.stucco.push(g);
+    } }
+  const grp = finish(P_, 'villa');
+  const st = treppe({ steps, rise, w: sw });
+  st.position.set(ax0 - steps * 0.32, 0, sz); st.rotation.y = -PI / 2; grp.add(st);
+  const lift = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 1.5), new THREE.MeshStandardMaterial({ color: '#c9a227', roughness: 0.35, metalness: 0.5, emissive: '#6b520f' }));
+  lift.position.set(ox0 + 0.05, F + 1.2, liftZ); lift.name = 'lift'; grp.add(lift);
+  // Deckenlampe im Büro (sonst ist es innen sehr dunkel); im Spiel je nach Grafikstufe weglassen
+  const lamp = new THREE.PointLight('#ffe2b0', 14, 9, 1.6); lamp.position.set((ox0 + ox1) / 2, o.h - 0.5, (oz0 + oz1) / 2); lamp.name = 'officeLight'; grp.add(lamp);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshBasicMaterial({ color: '#fff0cc' })); bulb.position.copy(lamp.position); bulb.position.y += 0.2; grp.add(bulb);
+  grp.userData = { ...grp.userData, floorY: F, stairs: { x0: ax0 - steps * 0.32, x1: ax0, z: sz, w: sw, rise, steps }, balcony: { x0: ax0, x1: ax1, z0: az0, z1: az1 },
+    office: { x0: ox0, x1: ox1, z0: oz0, z1: oz1 }, door: { x: doorX, z: -hd }, lift: { x: ox0 + 0.1, z: liftZ } };
+  grp.userData.colliders = [{ x: 0, z: 0, w: o.w, d: o.d }, { x: acx, z: acz, w: aw, d: ad }];
+  return grp;
 }

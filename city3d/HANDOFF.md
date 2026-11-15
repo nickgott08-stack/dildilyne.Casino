@@ -257,3 +257,8 @@ Dildi City (Quellcode):
 - Anwesen-Entwurf, weitere Wünsche (15.11. nachts): Loggia mit Dachterrasse im Mittelhof entfernt (Geländer geschlossen, Lücke nur an
   Treppe 8). Ost-Seite: Nordbau + U-Arkade (4 Stücke, jetzt `roof:'none'`) unter EINEM Ziegeldach (`verbundDach(rects, traufe)`),
   Lücke zwischen Nordbau und U zugemauert.
+- **Villa** (`villa()` in mediterran.js): Haupthaus neu. West- und Südseite Bogenfenster auf beiden Stockwerken, braune Tür im Westen weg.
+  Nordseite: Treppe (20 Stufen) an der Hauswand hinauf zum Anbau, dessen 1. Stock ein Balkon mit Säulen/Geländer/Pultdach ist; von dort
+  Bogentür ins Büro (Schreibtisch, Stuhl, Regal, Deckenlampe `officeLight`), darin die goldene Fahrstuhltür (`lift`).
+  `userData`: floorY, stairs, balcony, office, door, lift (lokale Koordinaten) – für Höhenabfrage/Kollision/Fahrstuhl-Logik im Spiel.
+  Im Spiel muss der Fahrstuhl (bisher Westwand außen) ins Büro umziehen.

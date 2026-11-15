@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { torbogen as pc, bogengang as mc, hausblock as gc, torbogenZwischen as Zu, treppe as Ju, gelaender as Er, hecke as _c, heckeGeo as Ku, zypresse as qu, pool as ju,
-  seehaus, verbundDach, mediterranParts, mediterranFinish as gi, mBox as Vt, mScaleUV as cn } from '../src/mediterran.js';
+  seehaus, verbundDach, villa, mediterranParts, mediterranFinish as gi, mBox as Vt, mScaleUV as cn } from '../src/mediterran.js';
 const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.domElement.style.touchAction = 'none';
 R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05;
@@ -60,9 +60,8 @@ rail(2.4,-14.8,H,7.83); rail(6.4,-7.2,H,7.83);              // NEU: Geländer, w
 stair(-12,0,13.12,0,-1);
 stair(-3.12,H,-6,1,0);
 pot(-6,H,-10,1.15); pot(-6,H,-2,1.15); pot(0,H,4,1.15);
-An(gc(11,6.8,8),12.5,2*H,-6.5);
-An(gc(5,5.4,4.5),16.5,2*H,-11.2,PI);
-{let d=new Te(new vn(.12,2.6,1.8),new on({color:"#c9a227",roughness:.35,metalness:.8}));d.position.set(6.94,2*H+1.3,-6);Ce.add(d)}
+// NEU: Villa mit Fenstern im Westen (keine Tür), Treppe an der Nordwand → Balkon mit Säulen → Büro mit Fahrstuhl
+An(villa(),12.5,2*H,-6.5);
 rail(17.6,11,2*H,1.83);
 rail(6,2.17,2*H,-10.9,PI/2); rail(6,2.17,2*H,-1.2,PI/2);
 rail(4,4.2,2*H,-13.83); rail(9.8,14.9,2*H,-13.83);
@@ -98,7 +97,7 @@ Ce.add(gi(B,"anwesen"));
 }
 const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.3, 600);
 const oc = new OrbitControls(cam, R.domElement); oc.maxPolarAngle = 1.52; oc.enableDamping = true;
-const V = { 'Seehaus': [[-12, 12, 4], [-12, 2, 27]], 'Vom Meer': [[-14, 9, 58], [-12, 3, 28]], 'Ecke West': [[-18, 7, 12], [-33, 2.5, 26]], 'Treppe': [[-8, 3, 16.5], [-8, 2.2, 26]], 'Drinnen': [[-30, 2.7, 27.8], [5, 2.6, 27.9]], 'Ende rechts': [[-2, 6, 15], [8, 2.5, 27]], 'Ost-Dach': [[8, 22, 19], [30, 3, 15]], 'Ost von oben': [[28, 60, 14.01], [28, 0, 14]], 'Mittelhof': [[-12, 9, 24], [-12, 3, 4]], 'Übersicht': [[-6, 34, 62], [2, 2, 0]], 'Von oben': [[0, 95, 1], [0, 0, 0]] };
+const V = { 'Seehaus': [[-12, 12, 4], [-12, 2, 27]], 'Vom Meer': [[-14, 9, 58], [-12, 3, 28]], 'Ecke West': [[-18, 7, 12], [-33, 2.5, 26]], 'Treppe': [[-8, 3, 16.5], [-8, 2.2, 26]], 'Drinnen': [[-30, 2.7, 27.8], [5, 2.6, 27.9]], 'Ende rechts': [[-2, 6, 15], [8, 2.5, 27]], 'Villa West': [[-5, 11, -3], [8, 8.3, -6.5]], 'Villa Treppe': [[3, 12.5, -24], [13, 8, -10]], 'Balkon': [[22.5, 11, -18.5], [16, 9.3, -10.5]], 'Büro': [[17.3, 10.5, -6.9], [13.4, 9.7, -9.2]], 'Büro Tür': [[13.6, 10.4, -6.8], [16.6, 9.9, -10.5]], 'Ost-Dach': [[8, 22, 19], [30, 3, 15]], 'Ost von oben': [[28, 60, 14.01], [28, 0, 14]], 'Mittelhof': [[-12, 9, 24], [-12, 3, 4]], 'Übersicht': [[-6, 34, 62], [2, 2, 0]], 'Von oben': [[0, 95, 1], [0, 0, 0]] };
 window.go = (k) => { const [p, t] = V[k]; cam.position.set(...p); oc.target.set(...t); oc.update(); R.render(Ce, cam); };
 window.views = Object.keys(V);
 const bar = document.createElement('div'); bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:6px;padding:8px;justify-content:center;font:14px sans-serif';
