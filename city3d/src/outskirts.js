@@ -3,7 +3,7 @@ import './dildi_cars.js';
 const DC = globalThis.DildiCars;
 import { cbox, ccyl, merge, canvasTex, neonSign, srand, srange, spick, colorize, place, lerp, clamp, tiledMeshes } from './util.js';
 import { world, roadC, RW, BOUND, H } from './world.js';
-import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround, KREISEL, WENDE, BUS_STOP, HAFENKREISEL } from './geo.js';
+import { ROADS, POI, RUNWAY, LAKE, ISLAND, COAST_Z, BRIDGE_S, WALL_OUT, WORLD, DESERTS, terrainH, rawH, deckAt, inIsland, onBridgeS, slopeAt  , radjGround, KREISEL, WENDE, BUS_STOP, HAFENKREISEL, DILDI_KREISEL } from './geo.js';
 
 export { LAKE, ISLAND };
 export const DOCKS = { x0: ISLAND.x0, x1: -10, z0: ISLAND.z0, z1: ISLAND.z1, name: 'Docks' };
@@ -276,9 +276,7 @@ export function buildOutskirts(scene, K) {
   world.cullList.push(...tiledMeshes(scene, asphaltGeos, world.asphaltMat, 250, true, rcv));
   world.cullList.push(...tiledMeshes(scene, dirtGeos, new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 1 }), 250, true, rcv));
   world.cullList.push(...tiledMeshes(scene, deckBody, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }), 250, false, (m) => { m.castShadow = true; m.receiveShadow = true; }));
-  // sign on the flyover
-  // Dildi-Kreuz deco from Nick's model file: sign gantries, skatepark under the flyover, diner + petrol station,
-  // motel with pool, billboards (the decks themselves are drawn above by the game, with clean joins)
+  // deco around the Dildi-Kreisel from Nick's model file (sign gantries, diner, petrol station, motel, ... – see KREUZ_EXTRAS)
   if (globalThis.DildiCars && globalThis.DildiCars.dildiKreuz) {
     const deko = globalThis.DildiCars.dildiKreuz.decor(THREE, { decks: false });
     scene.add(deko);
@@ -287,8 +285,8 @@ export function buildOutskirts(scene, K) {
     deko.traverse((o) => { if (o.isMesh) world.cullList.push(o); });
   }
   // text signs on the two gantries (south-bound from the city / north-bound from the bridge)
-  signs('DILDI-KREUZ · ↓ HAFEN · DOCKS · FLUGHAFEN', '#ffffff', 0, 5.25, -251.6, 0, 15, 1.4, { bg: '#1f5fa8', size: 90 });
-  signs('DILDI-KREUZ · ↑ INNENSTADT', '#ffffff', 0, 5.25, -404.4, Math.PI, 12, 1.4, { bg: '#1f5fa8', size: 90 });
+  signs('DILDI-KREISEL · ↓ HAFEN · DOCKS · FLUGHAFEN', '#ffffff', 0, 5.25, -251.6, 0, 15, 1.4, { bg: '#1f5fa8', size: 90 });
+  signs('DILDI-KREISEL · ↑ INNENSTADT', '#ffffff', 0, 5.25, -404.4, Math.PI, 12, 1.4, { bg: '#1f5fa8', size: 90 });
 
   // ================= SOUTH: coast, bridge, island =================
   {
@@ -670,6 +668,18 @@ export function buildOutskirts(scene, K) {
     plain.push(ccyl(0.7, 0.7, 0.9, 10, H2.x, 8.1, H2.z, '#2b2b2b'));
     addCirc(H2.x, H2.z, ri + 0.4, 1.4, -1);
   }
+  // Dildi-Kreisel (Hafenstraße × Querstraße): grass island with kerb and a pink-white column
+  {
+    const D2 = DILDI_KREISEL, ri = D2.r - D2.w / 2 - 0.4;
+    const kerb = new THREE.CylinderGeometry(ri + 0.35, ri + 0.45, 0.35, 40);
+    colorize(kerb, '#cfc9bb'); kerb.translate(D2.x, 0.17, D2.z);
+    const lawn = new THREE.CylinderGeometry(ri, ri, 0.42, 40);
+    colorize(lawn, '#4f8f3a'); lawn.translate(D2.x, 0.2, D2.z);
+    plain.push(kerb, lawn);
+    for (let k = 0; k < 4; k++) plain.push(ccyl(0.9 - k * 0.12, 1.0 - k * 0.12, 1.6, 12, D2.x, 1.2 + k * 1.6, D2.z, k % 2 ? '#ffffff' : '#ff3df0'));
+    plain.push(ccyl(0.05, 0.6, 1.2, 12, D2.x, 7.6, D2.z, '#ff3df0'));
+    addCirc(D2.x, D2.z, ri + 0.4, 1.4, -1);
+  }
   // turning loop at the airport: grass island with kerb + a "Shuttle" sign; bus shelter at the terminal stop
   {
     const W2 = WENDE, ri = W2.r - W2.w / 2 - 0.4;
@@ -710,7 +720,7 @@ export function buildOutskirts(scene, K) {
     { x: POI.tanke.x, z: POI.tanke.z, r: 14, n: 2 },
     { x: POI.camp.x, z: POI.camp.z, r: 16, n: 3 },
   ];
-  // people waiting at the bus stop + kiosk on the Hafenstraße (Dildi-Kreuz)
+  // people waiting at the bus stop + kiosk on the Hafenstraße (Dildi-Kreisel)
   { const kp = globalThis.DildiCars && globalThis.DildiCars.dildiKreuz.places ? globalThis.DildiCars.dildiKreuz.places().kiosk : null;
     if (kp) world.hotspots.push({ x: Math.sign(kp[0]) * 11, z: kp[1], r: 5, n: 4 }); }
   if (world.marketHotspot) world.hotspots.push(world.marketHotspot);
@@ -740,7 +750,7 @@ export function areaName(x, z) {
   if (onBridgeS(x, z)) return 'Brücke';
   if (z < -930 && radjGround(x, z) > -0.5) return 'Radj-Insel';
   if (z < COAST_Z) return 'Wasser';
-  if (z < -WALL_OUT) return 'Dildi-Kreuz';
+  if (z < -WALL_OUT) return 'Dildi-Kreisel';
   for (const D of DESERTS) {
     const ex = (x - D.x) / D.rx, ez = (z - D.z) / D.rz;
     if (ex * ex + ez * ez < 1) return D.name;
