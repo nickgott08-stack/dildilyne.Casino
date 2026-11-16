@@ -339,3 +339,6 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Casino (`tools/patch_dc_dp_rank.py`): `dcS(d)` liest die Werte; Erfolge-Gruppe „Dildi City“ (5) und die schon vorhandene
   „Dildi Peak“-Gruppe (6) werden jetzt angezeigt; Ranglisten-Reiter „Dildi Peak“ und „Dildi City“ (Peak-Rekord aus „Minispiele“ verschoben).
 - Getestet: Erfolge/Ranglisten-Werte mit Testdaten, Zähler im Spiel. Nicht getestet: echter Server/Rangliste mit anderen Spielern.
+
+## Sigma Liga 16.11.
+- Heute (Spieltag-Index 10) Anstoß 18/19/20 Uhr statt 8/10/12 (`tools/patch_sigma_today.py`, Sonderfall in `slTimes`), weil wegen des Saison-Fehlers niemand tippen konnte.
