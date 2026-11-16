@@ -377,3 +377,8 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Dildi City → „Insgesamt erspielt“: Bits, die aus dem Spiel ins Casino getauscht werden, zählen netto (minus vorher Hineingetauschtes;
   `dcIn`/`dcOut`/`dcTot` im Spielstand), damit Hin-und-her-Tauschen nichts bringt. Patch: `tools/patch_ach_fixed.py`.
 - Nick (16.11.): Glücksspiel zählt bei „Insgesamt erspielt“ weiter den vollen Gewinn (nicht nur Überschuss) – bewusst so lassen.
+
+## Dildi City: höhere Bezahlung (16.11., Nick)
+- Woche-1-Werte (steigen mit dem Wochen-Faktor): Bankraub 15.000, Docks-Coup 7.500 (Nick), Attentat 4.000, Zeitrennen bis 3.500,
+  Radjs Lieferung 3.500–5.700 (inkl. Sauber-Bonus), Pizza ×7,5 auf den alten Wert (~90–825 pro Lieferung), Flaschenpost ×7,5
+  (~750 pro Stopp, Tour ~3.750 + Sauber-Bonus 1.125). `jobPay(n, k)` in missions.js: k = Faktor auf den alten Wert.
