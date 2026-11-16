@@ -2183,7 +2183,7 @@ function CardHub(P){let card=(img,t,sub,go,neu)=>W("div",{onClick:go,style:{widt
 
 
 /* ===== SAISON-RESET (Saison 1 ab 16.11.) ===== */
-var SS_KEEP={cards:1,items:1,buys:1,packs:1,noAds:1,spent:1,seen:1,at:1,adm:1,bx:1,cm:1,lst:1,sacc:1,srej:1,arch:1,pig:1};
+var SS_KEEP={rev:1,cards:1,items:1,buys:1,packs:1,noAds:1,spent:1,seen:1,at:1,adm:1,bx:1,cm:1,lst:1,sacc:1,srej:1,arch:1,pig:1};
 /* Saisonwoche (0..4) / Saisontag (0..29) / Gewinn-Faktor pro Woche */
 function ssW(){try{let n=psNow();return n.p<0?0:Math.min(4,n.wk)}catch(e){return 0}}
 function ssDay(){try{let n=psNow();return n.p<0?0:n.din}catch(e){return 0}}
@@ -2210,10 +2210,10 @@ function ssApply(s,name){s=s||{};let ob=+s.bits||0,oe=+s.eur||0,tv=0;try{tv=trVa
 function ssRun(){let api=window.__ddApi||{};if(!DD.u||!DD.s||DD.s.ss1||!ssOn()||!api.setBal)return!1;let n=ssApply(DD.s,DD.u.name);Object.keys(DD.s).forEach((k)=>{delete DD.s[k]});Object.assign(DD.s,n);try{sv("dd_hs_h",0);sv("dd_hs_m",0)}catch(e){}api.setBal(n.eur,n.bits);DD.save();try{DD.push(!0)}catch(e){}return!0}
 function ssRk(d){return((d&&d.tot)||0)+((d&&d.tot0)||0)}
 function SeasonTx(){let [sh,setSh]=K.useState(null),[t,setT]=K.useState(0),[sc,setSc]=K.useState(()=>Math.min(innerWidth/1280,innerHeight/720)),api=()=>window.__ddApi||{};
- K.useEffect(()=>{let f=()=>setSc(Math.min(innerWidth/1280,innerHeight/720));addEventListener("resize",f);let iv=setInterval(()=>{if(document.hidden||!DD.u||!DD.s||api().scene!==2)return;if(!DD.s.ss1)ssRun();if(DD.s.ssShow&&!sh){window.__ssOpen=1;setSh(DD.s.ssShow)}},1200);return()=>{removeEventListener("resize",f);clearInterval(iv)}},[sh]);
+ K.useEffect(()=>{let f=()=>setSc(Math.min(innerWidth/1280,innerHeight/720));addEventListener("resize",f);let iv=setInterval(()=>{if(document.hidden||!DD.u||!DD.s||api().scene!==2)return;if(!DD.s.ss1)ssRun();if(DD.s.ssShow&&!sh&&!window.__ssDone){window.__ssOpen=1;setSh(DD.s.ssShow)}},1200);return()=>{removeEventListener("resize",f);clearInterval(iv)}},[sh]);
  K.useEffect(()=>{if(!sh)return;let t0=performance.now(),raf=0,lt=-1,st=(now)=>{let x=Math.min(1,(now-t0)/4200);setT(x);let q=Math.floor(x*24);if(q!==lt&&x<1){lt=q;try{let c=api().ctx&&api().ctx();if(c){let o=c.createOscillator(),g=c.createGain();o.type="triangle";o.frequency.value=500+q*30;g.gain.setValueAtTime(.06,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.07);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.08)}}catch(e){}}if(x<1)raf=requestAnimationFrame(st)};raf=requestAnimationFrame(st);return()=>cancelAnimationFrame(raf)},[sh]);
  if(!sh)return null;
- let close=()=>{delete DD.s.ssShow;DD.save();window.__ssOpen=0;setSh(null)},ph=(a,b)=>Math.max(0,Math.min(1,(t-a)/(b-a))),e=(x)=>1-Math.pow(1-x,3),
+ let close=()=>{delete DD.s.ssShow;DD.save();try{DD.push(!0)}catch(e){}window.__ssOpen=0;window.__ssDone=1;setSh(null)},ph=(a,b)=>Math.max(0,Math.min(1,(t-a)/(b-a))),e=(x)=>1-Math.pow(1-x,3),
  eu=(v)=>m("span",{style:{color:"#5CFF8A",fontWeight:900},children:(Math.round(v*100)/100).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €"}),
  bi=(v)=>m("span",{style:{color:"#FFD34D",fontWeight:900},children:fmN(Math.round(v))+" 🪙"}),
  row=(l,v,o)=>W("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10,fontSize:21,padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.1)",opacity:o==null?1:o},children:[m("span",{style:{color:"rgba(255,255,255,.75)",fontSize:16},children:l}),v]}),

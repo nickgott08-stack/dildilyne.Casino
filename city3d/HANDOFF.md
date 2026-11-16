@@ -319,3 +319,9 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - **Flucht**: keine Verfolger-Jeeps mehr (`ChaseDriver` entfernt), stattdessen 7 Wachen zu Fuß entlang des Wegs zum Helikopter (`startEscape`).
 - Getestet (Headless): Weg Weststreifen → Treppe → Podest → offenes Westtor → draußen durchgehend begehbar, Bilder von innen/außen.
   Flucht-Wachen nicht im Ablauf getestet.
+
+## Saison-1-Fix: Geld-Transfer-Bildschirm kam endlos (16.11.)
+- Ursache (Casino, `ssApply`): beim Reset wurde auch `rev` (Versionsnummer des Server-Spielstands) gelöscht → nächstes Speichern
+  vom Server als „stale“ abgelehnt → `resync()` lud den alten Stand ohne `ss1` → Reset + Bildschirm wieder, endlos. Nichts wurde gespeichert.
+- Fix `tools/patch_season1_fix.py`: `rev` bleibt erhalten (`SS_KEEP`), Bildschirm höchstens 1× pro Sitzung (`__ssDone`), Schließen speichert sofort.
+- Getestet mit Nachbau-Server (gleiche rev-Prüfung): alt = 25× Bildschirm, nur „stale“; neu = 1× Bildschirm, Server hat ss1 + Sparschwein.
