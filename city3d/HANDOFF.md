@@ -367,3 +367,12 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 ## Dildi-City-Erfolge: Belohnung nach Schwierigkeit (16.11.)
 - `ACH_B` (feste Werte je Erfolg, Woche 1, ×Wochen-Faktor) statt Position in der Gruppe; zusammen 714.000 Bits. Andere Spiele unverändert. Patch: `tools/patch_dc_ach_rewards.py`.
 - „Bilal Bruchpilot“ (Crash mit Einsatz, Szene 26) ist laut Nick nicht mehr im Casino (ersetzt durch die Flugschule), der Code liegt nur noch drin.
+
+## Erfolge fest + Budget, Dildi City zählt mit (16.11., Nicks Saison-Ziel)
+- Ziel: 1 Mio „Insgesamt erspielt“ (Titel Ultimativer Gambler) + Sigma-Pass knapp in 30 Tagen; spät einsteigen darf sich nicht lohnen.
+  Pass: max. ~28.500 XP (3 Tagesaufgaben × 150 XP × 30 Tage + 5 Wochen-Runden × 6 × ~500 XP), nötig 25.000 → ~88 % aller Aufgaben.
+- Erfolge zahlen jetzt immer gleich viel (kein Wochen-Faktor mehr, vorher zahlte Woche 4 doppelt). Andere Spiele ×0,7
+  (350/1.000/2.000/4.000/7.000, ab 6. +3.500) = 261.100, Dildi City fest (`ACH_B`) = 203.500, Legende 100.000.
+  (Der Absatz „Saison 1“ oben mit „Erfolge mit Wochen-Faktor“ ist damit überholt; Wochenaufgaben/Minispiele behalten ihn.)
+- Dildi City → „Insgesamt erspielt“: Bits, die aus dem Spiel ins Casino getauscht werden, zählen netto (minus vorher Hineingetauschtes;
+  `dcIn`/`dcOut`/`dcTot` im Spielstand), damit Hin-und-her-Tauschen nichts bringt. Patch: `tools/patch_ach_fixed.py`.
