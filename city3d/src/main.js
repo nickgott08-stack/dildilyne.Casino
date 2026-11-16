@@ -145,6 +145,20 @@ const akM = new THREE.Group();
   akM.add(body, barrel, stock, mag, guard);
 }
 player.h.hand.add(pistolM, akM);
+// Radj finale: swap to the rounder figure (human.js look.round) and back; weapons move to the new hand
+const playerFigs = { block: player.h, round: null };
+G.setRoundPlayer = (on) => {
+  if (on && !playerFigs.round) playerFigs.round = makeHuman({ ...nickLook, round: true });
+  const nh = on ? playerFigs.round : playerFigs.block, oh = player.h;
+  G.roundFigs = !!on; // online.js: crew mates are drawn round too
+  if (nh === oh) return;
+  const par = oh.root.parent || scene;
+  par.add(nh.root);
+  nh.root.position.copy(oh.root.position); nh.root.rotation.copy(oh.root.rotation); nh.root.visible = oh.root.visible;
+  par.remove(oh.root);
+  for (const c of [...oh.hand.children]) nh.hand.add(c);
+  player.h = nh;
+};
 pistolM.rotation.x = -Math.PI / 2; akM.rotation.x = -Math.PI / 2;
 // the hand points down the arm; rotate guns so they point forward when the arm is raised
 pistolM.rotation.set(Math.PI / 2, 0, 0);

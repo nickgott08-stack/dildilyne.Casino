@@ -305,6 +305,11 @@ export class Online {
         }
         r.h.root.visible = false;
       } else {
+        if (!!r.h.round !== !!this.G.roundFigs) { // finale: rounder figures
+          this.scene.remove(r.h.root);
+          r.h = makeHuman({ ...r.look, round: !!this.G.roundFigs });
+          this.scene.add(r.h.root);
+        }
         r.h.root.visible = true;
         r.h.root.position.set(x, y, z);
         r.h.root.rotation.y = yaw;

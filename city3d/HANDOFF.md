@@ -291,3 +291,21 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Keine Autos/Motorrad im Anwesen; ein grünes Motorrad steht draußen links vor dem Haupttor.
 - Nächster Schritt laut Nick: erst Spielfigur + Wachen (runder, natürlicher), dann die Wachrouten.
 - Finale immer bei Tag: `G.forceDay` (heist.js setzt es im Finale, `cleanupFinale` nimmt es zurück) → `G.cycle = 0.22` (Mittag) in simStep.
+
+## Runde Figuren + Wachrouten im Anwesen (16.11.)
+- **Neue Figur nur fürs Finale** (`makeRoundHuman` in human.js, über `look.round`): Kapseln/Kugeln statt Klötze, Eikopf mit Nase/Ohren/
+  Augenbrauen, Knie- und Ellbogen-Gelenke (`kneeL/R`, `elbowL/R`, bewegt in `animateJoints`), gleiche Schnittstelle wie `makeHuman`
+  (root/body/torso/armL…/hand), das Fern-Modell (`setHumanLod`) geht jetzt auch mit verschachtelten Gelenken.
+  - Spieler: `G.setRoundPlayer(true/false)` (main.js) tauscht die Figur samt Waffen – an in `arriveIsland`, aus in `cleanupFinale`.
+    Online: Mitspieler werden im Finale ebenfalls rund gezeichnet (`G.roundFigs`, online.js).
+  - Wachen (`sentryLook` in heist.js): runde Figur, dunkle Uniform, Weste mit Funkkabel, Handschuhe, verschiedene Hauttöne.
+    Auch die Turmwachen am Waldweg (radj.js).
+- **Wachrouten (Schritt 4)**: 14 Routen + Torwache (`out.sentryPosts` in radj.js, Helfer `R(lv, …punkte)` in Modul-Koordinaten).
+  Punkt = `[x, z]` oder `[x, z, schauX, schauZ, warten]` (warten 0 = steht fest); 1 Punkt = Posten, 2 = hin und her, mehr = Runde.
+  Jede Route hat ihre Ebene (`route.y`), die Wache startet darauf (unter Dächern nicht auf dem Dach).
+  Torhof: Ost-Arkade (unter dem Dach, nicht direkt hinterm Tor) · Garten zwischen den Töpfen · Mittelhof-Runde · Mittelhof ↔ Treppe aufs
+  Villa-Podium · Villa-Podium West/Süd · **Ausguck auf dem Villa-Balkon** (schaut über den Torhof) · Nordost-Terrasse · Osthof ·
+  Brunnen-Runde · U-Halle Süd (unter dem Dach) · Posten U-Halle Nord (unter dem Dach) · Poolterrasse · Seehaus-Kolonnade · Weststreifen.
+- Getestet (Headless): alle Routen-Abschnitte ohne Wand und ohne Höhensprung (Prüfung mit r 0,36), 90 s Laufen: jede Wache bleibt auf
+  ihrer Ebene und Route, kein Alarm im Rundgang; Nahaufnahme Spieler + Wache. **Nicht getestet**: FPS am Handy (eine runde Figur = 9 Teile
+  statt 5 in der Nähe), kompletter Finale-Ablauf mit Karten/Aufzug, Schwierigkeit mit 15 statt 10 Wachen.

@@ -290,7 +290,7 @@ export function buildRadjIsland(sceneRoot) {
       plain.push(cbox(0.5, 0.4, 0.5, tx, y + 10.3, tz, '#222'));
       addBox(tx - 1.7, tx + 1.7, tz - 1.7, tz + 1.7, y + 10.8, { y0: y - 1 });
       // the guard up there cannot be shot (just a figure, no Ped)
-      const man = makeHuman({ skin: '#c68a62', hair: '#111', shirt: '#2f3b2a', pants: '#1f2a1c', shoes: '#111', hairStyle: 0, cap: '#1f2a1c' });
+      const man = makeHuman({ round: true, skin: '#c68a62', hair: '#111', shirt: '#2f3b2a', pants: '#1f2a1c', shoes: '#111', hairStyle: 0, cap: '#1f2a1c', vest: '#2b3128', glove: '#151515' });
       man.root.position.set(tx, y + 8.15, tz); man.root.rotation.y = Math.atan2(-nx, -nz);
       scene.add(man.root);
       const beam = new THREE.Mesh(new THREE.ConeGeometry(4.6, 22, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#fff4c0', transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
@@ -517,19 +517,36 @@ export function buildRadjIsland(sceneRoot) {
     const W = ([x, z]) => [CX + x, CZ - z];
     out.garageCars = [];                          // no cars inside the estate (Nick)
     out.bike = { x: ISL.gate.x - 9, z: ISL.gate.z + 9 };   // green motorbike outside, next to the main gate
-    // fixed patrol routes (module coordinates, each on one level) – step 4 will add more and tune them
-    const loop = (x0, x1, z0, z1) => [[x0, z1], [x1, z1], [x1, z0], [x0, z0]];
+    // fixed patrol routes (step 4, checked: every leg stays on its level and clear of walls with r 0.36)
+    // module coordinates; a point is [x, z] or [x, z, lookX, lookZ, wait] (look = where he looks while standing there);
+    // 2 points = there and back, more = a loop (ping-pong paths repeat the points), 1 point = fixed post.
+    // lv = level of the first point (1 pool, 2 gate/courts, 3 villa podium + north-east terrace, 4.3 villa balcony)
+    const R = (lv, ...pts) => {
+      const r = pts.map(([x, z, lx, lz, wait]) => {
+        const p = [CX + x, CZ - z];
+        p.look = lx === undefined ? undefined : Math.atan2(lx - x, -(lz - z));
+        p.wait = wait;
+        return p;
+      });
+      r.y = y + (lv - 1) * LH;
+      return r;
+    };
     out.sentryPosts = [
-      [[-7, -24], [2, -24]],                 // gate court
-      [[-22, -25.25], [-12, -25.25]],        // garden, between the rows of pots
-      [[-14, 2], [-3, 2]],                   // middle court
-      [[4, -0.4], [18, -0.4]],               // villa podium, south side
-      [[22.5, -27], [22.5, -16]],            // north-east terrace
-      [[23, -5.5], [33, -5.5]],              // east court
-      loop(14, 24, 14.3, 24.2),              // round the fountain in the U court
-      [[-19, 11.5], [-19, 22]],              // pool terrace
-      [[-30, -12], [-30, 10]],               // west strip
-    ].map((r) => r.map(W));
+      R(2, [9, -28.2, 9, -20], [17, -28.2, 17, -20]),                    // gate court: under the east arcade (nobody right behind the gate)
+      R(2, [-23, -18.5], [-14, -18.5], [-14, -25.5], [-23, -25.5]),      // garden, between the rows of pots
+      R(2, [-16, -11.1], [-5, -11.1], [-5, 6], [-16, 6]),                // middle court, round the courtyard
+      R(2, [-11, -6], [5.5, -6]),                                        // middle court ↔ up the stairs onto the villa podium
+      R(3, [4, -12.5], [4, -0.6], [19, -0.6], [4, -0.6]),                // villa podium, west + south side
+      R(4.3, [16, -12.3, 10, -30, 0]),                                   // lookout on the villa balcony, watching the gate court
+      R(3, [22.5, -27], [22.5, -16]),                                    // north-east terrace
+      R(2, [23, -6.5], [33, -6.5]),                                      // east court
+      R(2, [14, 14.3], [24, 14.3], [24, 24.2], [14, 24.2]),              // round the fountain in the U court
+      R(2, [23.5, 27.2, 23.5, 20], [32.5, 27.2, 30, 20]),                // under the roof of the U hall (south wing)
+      R(2, [28, 11.3, 19, 19, 0]),                                       // post under the roof of the U hall (north wing)
+      R(1, [-3, 14.5], [-20, 14.5], [-20, 24.5], [-20, 14.5]),           // pool terrace
+      R(1, [-31.2, 10.5], [-31.2, 21]),                                  // under the Seehaus colonnade
+      R(1, [-30, -14], [-30, 6]),                                        // west strip (garage / west gate)
+    ];
   }
   // ---- helipad + helicopter ----
   {
