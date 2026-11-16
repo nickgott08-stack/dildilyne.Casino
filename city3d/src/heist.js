@@ -8,7 +8,7 @@ import { Ped, OutDriver } from './ai.js';
 import { Plane } from './plane.js';
 import { buildRadjIsland, ISL } from './radj.js';
 import { RADJ_CELLAR, radjE } from './geo.js';
-import { neonSign, rand, store, season } from './util.js';
+import { neonSign, rand, pick, store, season } from './util.js';
 import { seeded } from './coop.js';
 const _tv = new THREE.Vector3(), _down = new THREE.Vector3(0, -1, 0);
 
@@ -493,7 +493,8 @@ export function installHeist(Missions) {
 }
 
 // ======================= FINALE (Etappe 2) =======================
-const sentryLook = () => ({ skin: '#e0ac85', hair: '#222', shirt: '#151515', pants: '#101010', shoes: '#111', hairStyle: 0, cap: '#101010', cop: true });
+// Radj's men: the rounder finale figure (human.js), dark uniform, vest, gloves; a bit of variety in skin/hair
+const sentryLook = () => ({ round: true, skin: pick(['#e0ac85', '#c68a62', '#a86f4c', '#8d5a3b', '#f1c7a5']), hair: pick(['#222', '#111', '#3b2a1a']), shirt: '#20242a', pants: '#16191d', shoes: '#0d0d0d', hairStyle: 0, cap: '#16191d', vest: '#2b3128', glove: '#151515', cop: true });
 let coneGeo = null;
 function makeCone(scene) {
   if (!coneGeo) {
@@ -566,11 +567,13 @@ export function installFinale(Missions) {
     for (const c of I.garageCars || []) { const v = new Vehicle(this.scene, c.type, c.x, c.z, c.h, c.color); v.parked = true; v.keep = true; G.vehicles.push(v); j.vehs.push(v); }
     // gate guard walks along the wall in front of the gate
     const mk = (route, gate) => {
-      const [a, b] = route;
+      const a = route[0], b = route[1] || a;
       const p = new Ped(this.scene, sentryLook(), a[0], a[1], 'guard');
+      if (route.y !== undefined) p.pos.y = groundAt(a[0], a[1], route.y + 0.6); // under a roof: not on top of it
       p.keep = true; p.calm = true; p.walkMul = 0.42; p.hp = 60; p.hp0 = 60;
-      p.route = route; p.leg = 1; p.post = { x: b[0], z: b[1] };
-      p.lookYaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
+      p.route = route; p.leg = route.length > 1 ? 1 : 0; p.post = { x: b[0], z: b[1] };
+      p.lookYaw = a.look !== undefined ? a.look : Math.atan2(b[0] - a[0], b[1] - a[1]);
+      p.yaw = p.lookYaw;
       p.seen = 0; p.gate = !!gate;
       p.cone = makeCone(this.scene);
       p.cone.visible = false; // the cones are only drawn on the minimap (Nick)
@@ -594,6 +597,7 @@ export function installFinale(Missions) {
     const j = this.job, G = this.G, I = this.isl;
     for (const s of j.sentries || []) if (s.cone) { this.scene.remove(s.cone); s.cone = null; }
     for (const c of j.cards || []) this.scene.remove(c.m);
+    G.setRoundPlayer && G.setRoundPlayer(false);
     G.walkMul = 0; G.silenced = false; G.noVest = false; G.noAssist = false; G.coverOK = false; G.forceDay = false;
     $('money').style.display = $('stars').style.display = '';
     G.player.has[2] = false; if (G.player.weapon === 2) G.player.weapon = 1; // the AK stays on the island
@@ -618,6 +622,7 @@ export function installFinale(Missions) {
     G.player.pos.set(x + 2 + off, groundAt(x + 2 + off, z + 7, 1e9), z + 7);
     G.player.vy = 0;
     j.stage = 'island';
+    G.setRoundPlayer && G.setRoundPlayer(true); // rounder figure only in the finale
     this.spawnIsland();
     this.coupTarget(ISL.gate.x, ISL.gate.z + 12, '#ffd23b');
     this.api.banner('🏝️ RADJ-INSEL', 'Folge dem Weg durch den Wald zum Anwesen');
@@ -825,9 +830,12 @@ export function installFinale(Missions) {
       if (Math.hypot(s.pos.x - tgt[0], s.pos.z - tgt[1]) < 0.9) {
         s.waitT = (s.waitT || 0) + dt;
         // fixed routes: loops with several corners (short look-around at each) or there-and-back (longer stop at the ends)
+        // a point can say where to look (tgt.look) and how long to stand (tgt.wait, 0 = forever); posts sway less
         const nR = s.route.length, prev = s.route[(s.leg - 1 + nR) % nR];
-        s.lookYaw = Math.atan2(tgt[0] - prev[0], tgt[1] - prev[1]) + Math.sin(G.time * 0.9 + s.id) * 1.1;
-        if (s.waitT > (nR > 2 ? 1.6 : 3.5)) { s.waitT = 0; s.leg = (s.leg + 1) % nR; const n2 = s.route[s.leg]; s.post = { x: n2[0], z: n2[1] }; }
+        const base = tgt.look !== undefined ? tgt.look : Math.atan2(tgt[0] - prev[0], tgt[1] - prev[1]);
+        s.lookYaw = base + Math.sin(G.time * (nR > 1 ? 0.9 : 0.5) + s.id) * (nR > 1 ? 1.1 : 0.75);
+        const wait = tgt.wait !== undefined ? tgt.wait || 1e9 : nR > 2 ? 1.6 : 3.5;
+        if (nR > 1 && s.waitT > wait) { s.waitT = 0; s.leg = (s.leg + 1) % nR; const n2 = s.route[s.leg]; s.post = { x: n2[0], z: n2[1] }; }
       }
       // can he see you?
       const dx = pp.x - s.pos.x, dz = pp.z - s.pos.z, d = Math.hypot(dx, dz);
