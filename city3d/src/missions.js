@@ -7,7 +7,7 @@ import { setMask } from './human.js';
 import { installHeist, installFinale, installCutter } from './heist.js';
 import { installCoop } from './coop.js';
 import { POI, ROADS } from './geo.js';
-import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD, P10, season } from './util.js';
+import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD, P10, season, stat } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -920,6 +920,8 @@ export class Missions {
     this.setJobHUD('🍕 PIZZA CAPRI', j.stage === 'refill' ? 'Zurück zur Pizzeria – Nachschub holen' : `Liefern an ${t.name} · ${Math.round(d)} m`, j.stage === 'refill' ? `Verdient: ${fmt(j.earn)} D$ · ${j.done} geliefert` : `${heatBar} · Pizzen: ${j.pizzas} · Serie ${j.streak} · ${fmt(j.earn)} D$`, j.stage === 'deliver' && j.heat < 25);
   }
   endJob(msg) {
+    const jb = this.job;
+    if (jb && !jb.tour && (msg ? jb.kind === 'pizza' && jb.done > 0 : true)) { stat('jobs'); if (jb.kind === 'docks') stat('docks'); } // casino stats
     if (msg) this.api.toast(msg);
     if (this.job && this.job.kind === 'hit') for (const gd of this.job.guards) { gd.follow = null; if (!gd.dead) gd.calm = false; }
     if (this.job && this.job.kind === 'docks') this.G.wanted.lock = 0;
@@ -1020,6 +1022,7 @@ export class Missions {
       this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 ${fmtD(ecoPay(25000))} D$ · 📍 ${Math.round(d)} m`, false);
       if (d < 9) {
         robDone('bank');
+        stat('bank'); stat('jobs');
         this.api.addMoney(ecoPay(25000));
         this.api.setStars(0);
         this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(ecoPay(25000))} D$ · ${season.on ? 'Nächster Überfall in 30 Min.' : 'Die Bank öffnet morgen wieder'}`);

@@ -331,3 +331,11 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - `mkTabs()` gibt jetzt immer alle Kategorien zurück (`tools/patch_season1_fix2.py`), die neue Saison sieht aus wie die alte, nur bei 0.
   Saison 0 bleibt nur als Meisterschaftstabelle sichtbar (Rangliste → Meisterschaft → „Saison 0“; dazu „Ewige Tabelle“ = beide zusammen).
 - Sparschwein: steht im Profil unter dem Namen („🐷 Sparschwein aus Saison 0: … Bits“).
+
+## Dildi City + Dildi Peak in Erfolgen und Rangliste (16.11.)
+- Spiel zählt mit (`stat()` in util.js → `dc3d_stats` im Spielstand): `jobs` (jeder erfolgreich beendete Auftrag, Pizza-Schicht mit
+  mind. 1 Lieferung, Bankraub), `bank`, `docks`, `fin` (Radj-Finale allein), `coop` (Koop-Finale), `earned` (alle D$-Einnahmen außer
+  Wechselstube, `addMoney(n, noStat)`). Rundgang-Modus zählt nicht. Autos zählt das Casino aus `dc3d_owned`.
+- Casino (`tools/patch_dc_dp_rank.py`): `dcS(d)` liest die Werte; Erfolge-Gruppe „Dildi City“ (5) und die schon vorhandene
+  „Dildi Peak“-Gruppe (6) werden jetzt angezeigt; Ranglisten-Reiter „Dildi Peak“ und „Dildi City“ (Peak-Rekord aus „Minispiele“ verschoben).
+- Getestet: Erfolge/Ranglisten-Werte mit Testdaten, Zähler im Spiel. Nicht getestet: echter Server/Rangliste mit anderen Spielern.

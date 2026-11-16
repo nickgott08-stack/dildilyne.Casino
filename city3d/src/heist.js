@@ -8,7 +8,7 @@ import { Ped, OutDriver } from './ai.js';
 import { Plane } from './plane.js';
 import { buildRadjIsland, ISL } from './radj.js';
 import { RADJ_CELLAR, radjE } from './geo.js';
-import { neonSign, rand, pick, store, season } from './util.js';
+import { neonSign, rand, pick, store, season, stat } from './util.js';
 import { seeded } from './coop.js';
 const _tv = new THREE.Vector3(), _down = new THREE.Vector3(0, -1, 0);
 
@@ -716,7 +716,7 @@ export function installFinale(Missions) {
     const coop = j.coop;
     if (coop && !fromNet) this.cx({ k: 'win' });
     // solo 150.000 · crew: leader 100.000, helpers 37.500 (once a week)
-    if (!j.tour) this.coopPayout(coop ? coop.role : 'solo'); // no money in tour mode
+    if (!j.tour) { this.coopPayout(coop ? coop.role : 'solo'); stat(coop ? 'coop' : 'fin'); } // no money in tour mode
     if (G.player.inVehicle) { const v = G.player.inVehicle; v.driver = null; G.player.inVehicle = null; }
     this.cleanupCoup(false);
     this.endJob(null);
