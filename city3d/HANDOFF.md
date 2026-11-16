@@ -376,3 +376,4 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   (Der Absatz „Saison 1“ oben mit „Erfolge mit Wochen-Faktor“ ist damit überholt; Wochenaufgaben/Minispiele behalten ihn.)
 - Dildi City → „Insgesamt erspielt“: Bits, die aus dem Spiel ins Casino getauscht werden, zählen netto (minus vorher Hineingetauschtes;
   `dcIn`/`dcOut`/`dcTot` im Spielstand), damit Hin-und-her-Tauschen nichts bringt. Patch: `tools/patch_ach_fixed.py`.
+- Nick (16.11.): Glücksspiel zählt bei „Insgesamt erspielt“ weiter den vollen Gewinn (nicht nur Überschuss) – bewusst so lassen.
