@@ -562,13 +562,13 @@ export class Missions {
     const pp = this.api.playerPos();
     if (ph.ringing) {
       // another job started in the meantime: the call is gone
-      if (this.busy()) return this.dropCall(240);
+      if (this.busy()) return this.dropCall(180);
       if (!ph.accepted) {
         ph.askT -= dt;
         ph.beepT = (ph.beepT || 0) - dt;
         if (ph.beepT < 0 && G.time % 2 < 1.1) { ph.beepT = 0.12; G.audio.tone(0.07, 1300, 1300, 0.08, 'square'); }
         $('callT').textContent = `${Math.max(0, Math.ceil(ph.askT))} s`;
-        if (ph.askT < 0) { this.api.toast('📞 Anruf verpasst'); this.dropCall(240); }
+        if (ph.askT < 0) { this.api.toast('📞 Anruf verpasst'); this.dropCall(180); }
         return;
       }
       ph.ringT -= dt;
@@ -582,7 +582,7 @@ export class Missions {
       this.phoneMarker.beam.material.opacity = 0.55 + 0.45 * Math.abs(Math.sin(G.time * 4));
       const tm = Math.max(0, Math.ceil(ph.ringT));
       this.setJobHUD('📞 ' + this.offerText(ph.offer)[0], 'Fahr zur klingelnden Telefonzelle', `📍 ${Math.round(d)} m · ⏱ ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}`, tm < 20);
-      if (ph.ringT < 0) { this.api.toast('📞 Zu spät – der Anrufer hat aufgelegt'); this.dropCall(240); }
+      if (ph.ringT < 0) { this.api.toast('📞 Zu spät – der Anrufer hat aufgelegt'); this.dropCall(180); }
       return;
     }
     if (this.busy()) return;
@@ -614,7 +614,7 @@ export class Missions {
     const ph = this.phone, G = this.G;
     $('callBox').classList.remove('show');
     if (!ph.ringing) return;
-    if (!yes) { this.api.toast('📞 Abgelehnt'); this.dropCall(240); return; }
+    if (!yes) { this.api.toast('📞 Abgelehnt'); this.dropCall(180); return; }
     ph.accepted = true;
     ph.ringT = 180;
     const b = ph.ringing;
@@ -639,7 +639,7 @@ export class Missions {
     const ph = this.phone;
     if (!ph.ringing || !ph.accepted) return;
     const k = ph.offer;
-    this.dropCall(240);
+    this.dropCall(180);
     const TXT = this.offerText(k);
     this.offer = k;
     $('phoneT').textContent = TXT[0];
