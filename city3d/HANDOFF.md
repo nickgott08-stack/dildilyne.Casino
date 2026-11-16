@@ -363,3 +363,7 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   Casino liest außerdem dc3d_tune (getunte Autos) und dc3d_coup (Coup-Missionen 0–4).
 - Finale: neues `j.loud` = Alarm vor der Flucht (die Flucht löst immer Alarm aus). Siegerbild zeigte deshalb bisher immer „Mit Alarm“.
 - Flaschenpost-Banner zeigte beim Sauber-Bonus den Platzhalter statt der Zahl – behoben.
+
+## Dildi-City-Erfolge: Belohnung nach Schwierigkeit (16.11.)
+- `ACH_B` (feste Werte je Erfolg, Woche 1, ×Wochen-Faktor) statt Position in der Gruppe; zusammen 714.000 Bits. Andere Spiele unverändert. Patch: `tools/patch_dc_ach_rewards.py`.
+- „Bilal Bruchpilot“ (Crash mit Einsatz, Szene 26) ist laut Nick nicht mehr im Casino (ersetzt durch die Flugschule), der Code liegt nur noch drin.
