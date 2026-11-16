@@ -346,3 +346,11 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 ## Saison-1-Fix 3: Einmal-Gutschriften liefen nach dem Reset erneut (16.11.)
 - `jfix()`-Marken (rest1109, rest1109b, restJ1, back920, mio1) wurden von `ssApply` gelöscht → Nick bekam nach Reset + Login 1.000.000 Bits, Joshua Coup-Fortschritt Mission 3. Jetzt in `SS_KEEP` (`tools/patch_season1_fix3.py`). Test: alt 1.000.000 / Mission 3, neu 0 / nichts.
 - Reset-Test mit vollem Alt-Spielstand: übrig bleiben nur Karten (Doppelte verkauft), Shop-Käufe, Packs, Fischmarkt, Archiv, Sparschwein, Technisches.
+
+## Saison-1-Fix 4: Flugschule, Dildi-City-Aufträge, Korrekturen (16.11.)
+- Flugschule (Saison, Woche 1, voller Flug mit allen Ringen): leicht ~300 + Landung 1.500 (perfekt 1.800), mittel ~750 + 2.000 (2.400),
+  schwer ~2.500 + 15.000 (18.000). Faktor je Schwierigkeit (0,25/0,28/0,62) auf Sekunden-/Ringwerte, `fsEco()` auch beim Start.
+- Dildi City: normale Aufträge (Flaschenpost, Pizza, Rennen, Attentat, Radjs Lieferung) zahlen in der Saison ×3 (`jobPay` in missions.js).
+  Bank/Docks/Finale unverändert. Nebenbei: „Sauber-Bonus“-Text bei Radjs Lieferung zeigte den Platzhalter statt der Zahl.
+- Einmalig: Nicks Sparschwein = 39.737.890 (`fixPig1`), Joshua Coup zurück auf Mission 1 (`fixJ2`). Patch: `tools/patch_season1_fix4.py`.
+- „Bilal Bruchpilot“ (Crash-Spiel mit Einsatz, Szene 26) hat weder Erfolge noch Ranglisten-Reiter – Nick gefragt.
