@@ -23,6 +23,8 @@ function robCheck(k) {
   if (left > 0) return `Wieder möglich in ${Math.ceil(left / 60000)} Min.`;
   return null;
 }
+// Zeitrennen: under the record time (average RACE_REC_V m/s incl. corners) there is a big bonus – meant for the Ferrari
+const RACE_REC_V = 26; // autopilot test: Ferrari ~25 m/s, RS6 ≤ ~22 m/s average
 // normal jobs (Flaschenpost, Pizza, phone-box jobs) pay 3x in the season (Nick: far less than the mini games before)
 // k = factor on the old (pre-season) value; with k = 1 the number is the season value ×10 (ecoPay: /10 × week factor)
 const jobPay = (n, k = 3) => ecoPay(n * (season.on ? k : 1));
@@ -597,7 +599,7 @@ export class Missions {
   }
   offerText(k) {
     return {
-      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `bis ${fmtD(jobPay(4000, 8.75))} D$`],
+      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `bis ${fmtD(jobPay(4000, 8.75))} D$ · mit Rekordzeit bis ${fmtD(jobPay(4000, 8.75) + jobPay(65000, 1))} D$`],
       hit: ['🎯 Attentat', '„Ein Typ in Gold schuldet meinem Boss Geld. Er läuft mit zwei Bodyguards durch die Stadt. Erledige ihn.“', `${fmtD(jobPay(40000, 1))} D$`],
       radj: ['📦 Radjs Lieferung', '„Radj hier. In der Wüste wartet eine Lieferung für mich – keine Fragen. Hol sie ab und bring sie in meine Lagerhalle an den Docks. Und lass dir keine Bullen anhängen.“', `${fmtD(jobPay(4000, 8.75))}–${fmtD(jobPay(6500, 8.75))} D$`],
     }[k];
@@ -666,7 +668,7 @@ export class Missions {
     }
     let len = 0;
     for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
-    this.job = { kind: 'race', pts, k: 0, started: false, tl: Math.round(14 + len / 12), t: 0 };
+    this.job = { kind: 'race', pts, k: 0, started: false, tl: Math.round(14 + len / 12), t: 0, rec: Math.ceil(len / RACE_REC_V) };
     this.raceMark();
     this.api.banner('🏁 ZEITRENNEN', 'Fahr zum ersten Checkpoint – dann läuft die Uhr');
   }
@@ -702,17 +704,18 @@ export class Missions {
       } else G.audio.tone(0.2, 900, 1400, 0.1, 'triangle');
       j.k++;
       if (j.k >= j.pts.length) {
-        const pay = jobPay(Math.min(4000, 1200 + j.t * 70), 8.75);
+        const used = j.tl - j.t, rec = used <= j.rec;
+        const pay = jobPay(Math.min(4000, 1200 + j.t * 70), 8.75) + (rec ? jobPay(65000, 1) : 0);
         this.api.addMoney(pay);
-        stat('race');
+        stat('race'); if (rec) stat('raceRec');
         this.endJob(null);
-        this.api.banner('🏁 GESCHAFFT!', `${Math.round(j.t)} s übrig · +${fmt(pay)} D$`);
+        this.api.banner(rec ? '🔥 REKORDZEIT!' : '🏁 GESCHAFFT!', `${Math.round(used)} s${rec ? ` (Rekord ${j.rec} s)` : ` · Rekord wäre ${j.rec} s`} · +${fmt(pay)} D$`);
         return;
       }
       this.raceMark();
     }
     const tm = Math.max(0, Math.ceil(j.t));
-    this.setJobHUD('🏁 ZEITRENNEN', j.started ? `Checkpoint ${j.k}/${j.pts.length - 1}` : 'Fahr zum Start', j.started ? `⏱ ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}` : `Zeitlimit: ${j.tl} s`, j.started && j.t < 10);
+    this.setJobHUD('🏁 ZEITRENNEN', j.started ? `Checkpoint ${j.k}/${j.pts.length - 1}` : 'Fahr zum Start', j.started ? `⏱ ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}${j.tl - j.t <= j.rec ? ` · 🔥 Rekord noch ${Math.ceil(j.rec - (j.tl - j.t))} s` : ''}` : `Zeitlimit: ${j.tl} s · 🔥 Rekord: ${j.rec} s`, j.started && j.t < 10);
   }
   // --- hit ---
   startHit() {

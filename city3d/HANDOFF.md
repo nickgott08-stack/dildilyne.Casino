@@ -388,3 +388,12 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Autos: Transporter 25.000, RS6 60.000, Ferrari 150.000. Tuning + Shop ×5 (Lack 250, Neon 1.500, Tieferlegen 1.000, Spoiler 2.500/5.000/10.000, Panzerung 5.000/12.500/25.000, Weste 750, Erste Hilfe 250).
 - Tuning-Knöpfe zeigten feste alte Preise (z. B. 2.000) statt der abgebuchten – jetzt aus `P10()`.
 - Erfolg „Volle Garage“ 15.000 (`tools/patch_garage15k.py`).
+
+## Rangliste aufgeräumt, Spielzeit-Fehler, Zeitrennen-Rekord (16.11.)
+- Rangliste (`tools/patch_rank_fix.py`): „Wochenaufgaben erledigt“ (alte, nicht mehr erreichbare Aufgaben) → „Pass-Aufgaben erledigt“
+  (neuer Zähler `psn`, zählt ab jetzt); Fischmarkt-Umsatz, Fischmarkt-verkaufte Karten und Dildi City: Koop-Finale entfernt.
+- Fehler: alle außer Nick hatten 30 Min Spielzeit (gesamt + Pferde). `dm()` rechnete die alte Pferde-Gutschrift (HRB) mit dem Namen
+  des Betrachters auf fremde Spielstände. Gutschrift gilt jetzt nur vor Saisonstart (`dm` + `HRF`).
+- Zeitrennen: Rekordzeit = Strecke / 26 m/s (`RACE_REC_V`), darunter +6.500 (Woche 1) → bis 10.000. Anzeige im Auftragsfeld
+  („🔥 Rekord: X s“ / „Rekord noch X s“). Autopilot-Test: Ferrari ~25 m/s, RS6 ≤ ~22 m/s Schnitt → praktisch nur mit dem Ferrari.
+  Zähler `raceRec` im Spielstand.
