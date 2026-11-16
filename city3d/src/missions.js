@@ -25,6 +25,7 @@ function robCheck(k) {
 }
 // Zeitrennen: under the record time (average RACE_REC_V m/s incl. corners) there is a big bonus – meant for the Ferrari
 const RACE_REC_V = 26; // autopilot test: Ferrari ~25 m/s, RS6 ≤ ~22 m/s average
+const RACE_REC_VD = 29; // desert route – autopilot test: Ferrari ~26 m/s, RS6 ~22 m/s average
 // normal jobs (Flaschenpost, Pizza, phone-box jobs) pay 3x in the season (Nick: far less than the mini games before)
 // k = factor on the old (pre-season) value; with k = 1 the number is the season value ×10 (ecoPay: /10 × week factor)
 const jobPay = (n, k = 3) => ecoPay(n * (season.on ? k : 1));
@@ -84,11 +85,13 @@ class Marker {
       }
       this.sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.5), new THREE.MeshBasicMaterial({ map: this.signTex.right, transparent: true, side: THREE.DoubleSide, fog: false, toneMapped: false, depthWrite: false }));
       this.sign.position.y = 7.5;
+      this.sign.renderOrder = 5; // drawn after the additive light beam
       this.group.add(this.sign);
     }
     this.sign.material.map = this.signTex[kind];
     this.sign.material.needsUpdate = true;
     this.sign.rotation.y = Math.atan2(-dx, -dz); // the sign's front faces the arriving driver
+    this.sign.position.x = -dx * 2.6; this.sign.position.z = -dz * 2.6; // in front of the beam (radius 1.6), not inside it
     this.sign.visible = true;
   }
   update(t) {
@@ -589,6 +592,7 @@ export class Missions {
     if (!cand.length) { ph.next = 20; return; }
     ph.ringing = pick(cand);
     ph.offer = pick(['race', 'hit', 'radj', 'radj']);
+    if (ph.offer === 'race' && Math.random() < 0.5) ph.offer = 'raceD'; // desert route
     ph.accepted = false;
     ph.askT = 20;
     const T = this.offerText(ph.offer);
@@ -599,7 +603,8 @@ export class Missions {
   }
   offerText(k) {
     return {
-      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `bis ${fmtD(jobPay(4000, 8.75))} D$ · mit Rekordzeit bis ${fmtD(jobPay(4000, 8.75) + jobPay(65000, 1))} D$`],
+      race: ['🏁 Zeitrennen (Stadt)', '„Du hältst dich für schnell? 14 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `ca. ${fmtD(jobPay(4000 * 1.9, 8.75))} D$ · mit Rekordzeit ca. ${fmtD(jobPay(4000 * 1.9, 8.75) + jobPay(65000 * 1.9, 1))} D$`],
+      raceD: ['🏜️ Zeitrennen (Wüste)', '„Raus aus der Stadt, einmal über den Pass, rund durch die Wüste und wieder zurück. Lange Geraden – hier zählt Topspeed.“', `ca. ${fmtD(jobPay(4000 * 1.2, 8.75))} D$ · mit Rekordzeit ca. ${fmtD(jobPay(4000 * 1.2, 8.75) + jobPay(65000 * 1.2, 1))} D$`],
       hit: ['🎯 Attentat', '„Ein Typ in Gold schuldet meinem Boss Geld. Er läuft mit zwei Bodyguards durch die Stadt. Erledige ihn.“', `${fmtD(jobPay(40000, 1))} D$`],
       radj: ['📦 Radjs Lieferung', '„Radj hier. In der Wüste wartet eine Lieferung für mich – keine Fragen. Hol sie ab und bring sie in meine Lagerhalle an den Docks. Und lass dir keine Bullen anhängen.“', `${fmtD(jobPay(4000, 8.75))}–${fmtD(jobPay(6500, 8.75))} D$`],
     }[k];
@@ -648,28 +653,43 @@ export class Missions {
     this.G.paused = false;
     if (!yes) { this.api.toast('📞 Aufgelegt'); return; }
     this.G.missionTarget = null;
-    if (this.offer === 'race') this.startRace();
+    if (this.offer === 'race' || this.offer === 'raceD') this.startRace(this.offer === 'raceD');
     else if (this.offer === 'hit') this.startHit();
     else this.startRadj();
   }
   // --- race ---
-  startRace() {
+  startRace(desert) {
+    if (desert) return this.startDesertRace();
     const pp = this.api.playerPos();
     const ci = Math.round((pp.x + 204) / 68), cj = Math.round((pp.z + 204) / 68);
     let i = Math.max(0, Math.min(NB, ci)), j = Math.max(0, Math.min(NB, cj)), last = -1;
     const pts = [];
-    for (let k = 0; k < 9; k++) {
+    for (let k = 0; k < 15; k++) { // 14 checkpoints (Nick: the race was too short)
       const opts = [[1, 0], [-1, 0], [0, 1], [0, -1]].map((d, n) => [d, n]).filter(([d, n]) => i + d[0] >= 0 && i + d[0] <= NB && j + d[1] >= 0 && j + d[1] <= NB && n !== (last ^ 1));
       const [[dx, dz], n] = pick(opts);
-      const steps = 1 + Math.floor(rand(0, 2));
+      const steps = 1 + Math.floor(rand(0, 3));
       for (let q = 0; q < steps && i + dx >= 0 && i + dx <= NB && j + dz >= 0 && j + dz <= NB; q++) { i += dx; j += dz; }
       last = n;
       pts.push({ x: roadC(i), z: roadC(j) });
     }
     let len = 0;
     for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
-    this.job = { kind: 'race', pts, k: 0, started: false, tl: Math.round(14 + len / 12), t: 0, rec: Math.ceil(len / RACE_REC_V) };
+    this.job = { kind: 'race', pts, k: 0, started: false, tl: Math.round(14 + len / 12), t: 0, rec: Math.ceil(len / RACE_REC_V), lenK: clamp(len / 1000, 1, 2.2) };
     this.raceMark();
+  }
+  // desert race: from a city exit over the pass, once round the desert ring and back over the other pass
+  startDesertRace() {
+    const R = (n) => ROADS.find((r) => r.name === n).pts.map((p) => ({ x: p[0], z: p[p.length - 1] }));
+    const west = Math.random() < 0.5;
+    let pts = west ? [...R('Pass West-Süd'), ...R('Westring').slice(1), ...R('Pass West-Nord').reverse().slice(1)]
+      : [...R('Pass Ost-Süd'), ...R('Ostring').slice(1), ...R('Pass Ost-Nord').reverse().slice(1)];
+    if (Math.random() < 0.5) pts.reverse();
+    // every road point is a checkpoint, so the route follows the road over the passes
+    let len = 0;
+    for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
+    this.job = { kind: 'race', desert: true, pts, k: 0, started: false, tl: Math.round(14 + len / 16), t: 0, rec: Math.ceil(len / RACE_REC_VD), lenK: clamp(len / 1000, 1, 2.2) };
+    this.raceMark();
+    this.api.banner('🏜️ WÜSTENRENNEN', `${west ? 'Westen' : 'Osten'} · ${pts.length - 1} Checkpoints · fahr zum Start am Pass`);
     this.api.banner('🏁 ZEITRENNEN', 'Fahr zum ersten Checkpoint – dann läuft die Uhr');
   }
   raceMark() {
@@ -705,7 +725,7 @@ export class Missions {
       j.k++;
       if (j.k >= j.pts.length) {
         const used = j.tl - j.t, rec = used <= j.rec;
-        const pay = jobPay(Math.min(4000, 1200 + j.t * 70), 8.75) + (rec ? jobPay(65000, 1) : 0);
+        const pay = jobPay(Math.min(4000, 1200 + j.t * 70) * j.lenK, 8.75) + (rec ? jobPay(65000 * j.lenK, 1) : 0); // longer routes pay more
         this.api.addMoney(pay);
         stat('race'); if (rec) stat('raceRec');
         this.endJob(null);
@@ -715,7 +735,7 @@ export class Missions {
       this.raceMark();
     }
     const tm = Math.max(0, Math.ceil(j.t));
-    this.setJobHUD('🏁 ZEITRENNEN', j.started ? `Checkpoint ${j.k}/${j.pts.length - 1}` : 'Fahr zum Start', j.started ? `⏱ ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}${j.tl - j.t <= j.rec ? ` · 🔥 Rekord noch ${Math.ceil(j.rec - (j.tl - j.t))} s` : ''}` : `Zeitlimit: ${j.tl} s · 🔥 Rekord: ${j.rec} s`, j.started && j.t < 10);
+    this.setJobHUD(j.desert ? '🏜️ WÜSTENRENNEN' : '🏁 ZEITRENNEN', j.started ? `Checkpoint ${j.k}/${j.pts.length - 1}` : 'Fahr zum Start', j.started ? `⏱ ${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}${j.tl - j.t <= j.rec ? ` · 🔥 Rekord noch ${Math.ceil(j.rec - (j.tl - j.t))} s` : ''}` : `Zeitlimit: ${j.tl} s · 🔥 Rekord: ${j.rec} s`, j.started && j.t < 10);
   }
   // --- hit ---
   startHit() {
@@ -848,8 +868,8 @@ export class Missions {
       if (j.t <= 0) {
         j.stage = 'run';
         robDone('docks');
-        this.api.setStars(4, 'Diebstahl an den Docks gemeldet!');
-        G.wanted.lock = 4; // like in 2D: the stars stay until the cargo is at the hideout
+        this.api.setStars(3, 'Diebstahl an den Docks gemeldet!');
+        G.wanted.lock = 3; // like in 2D: the stars stay until the cargo is at the hideout
         const h = world.hideout;
         this.marker.set(h.x, h.z);
         G.missionTarget = { x: h.x, z: h.z, color: '#ff9a3c' };
@@ -916,7 +936,7 @@ export class Missions {
         j.earn += pay;
         j.done++;
         j.pizzas--;
-        stat('pz'); if (hot > 70) stat('pzHot'); statMax('pzSer', j.streak);
+        stat('pz'); if (hot > 70) stat('pzHot'); if (hot < 25) stat('pzCold'); if (j.streak === 15) stat('pzS15'); statMax('pzSer', j.streak);
         this.api.addMoney(pay);
         this.api.toast(`🍕 ${t.name}: +${fmt(pay)} D$${hot > 70 ? ' 🔥 heiß!' : hot < 25 ? ' (kalt…)' : ''}${j.streak > 1 ? ` · Serie ×${j.streak}` : ''}`);
         G.audio.pickup();
@@ -1002,7 +1022,7 @@ export class Missions {
       if (t >= 1) {
         st.state = 'loot';
         B.doorCol.off = true;
-        this.api.setStars(3, 'Stiller Alarm ausgelöst!');
+        this.api.setStars(4, 'Stiller Alarm ausgelöst!');
         this.marker.clear();
         G.missionTarget = null;
       }

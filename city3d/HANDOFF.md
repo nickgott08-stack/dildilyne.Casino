@@ -400,3 +400,20 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 
 ## Slots „Insgesamt gewonnen“, Pass-Aufgaben nachgezählt (16.11.)
 - Slots-Reiter: je Slot „Insgesamt gewonnen“. `psn` einmalig (`fixPsn1`) auf heute schon abgeholte Tages- + Wochenaufgaben gesetzt (`tools/patch_slots_psn.py`). Test mit Nicks echtem Spielstand: 9.
+
+## Polizei, Sterne, Zeitrennen Stadt + Wüste (16.11.)
+- Bankraub 4 Sterne, Docks-Coup 3 Sterne (Lock 3). Polizeiwagen je Sternestufe 2/3/4/6/8 (vorher 1–5), Nachschub alle 1,2–2,5 s,
+  ungültiger Spawnpunkt → neuer Versuch nach 0,4 s. Test: 5 Sterne → 9–10 Wagen nach 25 s.
+- Zeitrennen Stadt: 14 Checkpoints, 1–3 Blöcke je Abschnitt (~1.900 m, Zeitlimit ~170 s). Neu: Wüstenrennen (`startDesertRace`,
+  Anruf „🏜️ Zeitrennen (Wüste)“, 50 % der Rennen): Pass → Westring/Ostring → anderer Pass, jeder Straßenpunkt ein Checkpoint, Richtung zufällig.
+  Bezahlung × Streckenlänge (`lenK` = Länge/1000, 1–2,2). Rekord: Stadt 26 m/s, Wüste 29 m/s Schnitt
+  (Autopilot: Ferrari Stadt ~25, Wüste ~26; RS6 ~22).
+- Pfeilschild über dem Checkpoint sitzt jetzt 2,6 m vor dem Lichtkegel (zum ankommenden Fahrer) und wird nach dem Kegel gezeichnet.
+
+## Börse: Spieler bewegen die Kurse (16.11.)
+- `tools/patch_boerse_events.py` (Details + Tabelle Firma ← Ereignis im Docstring). Ereignisse `bxEv(k, %, text)` landen im Spielstand
+  (`bxe` Stunden-Eimer je Firma, `bxn` Nachrichten, `bxd` Tageslimit +20 % je Firma/Tag), `bxIngest()` holt sie von allen Spielern
+  (DD.board über MktSync alle 60 s + beim Öffnen der Börse), `bxBuild()` addiert sie → gleicher Kurs für alle.
+- Dildi City: Casino vergleicht beim Speichern dc3d_stats (fp, pzHot, pzCold, pzS15 – neu im Spiel) und erzeugt FLP/CAPRI-Ereignisse.
+- Test: eigenes Ereignis +4 % sofort im Kurs, Limit greift bei ~20 %, Ereignis eines anderen Spielers wirkt, Nachrichten mit Namen.
+  Nicht getestet: mit mehreren echten Spielern über den Server.
