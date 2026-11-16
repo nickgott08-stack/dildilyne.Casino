@@ -326,3 +326,8 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Fix `tools/patch_season1_fix.py`: `rev` bleibt erhalten (`SS_KEEP`), Bildschirm höchstens 1× pro Sitzung (`__ssDone`), Schließen speichert sofort.
 - Getestet mit Nachbau-Server (gleiche rev-Prüfung): alt = 25× Bildschirm, nur „stale“; neu = 1× Bildschirm, Server hat ss1 + Sparschwein.
 - PR #30 wurde wegen einer GitHub-Störung (502) zwar in main übernommen, aber GitHub Pages baute nicht neu → Nach-PR stößt den Build an.
+
+## Saison-1-Fix 2: Rangliste wie vorher (16.11.)
+- `mkTabs()` gibt jetzt immer alle Kategorien zurück (`tools/patch_season1_fix2.py`), die neue Saison sieht aus wie die alte, nur bei 0.
+  Saison 0 bleibt nur als Meisterschaftstabelle sichtbar (Rangliste → Meisterschaft → „Saison 0“; dazu „Ewige Tabelle“ = beide zusammen).
+- Sparschwein: steht im Profil unter dem Namen („🐷 Sparschwein aus Saison 0: … Bits“).
