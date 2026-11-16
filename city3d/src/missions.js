@@ -936,7 +936,7 @@ export class Missions {
         j.earn += pay;
         j.done++;
         j.pizzas--;
-        stat('pz'); if (hot > 70) stat('pzHot'); statMax('pzSer', j.streak);
+        stat('pz'); if (hot > 70) stat('pzHot'); if (hot < 25) stat('pzCold'); if (j.streak === 15) stat('pzS15'); statMax('pzSer', j.streak);
         this.api.addMoney(pay);
         this.api.toast(`🍕 ${t.name}: +${fmt(pay)} D$${hot > 70 ? ' 🔥 heiß!' : hot < 25 ? ' (kalt…)' : ''}${j.streak > 1 ? ` · Serie ×${j.streak}` : ''}`);
         G.audio.pickup();

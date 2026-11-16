@@ -409,3 +409,11 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   Bezahlung × Streckenlänge (`lenK` = Länge/1000, 1–2,2). Rekord: Stadt 26 m/s, Wüste 29 m/s Schnitt
   (Autopilot: Ferrari Stadt ~25, Wüste ~26; RS6 ~22).
 - Pfeilschild über dem Checkpoint sitzt jetzt 2,6 m vor dem Lichtkegel (zum ankommenden Fahrer) und wird nach dem Kegel gezeichnet.
+
+## Börse: Spieler bewegen die Kurse (16.11.)
+- `tools/patch_boerse_events.py` (Details + Tabelle Firma ← Ereignis im Docstring). Ereignisse `bxEv(k, %, text)` landen im Spielstand
+  (`bxe` Stunden-Eimer je Firma, `bxn` Nachrichten, `bxd` Tageslimit +20 % je Firma/Tag), `bxIngest()` holt sie von allen Spielern
+  (DD.board über MktSync alle 60 s + beim Öffnen der Börse), `bxBuild()` addiert sie → gleicher Kurs für alle.
+- Dildi City: Casino vergleicht beim Speichern dc3d_stats (fp, pzHot, pzCold, pzS15 – neu im Spiel) und erzeugt FLP/CAPRI-Ereignisse.
+- Test: eigenes Ereignis +4 % sofort im Kurs, Limit greift bei ~20 %, Ereignis eines anderen Spielers wirkt, Nachrichten mit Namen.
+  Nicht getestet: mit mehreren echten Spielern über den Server.
