@@ -325,3 +325,4 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   vom Server als „stale“ abgelehnt → `resync()` lud den alten Stand ohne `ss1` → Reset + Bildschirm wieder, endlos. Nichts wurde gespeichert.
 - Fix `tools/patch_season1_fix.py`: `rev` bleibt erhalten (`SS_KEEP`), Bildschirm höchstens 1× pro Sitzung (`__ssDone`), Schließen speichert sofort.
 - Getestet mit Nachbau-Server (gleiche rev-Prüfung): alt = 25× Bildschirm, nur „stale“; neu = 1× Bildschirm, Server hat ss1 + Sparschwein.
+- PR #30 wurde wegen einer GitHub-Störung (502) zwar in main übernommen, aber GitHub Pages baute nicht neu → Nach-PR stößt den Build an.
