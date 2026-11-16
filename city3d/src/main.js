@@ -1128,11 +1128,12 @@ function updateWanted(dt) {
       for (const v of police) v.driver.mode = 'leave';
     }
     // spawn police cars
-    const want = [0, 1, 2, 3, 4, 5][w.stars];
+    const want = [0, 2, 3, 4, 6, 8][w.stars]; // Nick: more police – at 5 stars at least 5 cars
     if (police.length < want && (G._polT = (G._polT || 0) - dt) < 0) {
-      G._polT = 4;
+      G._polT = 0.4; // retry soon if no usable spawn point was found
       const p = inCity(pp.x, pp.z) ? randomRoadSpawn(70, 150, pp) : randomOutRoadSpawn(80, 200, pp) || randomRoadSpawn(60, 400, pp);
       if (p && !isVisible(p.x, 1, p.z, 5)) {
+        G._polT = police.length < want - 2 ? 1.2 : 2.5;
         const v = new Vehicle(scene, 'police', p.x, p.z, p.h);
         v.driver = new PoliceDriver(v);
         v.sirenOn = true;
