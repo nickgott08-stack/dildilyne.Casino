@@ -7,7 +7,7 @@ import { setMask } from './human.js';
 import { installHeist, installFinale, installCutter } from './heist.js';
 import { installCoop } from './coop.js';
 import { POI, ROADS } from './geo.js';
-import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD, P10, season, stat } from './util.js';
+import { neonSign, canvasTex, clamp, rand, pick, store, ecoPay, fmtD, P10, season, stat, statMax } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -436,8 +436,9 @@ export class Missions {
           let bonus = 0;
           if (j.k >= 5 && j.broken <= 6) bonus = jobPay(1500);
           if (bonus) this.api.addMoney(bonus);
+          stat('fp'); if (bonus) stat('fpPerf');
           this.endJob(null);
-          this.api.banner('🍾 TOUR GESCHAFFT', `Verdient: ${fmt(j.earn + bonus)} D$${bonus ? ' (inkl. ${fmtD(bonus)} D$ Bonus für saubere Fahrt)' : ''}`);
+          this.api.banner('🍾 TOUR GESCHAFFT', `Verdient: ${fmt(j.earn + bonus)} D$${bonus ? ` (inkl. ${fmtD(bonus)} D$ Bonus für saubere Fahrt)` : ''}`);
           return;
         }
         this.nextStop();
@@ -702,6 +703,7 @@ export class Missions {
       if (j.k >= j.pts.length) {
         const pay = jobPay(Math.min(4000, 1200 + j.t * 70));
         this.api.addMoney(pay);
+        stat('race');
         this.endJob(null);
         this.api.banner('🏁 GESCHAFFT!', `${Math.round(j.t)} s übrig · +${fmt(pay)} D$`);
         return;
@@ -750,6 +752,7 @@ export class Missions {
     const pp = this.api.playerPos();
     if (v.dead) {
       this.api.addMoney(jobPay(3500));
+      stat('hit');
       this.api.setStars(Math.max(2, this.G.wanted.stars), 'Mord an einem VIP gemeldet');
       this.endJob(null);
       this.api.banner('🎯 ZIEL AUSGESCHALTET', `+${fmtD(jobPay(3500))} D$ · Häng die Polizei ab`);
@@ -812,6 +815,7 @@ export class Missions {
       if (G.wanted.stars > 0) { this.setJobHUD('📦 RADJS LIEFERUNG', 'Radj nimmt nichts mit Bullen im Nacken!', 'Häng erst die Polizei ab', true); return; }
       if (v !== j.veh) { this.setJobHUD('📦 RADJS LIEFERUNG', 'Die Ware ist im Fahrzeug', 'Bring das Fahrzeug mit der Ware hierher', true); return; }
       const pay = jobPay(rand(4000, 5500) + (j.clean ? 1000 : 0));
+      stat('radj'); if (j.clean) stat('radjClean');
       this.api.addMoney(pay);
       this.endJob(null);
       this.api.banner('📦 GELIEFERT', `+${fmt(pay)} D$${j.clean ? ` (inkl. ${fmtD(jobPay(1000))} D$ Sauber-Bonus)` : ''}`);
@@ -908,6 +912,7 @@ export class Missions {
         j.earn += pay;
         j.done++;
         j.pizzas--;
+        stat('pz'); if (hot > 70) stat('pzHot'); statMax('pzSer', j.streak);
         this.api.addMoney(pay);
         this.api.toast(`🍕 ${t.name}: +${fmt(pay)} D$${hot > 70 ? ' 🔥 heiß!' : hot < 25 ? ' (kalt…)' : ''}${j.streak > 1 ? ` · Serie ×${j.streak}` : ''}`);
         G.audio.pickup();
@@ -1024,7 +1029,7 @@ export class Missions {
       this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 ${fmtD(ecoPay(25000))} D$ · 📍 ${Math.round(d)} m`, false);
       if (d < 9) {
         robDone('bank');
-        stat('bank'); stat('jobs');
+        stat('bank'); stat('jobs'); if (robState('bank').n >= 10) stat('bank10');
         this.api.addMoney(ecoPay(25000));
         this.api.setStars(0);
         this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(ecoPay(25000))} D$ · ${season.on ? 'Nächster Überfall in 30 Min.' : 'Die Bank öffnet morgen wieder'}`);

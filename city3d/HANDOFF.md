@@ -354,3 +354,12 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   Bank/Docks/Finale unverändert. Nebenbei: „Sauber-Bonus“-Text bei Radjs Lieferung zeigte den Platzhalter statt der Zahl.
 - Einmalig: Nicks Sparschwein = 39.737.890 (`fixPig1`), Joshua Coup zurück auf Mission 1 (`fixJ2`). Patch: `tools/patch_season1_fix4.py`.
 - „Bilal Bruchpilot“ (Crash-Spiel mit Einsatz, Szene 26) hat weder Erfolge noch Ranglisten-Reiter – Nick gefragt.
+
+## Dildi City: viele Erfolge (16.11.)
+- 4 neue Erfolge-Gruppen (`tools/patch_dc_ach2.py`), die alte Gruppe „Dildi City“ (dc1–5) bleibt unverändert:
+  Pizza & Flaschenpost (5), Aufträge & Autos (6), Raubzüge (5), Radj-Coup (6) – zusammen 26 Erfolge, 135.000 Bits in Woche 1.
+- Neue Zähler im Spiel (`stat`/`statMax`/`statMin` in util.js): pz, pzHot (>70 % heiß), pzSer (beste Serie), fp, fpPerf, race, hit,
+  radj, radjClean, bank10 (10. Bankraub an einem Tag), finQuiet, finTD (beste lautlose Takedowns), finT (schnellstes Finale, Sekunden).
+  Casino liest außerdem dc3d_tune (getunte Autos) und dc3d_coup (Coup-Missionen 0–4).
+- Finale: neues `j.loud` = Alarm vor der Flucht (die Flucht löst immer Alarm aus). Siegerbild zeigte deshalb bisher immer „Mit Alarm“.
+- Flaschenpost-Banner zeigte beim Sauber-Bonus den Platzhalter statt der Zahl – behoben.

@@ -8,7 +8,7 @@ import { Ped, OutDriver } from './ai.js';
 import { Plane } from './plane.js';
 import { buildRadjIsland, ISL } from './radj.js';
 import { RADJ_CELLAR, radjE } from './geo.js';
-import { neonSign, rand, pick, store, season, stat } from './util.js';
+import { neonSign, rand, pick, store, season, stat, statMax, statMin } from './util.js';
 import { seeded } from './coop.js';
 const _tv = new THREE.Vector3(), _down = new THREE.Vector3(0, -1, 0);
 
@@ -624,6 +624,7 @@ export function installFinale(Missions) {
   P.raiseAlarm = function (why, fromNet) {
     const j = this.job;
     if (j.alarm) return;
+    if (j.stage !== 'escape') j.loud = true; // alarm before the escape (the escape itself always raises it)
     j.alarm = true;
     if (!fromNet) this.cx({ k: 'alarm', why });
     for (const t of this.isl.roadTowers || []) t.spot.material.color.set('#ff4a3a');
@@ -716,7 +717,12 @@ export function installFinale(Missions) {
     const coop = j.coop;
     if (coop && !fromNet) this.cx({ k: 'win' });
     // solo 150.000 · crew: leader 100.000, helpers 37.500 (once a week)
-    if (!j.tour) { this.coopPayout(coop ? coop.role : 'solo'); stat(coop ? 'coop' : 'fin'); } // no money in tour mode
+    if (!j.tour) { // no money in tour mode
+      this.coopPayout(coop ? coop.role : 'solo');
+      stat(coop ? 'coop' : 'fin');
+      if (!j.loud) stat('finQuiet');
+      statMax('finTD', j.takedowns); statMin('finT', secs);
+    }
     if (G.player.inVehicle) { const v = G.player.inVehicle; v.driver = null; G.player.inVehicle = null; }
     this.cleanupCoup(false);
     this.endJob(null);
@@ -726,7 +732,7 @@ export function installFinale(Missions) {
     G.player.pos.set(h.x, 0.2, h.z);
     G.player.h.root.visible = true;
     this.api.refreshControls && this.api.refreshControls();
-    $('winStats').innerHTML = `⏱ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} Min · 🔪 ${j.takedowns} lautlos · 💀 ${dead} Wachen<br>${j.alarm ? '🚨 Mit Alarm' : '🤫 Ohne Alarm – Profi!'}${coop ? `<br>👥 Crew: ${coop.names.join(', ')}${fromNet && who ? ` · ${who} hat euch rausgeholt` : ''}` : ''}`;
+    $('winStats').innerHTML = `⏱ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} Min · 🔪 ${j.takedowns} lautlos · 💀 ${dead} Wachen<br>${j.loud ? '🚨 Mit Alarm' : '🤫 Ohne Alarm – Profi!'}${coop ? `<br>👥 Crew: ${coop.names.join(', ')}${fromNet && who ? ` · ${who} hat euch rausgeholt` : ''}` : ''}`;
     if (coop) this.coopLeave(true);
     $('win').classList.add('show');
     G.paused = true;

@@ -221,6 +221,16 @@ export function stat(k, n = 1) {
   s[k] = (s[k] || 0) + n;
   store.set('dc3d_stats', JSON.stringify(s));
 }
+export function statMax(k, v) { statSet(k, v, (a, b) => Math.max(a, b)); }
+export function statMin(k, v) { statSet(k, v, (a, b) => Math.min(a, b)); }
+function statSet(k, v, f) {
+  let s = {};
+  try { s = JSON.parse(store.get('dc3d_stats') || '{}') || {}; } catch (e) {}
+  const nv = s[k] === undefined ? v : f(s[k], v);
+  if (nv === s[k]) return;
+  s[k] = nv;
+  store.set('dc3d_stats', JSON.stringify(s));
+}
 let _bits = GCFG ? +GCFG.bits || 0 : 0;
 export const casino = {
   linked: !!GCFG,
