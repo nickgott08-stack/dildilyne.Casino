@@ -14,7 +14,7 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMo
 // ab Saisonstart: Bankraub / Docks-Coup frühestens alle 30 Minuten, höchstens 10× pro Tag
 // davor wie früher: Bank 1× pro Tag, Docks alle 15 Minuten
 const robCd = (k) => (season.on ? 30 : k === 'docks' ? 15 : 0) * 60000;
-const robMax = (k) => (season.on ? 10 : k === 'bank' ? 1 : Infinity);
+const robMax = (k) => (season.on ? (k === 'bank' ? 5 : 10) : k === 'bank' ? 1 : Infinity); // season: bank 5×, docks 10× per day (Nick)
 function robState(k) { let s = null; try { s = JSON.parse(store.get('dc3d_rob_' + k) || 'null'); } catch (e) {} if (!s || s.d !== today()) s = { d: today(), n: 0, t: (s && s.t) || 0 }; return s; }
 function robCheck(k) {
   const s = robState(k);
@@ -1030,7 +1030,7 @@ export class Missions {
       this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 ${fmtD(jobPay(150000, 1))} D$ · 📍 ${Math.round(d)} m`, false);
       if (d < 9) {
         robDone('bank');
-        stat('bank'); stat('jobs'); if (robState('bank').n >= 10) stat('bank10');
+        stat('bank'); stat('jobs'); if (robState('bank').n >= 5) stat('bank10'); // (key name kept: full daily quota = 5 bank raids)
         this.api.addMoney(jobPay(150000, 1));
         this.api.setStars(0);
         this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(jobPay(150000, 1))} D$ · ${season.on ? 'Nächster Überfall in 30 Min.' : 'Die Bank öffnet morgen wieder'}`);
