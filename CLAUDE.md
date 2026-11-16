@@ -25,6 +25,9 @@ nur am Handy (Android) und iPad (Chrome). Alles läuft über Pull Requests auf G
 cd city3d && node build.mjs && cd .. && node tools/embed_city.mjs
 ```
 (baut `city3d/dist/dildi_city_3d.html` und setzt es ins Casino ein). Beides committen. `city3d/HANDOFF.md` aktuell halten.
+Das setzt auch die **Versionsanzeige** (Uhrzeit des Bauens, deutsche Zeit): im Casino unten im ☰-Menü der Lobby, in Dildi City
+im Pausenmenü. Auch bei reinen Casino-Änderungen am Ende `node tools/embed_city.mjs` laufen lassen, damit die Version stimmt.
+Nach dem Mergen Nick die Version nennen, die live sein muss.
 
 ## Season 1 (Sigma Season, Start Mo 16.11.2026)
 - Alles Neue der Season ist an `ssOn()` (Casino) bzw. `season.on` (Dildi City) gekoppelt – **vor dem Start darf sich nichts ändern**.
