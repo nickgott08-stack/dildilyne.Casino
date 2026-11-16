@@ -309,3 +309,13 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Getestet (Headless): alle Routen-Abschnitte ohne Wand und ohne Höhensprung (Prüfung mit r 0,36), 90 s Laufen: jede Wache bleibt auf
   ihrer Ebene und Route, kein Alarm im Rundgang; Nahaufnahme Spieler + Wache. **Nicht getestet**: FPS am Handy (eine runde Figur = 9 Teile
   statt 5 in der Nähe), kompletter Finale-Ablauf mit Karten/Aufzug, Schwierigkeit mit 15 statt 10 Wachen.
+
+## Nicks Test 16.11.: Grafik fest, Westtor, Flucht zu Fuß
+- **Keine automatische Grafik-Umstellung mehr** (main.js): weder Stufe noch Auflösung ändern sich von selbst, nur über das Pausenmenü.
+  (Die Absätze oben zur Automatik bei <30 FPS sind damit überholt.)
+- **Westtor**: draußen ist Weghöhe (Ebene 2), drinnen der Weststreifen (Ebene 1). Der Torbogen sitzt jetzt auf Ebene 2, darunter Mauer,
+  dahinter ein Podest und eine Treppe vom Weststreifen hoch (4 Zeilen mit „(Spiel)“ in anwesen.js – bei neuer Version von Nick wieder
+  übernehmen). Die Weststreifen-Wache läuft jetzt bei x = −26,5 (neben der Treppe).
+- **Flucht**: keine Verfolger-Jeeps mehr (`ChaseDriver` entfernt), stattdessen 7 Wachen zu Fuß entlang des Wegs zum Helikopter (`startEscape`).
+- Getestet (Headless): Weg Weststreifen → Treppe → Podest → offenes Westtor → draußen durchgehend begehbar, Bilder von innen/außen.
+  Flucht-Wachen nicht im Ablauf getestet.

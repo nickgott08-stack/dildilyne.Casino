@@ -506,22 +506,6 @@ function makeCone(scene) {
   scene.add(m);
   return m;
 }
-class ChaseDriver {
-  constructor(veh) { this.veh = veh; this.rev = 0; this.stuck = 0; }
-  update(dt, G) {
-    const v = this.veh, t = G.player.inVehicle ? G.player.inVehicle.pos : G.player.pos;
-    const f = v.fwd, dx = t.x - v.pos.x, dz = t.z - v.pos.z;
-    const ang = Math.atan2(dx * -f.z + dz * f.x, dx * f.x + dz * f.z);
-    if (this.rev > 0) { this.rev -= dt; v.input.throttle = -0.8; v.input.steer = -Math.sign(ang); v.input.handbrake = false; return; }
-    v.input.steer = Math.max(-1, Math.min(1, ang * 2.2));
-    const want = Math.hypot(dx, dz) < 6 ? 6 : 21;
-    v.input.throttle = Math.max(-1, Math.min(1, (want - v.vF) * 0.4));
-    v.input.handbrake = false;
-    if (Math.abs(v.vF) < 0.8) this.stuck += dt; else this.stuck = 0;
-    if (this.stuck > 1.6) { this.stuck = 0; this.rev = 1.2; }
-  }
-}
-
 export function installFinale(Missions) {
   const P = Missions.prototype;
   P.beginFinale = function () {
@@ -719,15 +703,8 @@ export function installFinale(Missions) {
     G.walkMul = 0;
     this.raiseAlarm('Radj weiß Bescheid – ab zum Helikopter!', fromNet);
     I.westGateCol.off = true; I.westGateMesh.visible = false;
-    // two jeeps full of Radj's men come after you
-    for (const [x, z] of [[-40, -1366], [-80, -1348]]) { // on the helipad road outside the west gate
-      const v = new Vehicle(this.scene, 'jeep', x, z, Math.PI / 2, '#111111');
-      v.keep = true;
-      v.driver = new ChaseDriver(v);
-      G.vehicles.push(v);
-      j.vehs.push(v);
-    }
-    for (const [x, z] of [[-110, -1320], [-150, -1345], [-176, -1318]]) j.peds.push(this.coupGuard(x, z, sentryLook()));
+    // no jeeps any more (Nick): Radj's men wait on foot along the road to the helicopter, left and right of the gravel
+    for (const [x, z] of [[-30, -1360], [-58, -1365], [-86, -1338], [-112, -1318], [-138, -1340], [-162, -1326], [-178, -1340]]) j.peds.push(this.coupGuard(x, z, sentryLook()));
     this.coupTarget(ISL.helipad.x, ISL.helipad.z, '#39ff88');
   };
 

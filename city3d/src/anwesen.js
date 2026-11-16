@@ -1080,7 +1080,10 @@ wall(X0,Z0,-24,Z0,0,H+4.2); wall(-24,Z0,-9.3,Z0,H,4.2); wall(17.3,Z0,20,Z0,H,4.2
 wall(X1,Z0,X1,-14,2*H,3.2); wall(X1,-14,X1,Z1,H,4.2);
 wall(X0,Z0,X0,-3.3,0,4.2); wall(X0,3.3,X0,22.55,0,4.2);       // NEU: Westmauer endet am Seehaus
 An(pc({spring:2.2,ends:!1}),4,H,Z0);
-An(pc({spring:2.2,ends:!1}),X0,0,0,PI/2);
+An(pc({spring:2.2,ends:!1}),X0,H,0,PI/2);   // (Spiel) Westtor auf Wegehöhe draußen = Ebene 2
+wall(X0,-3.3,X0,3.3,0,H);                     // (Spiel) Mauer unter dem angehobenen Westtor
+plat(-35.75,-33.5,-2.4,2.4,0,H);              // (Spiel) Podest hinter dem Westtor
+stair(-28.38,0,0,-1,0);                       // (Spiel) Treppe vom Weststreifen hoch zum Westtor
 An(mc({n:3,roof:"shed",spring:2.9}),-4.3,H,Z0+1.6);
 An(mc({n:3,roof:"shed",spring:2.9}),12.3,H,Z0+1.6);
 wall(-10.5,Z0,-10.5,-17.5,H,4);
