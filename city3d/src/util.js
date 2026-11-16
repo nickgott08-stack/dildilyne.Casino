@@ -214,6 +214,13 @@ export const store = {
     try { localStorage.setItem(k, v); } catch (e) {}
   },
 };
+// statistics for the casino (ranking + achievements): {jobs, bank, docks, fin, coop, earned} in dc3d_stats
+export function stat(k, n = 1) {
+  let s = {};
+  try { s = JSON.parse(store.get('dc3d_stats') || '{}') || {}; } catch (e) {}
+  s[k] = (s[k] || 0) + n;
+  store.set('dc3d_stats', JSON.stringify(s));
+}
 let _bits = GCFG ? +GCFG.bits || 0 : 0;
 export const casino = {
   linked: !!GCFG,

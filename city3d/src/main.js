@@ -14,7 +14,7 @@ import { FX } from './fx.js';
 import { Online } from './online.js';
 import { Audio } from './audio.js';
 import { Input } from './input.js';
-import { clamp, lerp, damp, dampAngle, angleWrap, rand, randi, pick, store, casino, ecoPay, season, P10 } from './util.js';
+import { clamp, lerp, damp, dampAngle, angleWrap, rand, randi, pick, store, casino, ecoPay, season, P10, stat } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 function lockPointer() {
@@ -445,8 +445,9 @@ function updatePickups(dt) {
   G.pickups = G.pickups.filter((p) => !p.gone);
 }
 
-function addMoney(n) {
+function addMoney(n, noStat) {
   G.money += n;
+  if (n > 0 && !noStat) stat('earned', Math.round(n)); // earned D$ (not the exchange office)
   store.set('dc3d_dollar', String(G.money));
   floatMoney(n);
 }
@@ -1556,7 +1557,7 @@ function buyItem(k) {
 function exchange(dir, v) {
   if (dir === 'in') {
     if (!casino.addBits(-v)) { toast('Zu wenig Bits'); return; }
-    addMoney(v * RATE);
+    addMoney(v * RATE, true);
   } else {
     if (G.money < v) { toast('Zu wenig D$'); return; }
     if (v > xLimit() - xUsed()) { toast('Tauschgrenze für heute erreicht'); return; }
