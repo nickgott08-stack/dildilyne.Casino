@@ -397,3 +397,6 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Zeitrennen: Rekordzeit = Strecke / 26 m/s (`RACE_REC_V`), darunter +6.500 (Woche 1) → bis 10.000. Anzeige im Auftragsfeld
   („🔥 Rekord: X s“ / „Rekord noch X s“). Autopilot-Test: Ferrari ~25 m/s, RS6 ≤ ~22 m/s Schnitt → praktisch nur mit dem Ferrari.
   Zähler `raceRec` im Spielstand.
+
+## Slots „Insgesamt gewonnen“, Pass-Aufgaben nachgezählt (16.11.)
+- Slots-Reiter: je Slot „Insgesamt gewonnen“. `psn` einmalig (`fixPsn1`) auf heute schon abgeholte Tages- + Wochenaufgaben gesetzt (`tools/patch_slots_psn.py`). Test mit Nicks echtem Spielstand: 9.
