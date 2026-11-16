@@ -1626,7 +1626,6 @@ setControlsMode();
 
 // ---------- main loop ----------
 let last = performance.now();
-let fpsAcc = 0, fpsN = 0, fpsCheckT = 0, autoChecked = false, slowN = 0;
 let mapT = 0, spawnT = 0;
 function loop(now) {
   requestAnimationFrame(loop);
@@ -1762,27 +1761,7 @@ function render(dt) {
   if (mapT <= 0) { mapT = 1 / 30; drawMini(); }
   online.update(dt);
   renderer.render(scene, camera);
-  // auto quality: if the device struggles on "hoch", drop once
-  if (G.started && !G.paused) {
-    fpsAcc += dt; fpsN++;
-    fpsCheckT += dt;
-    if (fpsCheckT > 4) {
-      const fps = fpsN / fpsAcc;
-      fpsAcc = 0; fpsN = 0; fpsCheckT = 0;
-      // when the device struggles: first simplify the graphics (shadows, traffic, details), only then
-      // lower the resolution – and never below 1.0 (below that the picture gets pixelated)
-      const cur = renderer.getPixelRatio(), MIN_PR = 1;
-      slowN = fps < 30 ? slowN + 1 : 0; // react only after two slow measurements in a row (~8 s)
-      if (slowN >= 2) {
-        slowN = 0;
-        if (qName !== 'niedrig' && !store.get('dc3d_qmanual')) {
-          qName = qName === 'hoch' ? 'mittel' : 'niedrig';
-          applyQuality(); markQ();
-          toast(`Grafik automatisch auf ${qName.toUpperCase()} gestellt (flüssiger)`);
-        } else if (cur > MIN_PR + 0.01) { renderer.setPixelRatio(Math.max(MIN_PR, cur - 0.1)); resize(); }
-      } else if (fps > 54 && cur < Q.pr - 0.01) { renderer.setPixelRatio(Math.min(Q.pr, cur + 0.1)); resize(); }
-    }
-  }
+  // no automatic quality/resolution changes any more (Nick picks the level himself in the pause menu)
 }
 qBtns.forEach((b) => b.addEventListener('click', () => store.set('dc3d_qmanual', '1')));
 const online = new Online({ scene, camera, player, G, toast, pause: (p) => setPaused(p) });

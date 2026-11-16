@@ -545,7 +545,7 @@ export function buildRadjIsland(sceneRoot) {
       R(2, [28, 11.3, 19, 19, 0]),                                       // post under the roof of the U hall (north wing)
       R(1, [-3, 14.5], [-20, 14.5], [-20, 24.5], [-20, 14.5]),           // pool terrace
       R(1, [-31.2, 10.5], [-31.2, 21]),                                  // under the Seehaus colonnade
-      R(1, [-30, -14], [-30, 6]),                                        // west strip (garage / west gate)
+      R(1, [-26.5, -14], [-26.5, 6]),                                    // west strip (garage / west gate)
     ];
   }
   // ---- helipad + helicopter ----
