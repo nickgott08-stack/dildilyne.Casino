@@ -418,3 +418,6 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Test: eigenes Ereignis +4 % sofort im Kurs, Limit greift bei ~20 %, Ereignis eines anderen Spielers wirkt, Nachrichten mit Namen.
   Nicht getestet: mit mehreren echten Spielern über den Server.
 - Telefonanrufe alle 3 Min statt 4 (`dropCall(180)`), 16.11.
+
+## Versionsanzeige (16.11.)
+- Dildi City: Pausenmenü „Version TT.MM. HH:MM“ (`/*VER*/` in template.html, gesetzt von build.mjs). Casino: `DD_VER` (gesetzt von `tools/embed_city.mjs`), unten im ☰-Menü der Lobby.
