@@ -2183,7 +2183,7 @@ function CardHub(P){let card=(img,t,sub,go,neu)=>W("div",{onClick:go,style:{widt
 
 
 /* ===== SAISON-RESET (Saison 1 ab 16.11.) ===== */
-var SS_KEEP={rev:1,cards:1,items:1,buys:1,packs:1,noAds:1,spent:1,seen:1,at:1,adm:1,bx:1,cm:1,lst:1,sacc:1,srej:1,arch:1,pig:1};
+var SS_KEEP={rev:1,rest1109:1,rest1109b:1,restJ1:1,back920:1,mio1:1,cards:1,items:1,buys:1,packs:1,noAds:1,spent:1,seen:1,at:1,adm:1,bx:1,cm:1,lst:1,sacc:1,srej:1,arch:1,pig:1};
 /* Saisonwoche (0..4) / Saisontag (0..29) / Gewinn-Faktor pro Woche */
 function ssW(){try{let n=psNow();return n.p<0?0:Math.min(4,n.wk)}catch(e){return 0}}
 function ssDay(){try{let n=psNow();return n.p<0?0:n.din}catch(e){return 0}}

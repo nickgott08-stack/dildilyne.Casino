@@ -342,3 +342,7 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 
 ## Sigma Liga 16.11.
 - Heute (Spieltag-Index 10) Anstoß 18/19/20 Uhr statt 8/10/12 (`tools/patch_sigma_today.py`, Sonderfall in `slTimes`), weil wegen des Saison-Fehlers niemand tippen konnte.
+
+## Saison-1-Fix 3: Einmal-Gutschriften liefen nach dem Reset erneut (16.11.)
+- `jfix()`-Marken (rest1109, rest1109b, restJ1, back920, mio1) wurden von `ssApply` gelöscht → Nick bekam nach Reset + Login 1.000.000 Bits, Joshua Coup-Fortschritt Mission 3. Jetzt in `SS_KEEP` (`tools/patch_season1_fix3.py`). Test: alt 1.000.000 / Mission 3, neu 0 / nichts.
+- Reset-Test mit vollem Alt-Spielstand: übrig bleiben nur Karten (Doppelte verkauft), Shop-Käufe, Packs, Fischmarkt, Archiv, Sparschwein, Technisches.
