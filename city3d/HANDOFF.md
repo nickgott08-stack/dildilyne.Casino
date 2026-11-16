@@ -93,7 +93,7 @@ Casino-Änderungen per `tools/patch_season1.py` (einmalig angewendet, dokumentie
 Dildi City (Quellcode):
 - Kurs 1 D$ = 1 Bit, alte D$ einmalig /10 (`dc3d_eco2`), Preise /10, alle Job-Bezahlungen über `ecoPay()` (alt/10 × Wochen-Faktor),
   Radj-Finale fest 150.000 (1×/Woche). Tauschgrenze D$→Bits pro Tag 10.000 + 5.000 × Saisontag, ab Tag 24 unbegrenzt.
-- Bankraub + Docks-Coup: alle 30 Min, max. 10× pro Tag (`robCheck`/`robDone`).
+- Bankraub + Docks-Coup: alle 30 Min, max. 10× pro Tag (Bankraub seit 16.11. max. 5×) (`robCheck`/`robDone`).
 - **Alles erst ab Saisonstart** (`ssOn()` im Casino, `season.on` in Dildi City – im Casino über GCFG.son, sonst Datum 16.11.2026):
   Einsätze, Kippen, Coup-Wartezeit (`hkh()`), Minispiel-Werte, Rangliste, Dildi-City-Kurs/Preise (`P10`)/Bezahlung/Raub-Regeln.
   D$ werden je nach Zustand umgerechnet (`dc3d_eco2` = '1' neuer Maßstab, '0' alter); das Sparschwein liest das Flag.
@@ -376,3 +376,10 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   (Der Absatz „Saison 1“ oben mit „Erfolge mit Wochen-Faktor“ ist damit überholt; Wochenaufgaben/Minispiele behalten ihn.)
 - Dildi City → „Insgesamt erspielt“: Bits, die aus dem Spiel ins Casino getauscht werden, zählen netto (minus vorher Hineingetauschtes;
   `dcIn`/`dcOut`/`dcTot` im Spielstand), damit Hin-und-her-Tauschen nichts bringt. Patch: `tools/patch_ach_fixed.py`.
+- Nick (16.11.): Glücksspiel zählt bei „Insgesamt erspielt“ weiter den vollen Gewinn (nicht nur Überschuss) – bewusst so lassen.
+
+## Dildi City: höhere Bezahlung (16.11., Nick)
+- Woche-1-Werte (steigen mit dem Wochen-Faktor): Bankraub 15.000, Docks-Coup 7.500 (Nick), Attentat 4.000, Zeitrennen bis 3.500,
+  Radjs Lieferung 3.500–5.700 (inkl. Sauber-Bonus), Pizza ×7,5 auf den alten Wert (~90–825 pro Lieferung), Flaschenpost ×7,5
+  (~750 pro Stopp, Tour ~3.750 + Sauber-Bonus 1.125). `jobPay(n, k)` in missions.js: k = Faktor auf den alten Wert.
+- Bankraub max. 5 pro Tag (`robMax`), Erfolg „Volles Tagespensum“ = 5 an einem Tag, 15.000 (`tools/patch_bank5.py`).

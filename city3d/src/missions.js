@@ -14,7 +14,7 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMo
 // ab Saisonstart: Bankraub / Docks-Coup frühestens alle 30 Minuten, höchstens 10× pro Tag
 // davor wie früher: Bank 1× pro Tag, Docks alle 15 Minuten
 const robCd = (k) => (season.on ? 30 : k === 'docks' ? 15 : 0) * 60000;
-const robMax = (k) => (season.on ? 10 : k === 'bank' ? 1 : Infinity);
+const robMax = (k) => (season.on ? (k === 'bank' ? 5 : 10) : k === 'bank' ? 1 : Infinity); // season: bank 5×, docks 10× per day (Nick)
 function robState(k) { let s = null; try { s = JSON.parse(store.get('dc3d_rob_' + k) || 'null'); } catch (e) {} if (!s || s.d !== today()) s = { d: today(), n: 0, t: (s && s.t) || 0 }; return s; }
 function robCheck(k) {
   const s = robState(k);
@@ -24,7 +24,8 @@ function robCheck(k) {
   return null;
 }
 // normal jobs (Flaschenpost, Pizza, phone-box jobs) pay 3x in the season (Nick: far less than the mini games before)
-const jobPay = (n) => ecoPay(n * (season.on ? 3 : 1));
+// k = factor on the old (pre-season) value; with k = 1 the number is the season value ×10 (ecoPay: /10 × week factor)
+const jobPay = (n, k = 3) => ecoPay(n * (season.on ? k : 1));
 function robDone(k) { const s = robState(k); s.n++; s.t = Date.now(); store.set('dc3d_rob_' + k, JSON.stringify(s)); }
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
 const loadTune = () => { try { return JSON.parse(store.get('dc3d_tune') || '{}'); } catch (e) { return {}; } };
@@ -425,7 +426,7 @@ export class Missions {
         let pay = want * 50;
         if (late) pay *= 0.5;
         else pay += Math.min(400, j.t * 8);
-        pay = jobPay(pay);
+        pay = jobPay(pay, 7.5);
         j.bottles -= want;
         j.earn += pay;
         this.api.addMoney(Math.round(pay));
@@ -434,7 +435,7 @@ export class Missions {
         j.k++;
         if (j.k >= 5 || j.bottles <= 0) {
           let bonus = 0;
-          if (j.k >= 5 && j.broken <= 6) bonus = jobPay(1500);
+          if (j.k >= 5 && j.broken <= 6) bonus = jobPay(1500, 7.5);
           if (bonus) this.api.addMoney(bonus);
           stat('fp'); if (bonus) stat('fpPerf');
           this.endJob(null);
@@ -596,9 +597,9 @@ export class Missions {
   }
   offerText(k) {
     return {
-      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `bis ${fmtD(jobPay(4000))} D$`],
-      hit: ['🎯 Attentat', '„Ein Typ in Gold schuldet meinem Boss Geld. Er läuft mit zwei Bodyguards durch die Stadt. Erledige ihn.“', `${fmtD(jobPay(3500))} D$`],
-      radj: ['📦 Radjs Lieferung', '„Radj hier. In der Wüste wartet eine Lieferung für mich – keine Fragen. Hol sie ab und bring sie in meine Lagerhalle an den Docks. Und lass dir keine Bullen anhängen.“', `${fmtD(jobPay(4000))}–${fmtD(jobPay(6500))} D$`],
+      race: ['🏁 Zeitrennen', '„Du hältst dich für schnell? 8 Checkpoints quer durch die Stadt – schaff sie in der Zeit und das Geld gehört dir.“', `bis ${fmtD(jobPay(4000, 8.75))} D$`],
+      hit: ['🎯 Attentat', '„Ein Typ in Gold schuldet meinem Boss Geld. Er läuft mit zwei Bodyguards durch die Stadt. Erledige ihn.“', `${fmtD(jobPay(40000, 1))} D$`],
+      radj: ['📦 Radjs Lieferung', '„Radj hier. In der Wüste wartet eine Lieferung für mich – keine Fragen. Hol sie ab und bring sie in meine Lagerhalle an den Docks. Und lass dir keine Bullen anhängen.“', `${fmtD(jobPay(4000, 8.75))}–${fmtD(jobPay(6500, 8.75))} D$`],
     }[k];
   }
   // answer on the popup: accept → route to the booth
@@ -701,7 +702,7 @@ export class Missions {
       } else G.audio.tone(0.2, 900, 1400, 0.1, 'triangle');
       j.k++;
       if (j.k >= j.pts.length) {
-        const pay = jobPay(Math.min(4000, 1200 + j.t * 70));
+        const pay = jobPay(Math.min(4000, 1200 + j.t * 70), 8.75);
         this.api.addMoney(pay);
         stat('race');
         this.endJob(null);
@@ -751,11 +752,11 @@ export class Missions {
     this.G.missionTarget = { x: v.pos.x, z: v.pos.z, color: '#ff4040' };
     const pp = this.api.playerPos();
     if (v.dead) {
-      this.api.addMoney(jobPay(3500));
+      this.api.addMoney(jobPay(40000, 1));
       stat('hit');
       this.api.setStars(Math.max(2, this.G.wanted.stars), 'Mord an einem VIP gemeldet');
       this.endJob(null);
-      this.api.banner('🎯 ZIEL AUSGESCHALTET', `+${fmtD(jobPay(3500))} D$ · Häng die Polizei ab`);
+      this.api.banner('🎯 ZIEL AUSGESCHALTET', `+${fmtD(jobPay(40000, 1))} D$ · Häng die Polizei ab`);
       for (const gd of j.guards) gd.follow = null;
       return;
     }
@@ -814,11 +815,11 @@ export class Missions {
     if (d < 12) {
       if (G.wanted.stars > 0) { this.setJobHUD('📦 RADJS LIEFERUNG', 'Radj nimmt nichts mit Bullen im Nacken!', 'Häng erst die Polizei ab', true); return; }
       if (v !== j.veh) { this.setJobHUD('📦 RADJS LIEFERUNG', 'Die Ware ist im Fahrzeug', 'Bring das Fahrzeug mit der Ware hierher', true); return; }
-      const pay = jobPay(rand(4000, 5500) + (j.clean ? 1000 : 0));
+      const pay = jobPay(rand(4000, 5500) + (j.clean ? 1000 : 0), 8.75);
       stat('radj'); if (j.clean) stat('radjClean');
       this.api.addMoney(pay);
       this.endJob(null);
-      this.api.banner('📦 GELIEFERT', `+${fmt(pay)} D$${j.clean ? ` (inkl. ${fmtD(jobPay(1000))} D$ Sauber-Bonus)` : ''}`);
+      this.api.banner('📦 GELIEFERT', `+${fmt(pay)} D$${j.clean ? ` (inkl. ${fmtD(jobPay(1000, 8.75))} D$ Sauber-Bonus)` : ''}`);
       return;
     }
     this.setJobHUD('📦 RADJS LIEFERUNG', 'Bring die Ware zu Radjs Lagerhalle', `📍 ${Math.round(d)} m${G.wanted.stars ? ' · ⭐ erst abhängen' : ''}`, false);
@@ -858,11 +859,11 @@ export class Missions {
     const d = Math.hypot(pp.x - h.x, pp.z - h.z);
     if (d < 12) {
       if (v !== j.veh) { this.setJobHUD('📦 DOCKS-COUP', 'Die Fracht ist im Transporter!', 'Hol den Transporter hierher', true); return; }
-      this.api.addMoney(ecoPay(20000));
+      this.api.addMoney(jobPay(75000, 1));
       G.wanted.lock = 0;
       this.api.setStars(0);
       this.endJob(null);
-      this.api.banner('📦 FRACHT VERKAUFT', `+${fmtD(ecoPay(20000))} D$`);
+      this.api.banner('📦 FRACHT VERKAUFT', `+${fmtD(jobPay(75000, 1))} D$`);
       return;
     }
     this.setJobHUD('📦 DOCKS-COUP', 'Bring die Fracht zum Versteck', `📍 ${Math.round(d)} m${v !== j.veh ? ' · 🚐 Transporter zurückholen!' : ''}`, false);
@@ -908,7 +909,7 @@ export class Missions {
       if (j.stage === 'deliver') {
         const hot = j.heat;
         j.streak = hot > 40 ? j.streak + 1 : 0;
-        const pay = jobPay(120 + hot * 5 + Math.min(600, j.streak * 60));
+        const pay = jobPay(120 + hot * 5 + Math.min(600, j.streak * 60), 7.5);
         j.earn += pay;
         j.done++;
         j.pizzas--;
@@ -1020,19 +1021,19 @@ export class Missions {
         const h = world.hideout;
         this.marker.set(h.x, h.z);
         G.missionTarget = { x: h.x, z: h.z, color: '#39ff88' };
-        this.api.banner('🚨 ABHAUEN!', `Bring die Beute (${fmtD(ecoPay(25000))} D$) ins Versteck`);
+        this.api.banner('🚨 ABHAUEN!', `Bring die Beute (${fmtD(jobPay(150000, 1))} D$) ins Versteck`);
       }
     } else if (st.state === 'escape') {
       const pp = this.api.playerPos();
       const h = world.hideout;
       const d = Math.hypot(pp.x - h.x, pp.z - h.z);
-      this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 ${fmtD(ecoPay(25000))} D$ · 📍 ${Math.round(d)} m`, false);
+      this.setJobHUD('🏦 BANKÜBERFALL', 'Bring die Beute ins Versteck', `💰 ${fmtD(jobPay(150000, 1))} D$ · 📍 ${Math.round(d)} m`, false);
       if (d < 9) {
         robDone('bank');
-        stat('bank'); stat('jobs'); if (robState('bank').n >= 10) stat('bank10');
-        this.api.addMoney(ecoPay(25000));
+        stat('bank'); stat('jobs'); if (robState('bank').n >= 5) stat('bank10'); // (key name kept: full daily quota = 5 bank raids)
+        this.api.addMoney(jobPay(150000, 1));
         this.api.setStars(0);
-        this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(ecoPay(25000))} D$ · ${season.on ? 'Nächster Überfall in 30 Min.' : 'Die Bank öffnet morgen wieder'}`);
+        this.api.banner('💰 ÜBERFALL GESCHAFFT', `+${fmtD(jobPay(150000, 1))} D$ · ${season.on ? 'Nächster Überfall in 30 Min.' : 'Die Bank öffnet morgen wieder'}`);
         this.resetBank();
       }
     }
