@@ -1528,8 +1528,8 @@ function renderShop() {
   let h = `<div class="wal"><div><small>Dildi-Dollar</small><b style="color:#3bff6a">D$ ${fmtN(G.money)}</b></div><div><small>Deine Bits${casino.linked ? '' : ' (Test)'}</small><b style="color:#ffd23b">◆ ${fmtN(casino.bits())}</b></div></div>`;
   if (tab === 'shop') {
     const items = [
-      ['vest', '🦺', 'Schutzweste', 'Volle Panzerung (100)', P10(150), player.armor >= 100 ? 'Schon voll' : ''],
-      ['heal', '🩹', 'Erste-Hilfe-Kasten', 'Volle Gesundheit', P10(50), player.hp >= 100 ? 'Schon voll' : ''],
+      ['vest', '🦺', 'Schutzweste', 'Volle Panzerung (100)', P10(750), player.armor >= 100 ? 'Schon voll' : ''],
+      ['heal', '🩹', 'Erste-Hilfe-Kasten', 'Volle Gesundheit', P10(250), player.hp >= 100 ? 'Schon voll' : ''],
     ];
     h += '<div class="shopGrid">' + items.map(([k, ic, n, d, pr, off]) => `<button class="gcar" data-buy="${k}" ${off ? 'disabled style="opacity:.45"' : ''}><div class="gi">${ic}</div><div class="gn">${n}</div><div class="gs">${d}</div><div class="gs" style="opacity:1;color:#3bff6a;font-weight:900">${off || fmtN(pr) + ' D$'}</div></button>`).join('') + '</div>';
   } else {
@@ -1544,7 +1544,7 @@ function renderShop() {
   body.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', () => exchange(b.dataset.x, +b.dataset.v)));
 }
 function buyItem(k) {
-  const price = P10({ vest: 150, heal: 50, ak: 800 }[k]);
+  const price = P10({ vest: 750, heal: 250, ak: 800 }[k]);
   if (G.money < price) { toast(`💸 Zu wenig Geld (${fmtN(price)} D$)`); return; }
   if (k === 'vest') { if (G.noVest) { toast('🦺 Im Finale gibt es keine Weste'); return; } if (player.armor >= 100) return; player.armor = 100; }
   else if (k === 'heal') { if (player.hp >= 100) return; player.hp = 100; }

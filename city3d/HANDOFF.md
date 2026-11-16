@@ -383,3 +383,8 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   Radjs Lieferung 3.500–5.700 (inkl. Sauber-Bonus), Pizza ×7,5 auf den alten Wert (~90–825 pro Lieferung), Flaschenpost ×7,5
   (~750 pro Stopp, Tour ~3.750 + Sauber-Bonus 1.125). `jobPay(n, k)` in missions.js: k = Faktor auf den alten Wert.
 - Bankraub max. 5 pro Tag (`robMax`), Erfolg „Volles Tagespensum“ = 5 an einem Tag, 15.000 (`tools/patch_bank5.py`).
+
+## Neue Preise in Dildi City (16.11., Nick)
+- Autos: Transporter 25.000, RS6 60.000, Ferrari 150.000. Tuning + Shop ×5 (Lack 250, Neon 1.500, Tieferlegen 1.000, Spoiler 2.500/5.000/10.000, Panzerung 5.000/12.500/25.000, Weste 750, Erste Hilfe 250).
+- Tuning-Knöpfe zeigten feste alte Preise (z. B. 2.000) statt der abgebuchten – jetzt aus `P10()`.
+- Erfolg „Volle Garage“ 15.000 (`tools/patch_garage15k.py`).
