@@ -20,7 +20,7 @@ Im Spiel ist `window.G` zum Testen offen (`G.step(n)` simuliert n Frames).
 - `vehicles.js` – Fahrzeuge & Physik, Tuning (Spoiler/Panzerung/Neon/Tieferlegen), LOD-Klotz für ferne Autos
 - `dildi_cars.js` – **Nicks eigene Modelle** (Autos, Flugzeug, Fassaden, Docks/Flughafen-Deko) – `globalThis.DildiCars`
 - `ai.js` – Passanten, Wachen, Verkehr (Stadt/Wüste, Stau-Auflöser), Polizei (80 % Tempo des Spielerautos)
-- `missions.js` – Garagen + Autokauf, Flaschenpost, Pizza Capri, Bankraub (nur mit eigenem RS6), Docks-Coup (nur eigener Transporter), Dildi Customs, Telefonzellen-Aufträge (alle ~4 Min)
+- `missions.js` – Garagen + Autokauf, Flaschenpost, Pizza Capri, Bankraub (nur mit eigenem RS6), Docks-Coup (nur eigener Transporter), Dildi Customs, Telefonzellen-Aufträge (alle ~3 Min)
 - `heist.js` – Radj-Coup: Planungsbrett, Missionen 1–4, Finale, Glasschneider-Minispiel
 - `radj.js` – Radj-Insel (Piste, Waldweg mit Brücke, Anwesen, Keller, Helikopter)
 - `plane.js` – Flugzeug-Flugmodell
@@ -417,3 +417,4 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Dildi City: Casino vergleicht beim Speichern dc3d_stats (fp, pzHot, pzCold, pzS15 – neu im Spiel) und erzeugt FLP/CAPRI-Ereignisse.
 - Test: eigenes Ereignis +4 % sofort im Kurs, Limit greift bei ~20 %, Ereignis eines anderen Spielers wirkt, Nachrichten mit Namen.
   Nicht getestet: mit mehreren echten Spielern über den Server.
+- Telefonanrufe alle 3 Min statt 4 (`dropCall(180)`), 16.11.
