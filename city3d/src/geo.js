@@ -42,7 +42,10 @@ export function rawH(x, z) {
   const env = envelope(x, z);
   const base = z < -WALL_OUT ? 0 : dunes(x, z) * (1 - env * 0.6);
   // gentler mountains around the deserts (were up to ~80 m, now ~45 m max)
-  let h = base + env * mNoise(x, z) * 0.55;
+  // between the two pass roads (west + east of the city) only small drivable hills (Nick: you should be able to drive over them)
+  const ax = Math.abs(x), az = Math.abs(z);
+  const flat = ax > 200 && ax < 470 ? (1 - ss(70, 125, az)) * (1 - ss(380, 460, ax)) : 0;
+  let h = base + env * mNoise(x, z) * 0.55 * (1 - 0.85 * flat);
   // keep the foot of the mountains low right next to the city wall
   const wd = Math.max(Math.abs(x), Math.abs(z)) - WALL_OUT;
   if (wd < 30 && z >= -WALL_OUT) h *= lerp(0.35, 1, ss(0, 30, wd));
