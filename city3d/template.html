@@ -46,6 +46,9 @@ body.incar #carInfo{display:block}
 #toast.show{opacity:1;transform:translateX(-50%)}
 #hint{position:absolute;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:7px 14px;font-size:14px;font-weight:700;opacity:0;transition:.2s}
 #hint.show{opacity:1}
+#hint.kill{color:#ff6b6b;font-size:18px;text-shadow:0 0 10px #f00}
+#bKill{display:none;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);border-radius:18px;padding:14px 26px;font-size:20px;background:rgba(200,20,40,.88);border-color:#ff9a9a;box-shadow:0 0 22px rgba(255,40,60,.8);animation:killP .7s infinite alternate}
+@keyframes killP{from{box-shadow:0 0 10px rgba(255,40,60,.5)}to{box-shadow:0 0 30px rgba(255,40,60,1)}}
 #cross{position:absolute;left:50%;top:50%;width:30px;height:30px;transform:translate(-50%,-50%);pointer-events:none}
 #cross i{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.55);transition:background .1s}
 #cross b{position:absolute;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);opacity:0;transition:opacity .12s,transform .12s}
@@ -306,6 +309,7 @@ body.notouch #bCam,body.notouch #bPause{display:none}
   <div class="tb foot" id="bShoot">💥<small>SCHIESSEN</small></div>
   <div class="tb foot" id="bAim">🎯<small>ZIELEN</small></div>
   <div class="tb foot" id="bEnter">EIN</div>
+  <div class="tb" id="bKill">🔪 AUSSCHALTEN</div>
   <div class="tb foot" id="bWeapon">🔄</div>
   <div class="tb foot" id="bReload">🔃<small>LADEN</small></div>
   <div class="tb car" id="bGas">▲<small>GAS</small></div>

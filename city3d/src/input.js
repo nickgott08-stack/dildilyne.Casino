@@ -68,6 +68,7 @@ export class Input {
     btn('bAim', () => { this.aimToggle = !this.aimToggle; this.press(this.aimToggle ? 'aimOn' : 'aimOff'); });
     btn('bJump', () => this.press('jump'));
     btn('bEnter', () => this.press('enter'));
+    btn('bKill', () => this.press('enter')); // silent takedown (same action as EIN)
     btn('bExit', () => this.press('enter'));
     btn('bWeapon', () => this.press('weapon'));
     btn('bReload', () => this.press('reload'));

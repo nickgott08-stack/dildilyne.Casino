@@ -580,7 +580,10 @@ function fire() {
     const wasCop = p.role === 'cop';
     const head = hp.y - p.pos.y > 1.65;
     // silenced pistol: a head shot drops a guard at once and without a sound
-    p.hit(G.silenced && head && p.role === 'guard' ? 999 : W.dmg * (head ? 2.5 : 1), G, d.x, d.z, true);
+    // Radj finale, silenced pistol (Nick): head or upper body = guard drops at once and silently, legs = no effect
+    const upper = hp.y - p.pos.y > 0.95;
+    if (G.silenced && G.noAssist && p.role === 'guard' && !upper) fx.sparks(hp.x, hp.y, hp.z, 2);
+    else p.hit(G.silenced && (head || (G.noAssist && upper)) && p.role === 'guard' ? 999 : W.dmg * (head ? 2.5 : 1), G, d.x, d.z, true);
     if (wasCop) crime(1.0, 'Polizist angeschossen');
     else if (p.role !== 'guard') crime(0.2, null, true);
   } else if (hit.kind === 'veh') {
@@ -1375,6 +1378,9 @@ function updateHUD(dt) {
       if (Math.hypot(o.pos.x - player.pos.x, o.pos.z - player.pos.z) - o.M.wid * 0.3 < 4.2) { hint = `${isTouch ? 'EIN' : 'F'} – ${o.M.name}${o.driver ? ' klauen' : ''}`; break; }
     }
   }
+  const kill = !!(ca && ca.text.startsWith('🔪'));
+  $('hint').classList.toggle('kill', kill);
+  $('bKill').style.display = kill ? 'flex' : 'none';
   setText('hint', hint);
   setText('bExit', v && ca ? 'START' : 'RAUS');
   $('hint').classList.toggle('show', !!hint);
