@@ -646,9 +646,9 @@ export function installFinale(Missions) {
       for (const s of j.sentries) {
         if (s.dead || !s.calm) continue;
         const dx = pp.x - s.pos.x, dz = pp.z - s.pos.z, d = Math.hypot(dx, dz);
-        if (d > 2.1) continue;
+        if (d > 3 || Math.abs(pp.y - s.pos.y) > 1.3) continue;
         const fx = Math.sin(s.yaw), fz = Math.cos(s.yaw);
-        if ((dx * fx + dz * fz) / d < -0.2) return { text: '🔪 Lautlos ausschalten', run: () => { s.hit(999, G, fx, fz, true); j.takedowns++; G.audio.tone(0.15, 200, 80, 0.12, 'sine'); } };
+        if ((dx * fx + dz * fz) / (d || 1) < 0.15) return { text: '🔪 Lautlos ausschalten', run: () => { s.hit(999, G, fx, fz, true); j.takedowns++; G.audio.tone(0.15, 200, 80, 0.12, 'sine'); } };
       }
     }
     if (j.stage === 'gate' && j.hasGate && Math.hypot(pp.x - ISL.gate.x, pp.z - ISL.gate.z) < 7) return { text: '🔓 Tor öffnen (Torkarte)', run: () => { I.gateCol.off = true; I.gateMesh.visible = false; j.stage = 'estate'; G.audio.pickup(); this.cx({ k: 'gate' }); this.api.banner('🔓 TOR OFFEN', 'Finde die Wache mit der Aufzugkarte (gold)'); } };
@@ -817,7 +817,7 @@ export function installFinale(Missions) {
         const nR = s.route.length, prev = s.route[(s.leg - 1 + nR) % nR];
         const base = tgt.look !== undefined ? tgt.look : Math.atan2(tgt[0] - prev[0], tgt[1] - prev[1]);
         s.lookYaw = base + Math.sin(G.time * (nR > 1 ? 0.9 : 0.5) + s.id) * (nR > 1 ? 1.1 : 0.75);
-        const wait = tgt.wait !== undefined ? tgt.wait || 1e9 : nR > 2 ? 1.6 : 3.5;
+        const wait = tgt.wait !== undefined ? tgt.wait || 1e9 : nR <= 2 || s.leg === 0 || s.leg === Math.floor(nR / 2) ? 4.5 : 1.6; // ends of the route: 4.5 s (Nick: min. 4 s)
         if (nR > 1 && s.waitT > wait) { s.waitT = 0; s.leg = (s.leg + 1) % nR; const n2 = s.route[s.leg]; s.post = { x: n2[0], z: n2[1] }; }
       }
       // can he see you?

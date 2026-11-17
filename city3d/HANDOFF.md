@@ -428,3 +428,10 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   (1.500/3.000/6.000 D$), Flaschenpost-Wagen 77/80/83/85 km/h (2.500/5.000/10.000 D$). Gemessen Stufe 3: Roller 51 km/h. Dialog im Customs-Fenster.
 - Berge zwischen den beiden Pass-Straßen (West + Ost, |x| 200–470, |z| < ~100) auf ~15 % Höhe (`flat` in `rawH`, geo.js):
   vorher bis 43 m hoch und 28–35 % zu steil zum Fahren, jetzt max. ~13 m und nirgends über der Fahr-Grenze (Steigung 0,62).
+
+## Finale: Takedown-Knopf, Wartezeiten, Schalldämpfer (17.11.)
+- Lautlos ausschalten: bis 3 m (vorher 2,1), überall hinter der Schulterlinie (Skalarprodukt < 0,15 statt < −0,2), gleiche Ebene (±1,3 m).
+  Großer roter, pulsierender Knopf „🔪 AUSSCHALTEN“ (`#bKill`, gleiche Aktion wie EIN) + roter Hinweistext, sobald möglich.
+- Wachen bleiben an den Enden ihrer Route 4,5 s stehen (2-Punkt-Routen an beiden Enden, Runden am Start + gegenüberliegenden Punkt), sonst 1,6 s.
+- Schalldämpfer-Pistole auf der Insel: Körpertreffer an einer Wache = kein Treffer (nur Funken) → kein „angeschossen“-Alarm.
+  Achtung: Der Schuss selbst ist für Wachen unter 7 m weiterhin hörbar.
