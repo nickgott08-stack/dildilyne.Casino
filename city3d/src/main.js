@@ -580,8 +580,10 @@ function fire() {
     const wasCop = p.role === 'cop';
     const head = hp.y - p.pos.y > 1.65;
     // silenced pistol: a head shot drops a guard at once and without a sound
-    if (G.silenced && G.noAssist && p.role === 'guard' && !head) { fx.sparks(hp.x, hp.y, hp.z, 2); } // Radj finale: body shot with the silencer = no hit (Nick)
-    else p.hit(G.silenced && head && p.role === 'guard' ? 999 : W.dmg * (head ? 2.5 : 1), G, d.x, d.z, true);
+    // Radj finale, silenced pistol (Nick): head or upper body = guard drops at once and silently, legs = no effect
+    const upper = hp.y - p.pos.y > 0.95;
+    if (G.silenced && G.noAssist && p.role === 'guard' && !upper) fx.sparks(hp.x, hp.y, hp.z, 2);
+    else p.hit(G.silenced && (head || (G.noAssist && upper)) && p.role === 'guard' ? 999 : W.dmg * (head ? 2.5 : 1), G, d.x, d.z, true);
     if (wasCop) crime(1.0, 'Polizist angeschossen');
     else if (p.role !== 'guard') crime(0.2, null, true);
   } else if (hit.kind === 'veh') {

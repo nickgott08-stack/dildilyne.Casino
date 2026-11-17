@@ -433,5 +433,5 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Lautlos ausschalten: bis 3 m (vorher 2,1), überall hinter der Schulterlinie (Skalarprodukt < 0,15 statt < −0,2), gleiche Ebene (±1,3 m).
   Großer roter, pulsierender Knopf „🔪 AUSSCHALTEN“ (`#bKill`, gleiche Aktion wie EIN) + roter Hinweistext, sobald möglich.
 - Wachen bleiben an den Enden ihrer Route 4,5 s stehen (2-Punkt-Routen an beiden Enden, Runden am Start + gegenüberliegenden Punkt), sonst 1,6 s.
-- Schalldämpfer-Pistole auf der Insel: Körpertreffer an einer Wache = kein Treffer (nur Funken) → kein „angeschossen“-Alarm.
-  Achtung: Der Schuss selbst ist für Wachen unter 7 m weiterhin hörbar.
+- Schalldämpfer-Pistole auf der Insel (Nick): Kopf oder Oberkörper (Treffer > 0,95 m über den Füßen) = Wache sofort und lautlos tot,
+  Beine = keine Wirkung. Wachen hören die Pistole nicht mehr (Schuss-gehört-Alarm nur noch bei der AK).

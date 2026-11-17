@@ -823,7 +823,7 @@ export function installFinale(Missions) {
       // can he see you?
       const dx = pp.x - s.pos.x, dz = pp.z - s.pos.z, d = Math.hypot(dx, dz);
       const range = v ? 24 : G.player.cover ? 7 : 14; // pressed against a wall: only seen from close up
-      if (!j.tour && d < range && G.lastShot && G.time - G.lastShot.t < 0.1 && d < 7) { this.raiseAlarm('Ein Schuss wurde gehört!'); continue; }
+      if (!j.tour && d < range && G.lastShot && G.lastShot.w === 2 && G.time - G.lastShot.t < 0.1 && d < 7) { this.raiseAlarm('Ein Schuss wurde gehört!'); continue; }
       let see = false;
       if (d < range) {
         const a = Math.acos(Math.max(-1, Math.min(1, (dx * Math.sin(s.yaw) + dz * Math.cos(s.yaw)) / (d || 1))));
