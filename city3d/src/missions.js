@@ -31,6 +31,16 @@ const RACE_REC_VD = 29; // desert route – autopilot test: Ferrari ~26 m/s, RS6
 const jobPay = (n, k = 3) => ecoPay(n * (season.on ? k : 1));
 function robDone(k) { const s = robState(k); s.n++; s.t = Date.now(); store.set('dc3d_rob_' + k, JSON.stringify(s)); }
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
+// tuning for the job vehicles (Nick 17.11.): Pizza-Roller 35 → ~52 km/h, Flaschenpost-Wagen 77 → ~85 km/h, 3 stages each
+const JOB_TUNE = {
+  roller: { name: 'Pizza-Roller', ico: '🛵', f: [1, 1.15, 1.3, 1.47], p: [0, 1500, 3000, 6000], kmh: [35, 40, 46, 52] },
+  van: { name: 'Flaschenpost-Wagen', ico: '🍾', f: [1, 1.035, 1.065, 1.09], p: [0, 2500, 5000, 10000], kmh: [77, 80, 83, 85] },
+};
+const loadJT = () => { try { return JSON.parse(store.get('dc3d_jobtune') || '{}') || {}; } catch (e) { return {}; } };
+function applyJobTune(v, key) {
+  const n = loadJT()[key] || 0, f = JOB_TUNE[key].f[n];
+  if (n) v.M = { ...v.M, maxSpeed: v.M.maxSpeed * f, accel: v.M.accel * (1 + (f - 1) * 1.2) };
+}
 const loadTune = () => { try { return JSON.parse(store.get('dc3d_tune') || '{}'); } catch (e) { return {}; } };
 const saveTune = (t) => store.set('dc3d_tune', JSON.stringify(t));
 const COLORS = ['#d40000', '#ff6a00', '#ffd23b', '#2e9e44', '#14b8a6', '#2471a3', '#1f3a8a', '#7d3c98', '#ff3df0', '#ecf0f1', '#8e9397', '#111111'];
@@ -158,6 +168,21 @@ export class Missions {
     add('depot', world.depot, '#3dff6a', '🍾', 'Flaschenpost');
     add('pizza', world.pizza, '#ff5a1f', '🍕', 'Pizza Capri');
     if (world.bank) add('bank', world.bank.entrance, '#ffd700', '🏦', 'Bank');
+    // small tuning pads on the parking lots of Pizza Capri and Flaschenpost
+    this.tunePads = [];
+    const tp = (key, x, z) => {
+      const y = groundAt(x, z), grp = new THREE.Group();
+      const sq = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ color: '#39c6ff', transparent: true, opacity: 0.35, toneMapped: false, depthWrite: false }));
+      sq.rotation.x = -Math.PI / 2; sq.position.y = 0.06;
+      const rim = new THREE.Mesh(new THREE.RingGeometry(2.3, 2.6, 4, 1), new THREE.MeshBasicMaterial({ color: '#39c6ff', side: THREE.DoubleSide, toneMapped: false }));
+      rim.rotation.x = -Math.PI / 2; rim.rotation.z = Math.PI / 4; rim.position.y = 0.08;
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(128, 128, (c, w, h) => { c.font = '90px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🔧', w / 2, h / 2 + 6); }, false), toneMapped: false }));
+      spr.scale.set(1.4, 1.4, 1); spr.position.y = 2.6;
+      grp.add(sq, rim, spr); grp.position.set(x, y, z); this.scene.add(grp);
+      this.tunePads.push({ key, x, z, spr });
+    };
+    if (world.pizza) tp('roller', world.pizza.x + 10, world.pizza.z + 14);
+    if (world.depot) tp('van', world.depot.x - 2, world.depot.z + 11);
     if (world.docksCargo) add('docks', world.docksCargo, '#39c6ff', '📦', 'Docks-Coup');
   }
 
@@ -284,6 +309,7 @@ export class Missions {
     if (d && free && Math.hypot(pp.x - d.x, pp.z - d.z) < R) return { text: '🍾 Flaschenpost-Tour starten', run: () => this.startBottles() };
     const pz = world.pizza;
     if (pz && free && Math.hypot(pp.x - pz.x, pp.z - pz.z) < R) return { text: '🍕 Pizza Capri – ausliefern', run: () => this.startPizza() };
+    for (const t of this.tunePads || []) if (free && Math.hypot(pp.x - t.x, pp.z - t.z) < (v ? 4 : 2.6)) return { text: `🔧 ${JOB_TUNE[t.key].name} tunen`, run: () => this.openJobTune(t.key) };
     const cu = world.customs;
     if (v && cu && Math.hypot(pp.x - cu.x, pp.z - cu.z) < 9) {
       if (v.mine && !v.M.bike) return { text: '🎨 Dildi Customs', run: () => this.openCustoms() };
@@ -342,6 +368,7 @@ export class Missions {
   startBottles() {
     const G = this.G, d = world.depot;
     const v = new Vehicle(this.scene, 'van', d.spawn.x, d.spawn.z, d.spawn.h, '#f5f5f5');
+    applyJobTune(v, 'van');
     // Flaschenpost livery: white van, purple band + lettering – placed right on the body side
     // (the real side of the model at that height, was a fixed width → the sign stood off the van)
     const sideAt = (y0, y1) => {
@@ -505,7 +532,35 @@ export class Missions {
     G.audio.tone(0.2, 600, 1200, 0.15, 'triangle');
     this.renderCustoms();
   }
+  openJobTune(key) {
+    this.G.paused = true;
+    this.jt = key;
+    this.renderJobTune();
+    $('customs').classList.add('show');
+  }
+  renderJobTune() {
+    const T = JOB_TUNE[this.jt], n = loadJT()[this.jt] || 0, G = this.G;
+    let h = `<div class="cmoney">D$ ${fmt(G.money)} · ${T.ico} ${T.name}</div>`;
+    h += `<div class="crow"><b>Motor-Tuning</b> <small>jetzt ${T.kmh[n]} km/h · gilt für jede neue Schicht/Tour</small><div class="cbs">`;
+    h += [1, 2, 3].map((k) => `<button class="cb${n >= k ? ' own' : ''}" data-st="${k}">Stufe ${k} · ${T.kmh[k]} km/h<small>${n >= k ? '✓ eingebaut' : fmt(P10(T.p[k])) + ' D$'}</small></button>`).join('');
+    h += '</div></div>';
+    $('custBody').innerHTML = h;
+    $('custBody').querySelectorAll('[data-st]').forEach((b) => b.addEventListener('click', () => this.buyJobTune(+b.dataset.st)));
+  }
+  buyJobTune(k) {
+    const all = loadJT(), n = all[this.jt] || 0, G = this.G;
+    if (k <= n) return;
+    if (k > n + 1) { this.api.toast('Erst die Stufe davor einbauen'); return; }
+    const price = P10(JOB_TUNE[this.jt].p[k]);
+    if (G.money < price) { this.api.toast('Zu wenig D$'); return; }
+    this.api.addMoney(-price);
+    all[this.jt] = k;
+    store.set('dc3d_jobtune', JSON.stringify(all));
+    G.audio.tone(0.2, 600, 1200, 0.15, 'triangle');
+    this.renderJobTune();
+  }
   closeCustoms() {
+    this.jt = null;
     $('customs').classList.remove('show');
     this.G.paused = false;
     this.cust = null;
@@ -896,6 +951,7 @@ export class Missions {
   startPizza() {
     const G = this.G, P = world.pizza;
     const v = new Vehicle(this.scene, 'roller', P.spawn.x, P.spawn.z, P.spawn.h, '#c0392b');
+    applyJobTune(v, 'roller');
     G.vehicles.push(v);
     this.api.putPlayerInVehicle(v);
     this.job = { kind: 'pizza', veh: v, pizzas: 3, heat: 100, streak: 0, earn: 0, stage: 'deliver', awayT: 0, done: 0 };
