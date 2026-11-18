@@ -441,3 +441,13 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 
 ## Minispiele (18.11.)
 - Memory ohne Fahrprüfung, Hafen-Fang ohne Quizfrage; „Nebenjob-Legende“ = die anderen 4 Nebenquests; Gekoffert-Anruf schneller (250 ms + 0,9 s), Aufdecken 1,0 s. Patch `tools/patch_minigames_1811.py`.
+
+## Online-Poker + Kartenvorderseiten (18.11.)
+- `server/poker.js` (vom Online-Server eingebunden, Nachrichten `t:'pk'` auf derselben WebSocket /ws, ohne Raum):
+  Texas Hold'em Fixed Limit, Tische 100–5.000, 2–6 echte Spieler, 20 s pro Zug (sonst Check/Fold), Server mischt und zeigt
+  fremde Karten erst beim Showdown. Mitspielen ab 24 × Tisch Stapel (höchster Verlust einer Fixed-Limit-Hand → kein All-in nötig).
+  `/status` zeigt die Spieler pro Tisch. Test mit 3 Bots: Chips gehen auf null auf, keine fremden Karten sichtbar.
+- Casino (`tools/patch_online_poker.py`): Poker-Lobby → „🌐 ONLINE-POKER“ (`OnlinePoker`, Server `PK_SRV`, mit `?server=` überschreibbar).
+  Buy-in min(Bits, 60 × Tisch); Stapel in `DD.s.pko` – zurück beim Aufstehen (pkbye), Verbindungsabbruch oder nächsten Login (jfix).
+  Statistik/Pass/Börse/Insgesamt erspielt wie beim normalen Poker. Test: 2 Browser gegen lokalen Server, Bits stimmen nach dem Aufstehen.
+- Kartenvorderseite passend zum Rücken-Skin (`psCardFront`): Schwarz-Gold (schwarz, gold/rot), Sigma-Lila (lila, weiß/rosa).
