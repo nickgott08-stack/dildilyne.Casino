@@ -435,3 +435,6 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 - Wachen bleiben an den Enden ihrer Route 4,5 s stehen (2-Punkt-Routen an beiden Enden, Runden am Start + gegenüberliegenden Punkt), sonst 1,6 s.
 - Schalldämpfer-Pistole auf der Insel (Nick): Kopf oder Oberkörper (Treffer > 0,95 m über den Füßen) = Wache sofort und lautlos tot,
   Beine = keine Wirkung. Wachen hören die Pistole nicht mehr (Schuss-gehört-Alarm nur noch bei der AK).
+
+## Börse: Casino-Aktie durch Umsatz (18.11.)
+- DIL: je 10.000 Bits Einsatz +1 % (`bxWager`, Zähler `bxw`: Slots ohne Freispiele, BJ, Roulette, Poker, Pferde, Wetten), Shop-Kauf +2 %, Verlust ab 5.000 +1 % (BJ, Roulette, Poker, Pferde, Wetten), Gewinne erst ab 20.000 −1 %. Tageslimit DIL +30 %. Patch `tools/patch_boerse_dil.py`. Test: 50 Spins à 1.000 = +5 %.
