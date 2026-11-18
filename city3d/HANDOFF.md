@@ -438,3 +438,6 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
 
 ## Börse: Casino-Aktie durch Umsatz (18.11.)
 - DIL: je 10.000 Bits Einsatz +1 % (`bxWager`, Zähler `bxw`: Slots ohne Freispiele, BJ, Roulette, Poker, Pferde, Wetten), Shop-Kauf +2 %, Verlust ab 5.000 +1 % (BJ, Roulette, Poker, Pferde, Wetten), Gewinne erst ab 20.000 −1 %. Tageslimit DIL +30 %. Patch `tools/patch_boerse_dil.py`. Test: 50 Spins à 1.000 = +5 %.
+
+## Minispiele (18.11.)
+- Memory ohne Fahrprüfung, Hafen-Fang ohne Quizfrage; „Nebenjob-Legende“ = die anderen 4 Nebenquests; Gekoffert-Anruf schneller (250 ms + 0,9 s), Aufdecken 1,0 s. Patch `tools/patch_minigames_1811.py`.
