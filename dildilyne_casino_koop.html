@@ -2125,7 +2125,7 @@ function PokerGame(P){pkCss();let [ph,setPh]=K.useState("lobby"),[stake,setStake
  let showdown=()=>{let g=G.current,al=alive(),sc=al.map((i)=>({i,v:pkEval(g.seats[i].h.concat(g.board))}));sc.sort((a,b)=>pkCmp(b.v,a.v));let top=sc[0].v,win=sc.filter((x)=>pkCmp(x.v,top)===0).map((x)=>x.i);al.forEach((i)=>{g.seats[i].show=1});settle(win,PK_HN[top[0]])};
  let finish=()=>{let g=G.current;settle(alive(),null)};
  let settle=(win,hn)=>{let g=G.current;g.over=1;clearTimeout(tmr.current);let share=Math.floor(g.pot/win.length),meWin=win.includes(0),won=meWin?share:0;if(won>0)P.earn(won);
-  let s=pkS(),net=won-g.myIn;s.h++;if(meWin){s.w++;s.big=Math.max(s.big,won)}if(net>0){s.won+=net;DD.s.tot=(DD.s.tot||0)+net;s.best=Math.max(s.best,net)}else s.lost+=-net;
+  let s=pkS(),net=won-g.myIn;try{bxWager(g.myIn);if(net<=-5000)bxEv("DIL",1,"Verliert "+fmN(-net)+" Bits am Pokertisch")}catch(e){}s.h++;if(meWin){s.w++;s.big=Math.max(s.big,won)}if(net>0){s.won+=net;DD.s.tot=(DD.s.tot||0)+net;s.best=Math.max(s.best,net)}else s.lost+=-net;
   let myV=!g.seats[0].f?pkEval(g.seats[0].h.concat(g.board))[0]:-1;if(meWin&&myV>s.top)s.top=myV;DD.s.pl=Object.assign({},DD.s.pl);DD.s.pl.pk=(DD.s.pl.pk||0)+1;
   try{psEv("pkh");if(meWin)psEv("pkw");psPlay("pk")}catch(e){}if(net>=1000&&DD.bigw)DD.bigw("Poker",net);DD.save();
   g.res={win,hn,share,net};g.msg=win.map((i)=>g.seats[i].n).join(" & ")+(win.length>1?" teilen":" gewinnt")+" "+fmN(g.pot)+(hn?" mit "+hn:"");
@@ -2258,19 +2258,20 @@ function bxIngest(rows){try{if(rows)BXI.rows=rows;let me=DD.u?DD.u.name:"",all=(
  let mm=BX.map(()=>({})),nw=[];all.forEach((p)=>{let e=p.d.bxe||{};Object.keys(e).forEach((k)=>{let i=BX.findIndex((x)=>x.k===k);if(i<0)return;Object.keys(e[k]||{}).forEach((b)=>{let t=(+b)*4;mm[i][t]=(mm[i][t]||0)+(+e[k][b]||0)})});(p.d.bxn||[]).forEach((x)=>{let i=BX.findIndex((y)=>y.k===x.k);if(i>=0)nw.push({t:x.t,i:i,up:x.p>0,p:x.p,tx:"👤 "+p.n+": "+x.x})})});
  let sg=JSON.stringify(mm);BXI.news=nw;if(sg!==BXI.sg){BXI.sg=sg;BXI.m=mm;BXC.L=BX.map(()=>[]);BXC.news=[]}}catch(e){}}
 function bxEv(k,pct,tx){try{if(!ssOn()||!DD.u||!pct)return;if(BX.findIndex((x)=>x.k===k)<0)return;let s=DD.s,T=Math.max(0,bxTn()),day=ssDay(),q=s.bxd=(s.bxd&&s.bxd.d===day)?Object.assign({},s.bxd):{d:day};
- if(pct>0){let u=q[k]||0,a=Math.min(pct,20-u);if(a<.001)return;q[k]=Math.round((u+a)*1000)/1000;pct=a}
+ if(pct>0){let u=q[k]||0,a=Math.min(pct,(k==="DIL"?30:20)-u);if(a<.001)return;q[k]=Math.round((u+a)*1000)/1000;pct=a}
  let b=Math.floor(T/4);s.bxe=Object.assign({},s.bxe);let e=s.bxe[k]=Object.assign({},s.bxe[k]);e[b]=Math.round(((e[b]||0)+Math.log(1+pct/100))*1e5)/1e5;
  s.bxn=[{t:T,k:k,p:Math.round(pct*10)/10,x:tx}].concat(s.bxn||[]).slice(0,12);DD.save();bxIngest(null)}catch(e){}}
+function bxWager(n){try{if(!ssOn()||!DD.u||!(n>0))return;let s=DD.s;s.bxw=(s.bxw||0)+n;let k=Math.floor(s.bxw/10000);if(k>0){s.bxw-=k*10000;bxEv("DIL",k,"Umsatz im Casino: "+fmN(k*10000)+" Bits Einsatz")}}catch(e){}}
 function bxCity(sv){try{let a=dcS(DD.s),b=dcS({gta:sv}),d=(k)=>Math.max(0,(b[k]||0)-(a[k]||0));
  let fp=d("fp"),ph=d("pzHot"),pc=d("pzCold"),p15=d("pzS15");if(fp)bxEv("FLP",1.5*fp,"Flaschenpost-Tour in Dildi City");if(ph)bxEv("CAPRI",.3*ph,ph+"× heiße Pizza geliefert");if(p15)bxEv("CAPRI",3*p15,"Pizza-Serie ×15!");if(pc)bxEv("CAPRI",-.2*pc,pc+"× kalte Pizza")}catch(e){}}
 function bxHook(){if(window.__bxHooked||typeof DD==="undefined")return;window.__bxHooked=1;let w=(name,fn)=>{let o=DD[name];if(typeof o!=="function")return;DD[name]=function(){let r=o.apply(this,arguments);try{fn.apply(null,[r].concat([].slice.call(arguments)))}catch(e){}return r}};
- w("res",(r,l,j,j0)=>{if(l&&j0>=100)bxEv("HFS",-3,"Jackpot am Hafensänger – die Reederei zahlt");if(j>=5000)bxEv("DIL",-1.5,"Großer Slot-Gewinn: "+fmN(Math.round(j))+" Bits")});
- w("pw",(r,j)=>{if(j>=5000)bxEv("DIL",-1.5,"Power-Spins bringen "+fmN(Math.round(j))+" Bits")});
- w("bjEnd",(r,p)=>{if(p>=5000)bxEv("DIL",-1.5,"Blackjack-Gewinn: "+fmN(p)+" Bits");else if(p<=-5000)bxEv("DIL",1,"Verliert "+fmN(-p)+" Bits am Blackjack-Tisch")});
- w("roul",(r,win,bet,zero)=>{if(win&&!zero&&bet>=5000)bxEv("DIL",-1.5,"Roulette-Gewinn: "+fmN(bet)+" Bits");else if(!win&&!zero&&bet>=5000)bxEv("DIL",1,"Verliert "+fmN(bet)+" Bits am Roulette")});
- w("kEnd",(r,wn)=>{if(wn>=5000)bxEv("DIL",-1.5,"Gekoffert: "+fmN(wn)+" Bits")});
+ w("res",(r,l,j,j0)=>{if(l&&j0>=100)bxEv("HFS",-3,"Jackpot am Hafensänger – die Reederei zahlt");if(j>=20000)bxEv("DIL",-1,"Riesiger Slot-Gewinn: "+fmN(Math.round(j))+" Bits")});
+ w("pw",(r,j)=>{if(j>=20000)bxEv("DIL",-1,"Power-Spins bringen "+fmN(Math.round(j))+" Bits")});
+ w("bjEnd",(r,p)=>{if(p>=20000)bxEv("DIL",-1,"Blackjack-Gewinn: "+fmN(p)+" Bits");else if(p<=-5000)bxEv("DIL",1,"Verliert "+fmN(-p)+" Bits am Blackjack-Tisch")});
+ w("roul",(r,win,bet,zero)=>{bxWager(bet);if(win&&!zero&&bet>=20000)bxEv("DIL",-1,"Roulette-Gewinn: "+fmN(bet)+" Bits");else if(!win&&!zero&&bet>=5000)bxEv("DIL",1,"Verliert "+fmN(bet)+" Bits am Roulette")});
+ w("kEnd",(r,wn)=>{if(wn>=20000)bxEv("DIL",-1,"Gekoffert: "+fmN(wn)+" Bits")});
  w("openPack",(r)=>{if(r)bxEv("FLP",1,"Fläschchen-Pack geöffnet")});
- w("smoke",(r)=>{if(r)bxEv("KIP",.7,"Kippe gezogen")})}
+ w("smoke",(r)=>{if(r)bxEv("KIP",.7,"Kippe gezogen")});w("spin",(r,l,bet,fr)=>{if(!fr)bxWager(bet)});w("horse",(r,bet,pay)=>{bxWager(bet);if(!(pay>0)&&bet>=5000)bxEv("DIL",1,"Verliert "+fmN(bet)+" Bits beim Pferderennen")});w("sport",(r,k,stake,pay)=>{bxWager(stake);if(!(pay>0)&&stake>=5000)bxEv("DIL",1,"Verliert "+fmN(stake)+" Bits bei einer Wette")});w("buy",()=>bxEv("DIL",2,"Einkauf im Casino-Shop"))}
 
 function bxSig(){if(BXC.sig)return BXC.sig;let o={};try{for(let s=1;s<=15;s++)for(let md=0;md<10;md++)for(let g=0;g<3;g++){let mt=slMatch(s,md,g),te=Math.floor((mt.ko+SL_FIN-BX_T0)/BX_TICK);if(te<0)continue;(o[te]=o[te]||[]).push(mt)}}catch(e){}return BXC.sig=o}
 function bxTn(now){return Math.floor(((now==null?Date.now():now)-BX_T0)/BX_TICK)}
@@ -2609,7 +2610,7 @@ W("div",{style:{position:"absolute",left:0,right:0,top:76,height:52,display:"fle
 m("div",{style:{position:"absolute",left:0,right:0,top:128,bottom:0,overflowY:"auto",overflowX:"hidden",touchAction:"pan-y",overscrollBehavior:"contain",WebkitOverflowScrolling:"touch",padding:"16px 30px 40px"},children:content}),
 msg&&m("div",{style:{position:"absolute",left:"50%",bottom:22,transform:"translateX(-50%)",zIndex:30,background:"rgba(0,0,0,0.94)",border:"2px solid #D4AF37",borderRadius:12,padding:"10px 24px",color:"#FFE27A",fontFamily:"Impact, sans-serif",fontSize:20},children:msg})]})]})}
 
-var DD_VER="17.11. 16:12",DDCFG={url:"https://afqkgyqjaedxtawfqdqt.supabase.co",key:"sb_publishable_D28QZwfQgrXn5XAoL0sEaQ_0S9ZHrkG"};
+var DD_VER="18.11. 22:23",DDCFG={url:"https://afqkgyqjaedxtawfqdqt.supabase.co",key:"sb_publishable_D28QZwfQgrXn5XAoL0sEaQ_0S9ZHrkG"};
 function dd0(){return{tot:0,eur:1,bits:0,w:100,pk:100,br:0,sp:0,jp:0,t:0,gj:0,bk:0,bjh:0,bjw:0,bjb:0,bjn:0,bjg:0,pl:{h:0,r:0,hm:0,rm:0,gk:0,bj:0,ro:0},sec:{h:0,r:0,hm:0,rm:0,gk:0,bj:0,ro:0,hr:0},wag:{h:0,r:0},won:{h:0,r:0},bw:{h:0,r:0},bm:{h:0,r:0},bon:{h:0,r:0},mb:{hm:0,rm:0,gk:0},bh:0,bmm:0,bjt:0,items:{},spent:0,rh:0,rp:0,ach:{},dayLast:"",dayStreak:0,dayBest:0,wk:{},wkn:0,bx:[],cm:[],adm:{st:{},rp:[],hide:{}},ro:{p:0,w:0,won:0,lost:0},hr:{p:0,w:0,won:0,lost:0},boxT:[],noAds:0,seen:0,at:2,rw5:0,bw5:0,cig:0,cigs:0,box:{n:0,sum:0,best:0},packs:0,popen:0,cards:{},lst:[],buys:[],sacc:{},srej:{},mkt:{sold:0,earned:0,bought:0}}}
 function dm(d){let b=dd0();for(let k in d){if(d[k]&&typeof d[k]==="object"&&b[k]&&typeof b[k]==="object")b[k]=Object.assign(b[k],d[k]);else b[k]=d[k]}if(typeof DD!=="undefined"&&DD&&DD.u&&/^mats$/i.test(DD.u.name||""))b.bjg=1200;else if(b.bjg>1000)b.bjg=1000;if(typeof DD!=="undefined"&&DD&&DD.u&&HRB(DD.u.name)&&!b.fixhr&&!ssOn()){b.fixhr=1;b.sec=Object.assign({},b.sec);b.sec.hr=(b.sec.hr||0)+HRB(DD.u.name)*60}if(b.sp&&typeof b.sp==="object"){if(!b.spt)b.spt=b.sp;b.sp=null}if(typeof b.sp!=="number"||!isFinite(b.sp))b.sp=((b.pl||{}).h||0)+((b.pl||{}).r||0);if(!b.fix1){b.fix1=1;b.pk=b.w||100;b.mkt=Object.assign({},b.mkt,{earned:0,sold:0,ds:0,de:0})}return b}
 var DD={s:dm(ld("dd_stats",{})),u:null,tm:null,
@@ -2810,7 +2811,7 @@ function Blackjack(P){let [ph,setPh]=K.useState("bet"),[hs,setHs]=K.useState([])
 let tn=(fr,d,ty,t0,v)=>{let c=P.ctx();if(!c)return;let o=c.createOscillator(),g=c.createGain(),t=c.currentTime+(t0||0);o.type=ty||"sine";o.frequency.value=fr;g.gain.setValueAtTime(v||.2,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.02)},fan=(a,g)=>a.forEach((fr,i)=>tn(fr,.3,"triangle",i*(g||.1),.26));
 let draw=(dl)=>{if(sh.current.length<60)sh.current=bjShoe();return{...sh.current.pop(),dl:dl||0}};
 let fin=(H,D,nat)=>{let dv=bjV(D),dbj=D.length===2&&dv===21,tot=0,spent=0,lines=[],bjw=!1;H.forEach((h)=>{let pv=bjV(h.c),natural=nat&&H.length===1&&h.c.length===2&&pv===21,r=0,txt;spent+=h.bet;if(pv>21)txt="Bust";else if(natural){if(dbj){r=h.bet;txt="Unentschieden"}else{r=h.bet*2.5;txt="Blackjack!";bjw=!0}}else if(dbj)txt="Verloren";else if(dv>21||pv>dv){r=h.bet*2;txt="Gewonnen"}else if(pv===dv){r=h.bet;txt="Unentschieden"}else txt="Verloren";tot+=r;lines.push({pv,dv,txt,r,bet:h.bet})});
-if(tot>0)P.pay(tot);let prof=tot-spent;let gotPk=DD.bjEnd(prof,bjw);setHole(!1);setRes({lines,prof,tot,bjw});setPh("end");setBz(!1);setMsg(bjw?"BLACKJACK! Sigma!":prof>0?"Gewonnen! Gut gespielt.":prof===0?"Unentschieden.":(lines.every((l)=>l.pv>21)?"Zu viel! Das war's.":"Das Haus gewinnt."));if(bjw)fan([523,659,784,1047,1319],.1);else if(prof>0)fan([523,659,784],.1);else if(prof<0)fan([330,262,196],.15);if(gotPk)setTimeout(()=>{DD.note(bjw?"🍾 BLACKJACK = 6 Flaschen – Fläschchen-Pack gesammelt!":"🍾 5 Hände gewonnen – Fläschchen-Pack gesammelt!")},1500)};
+if(tot>0)P.pay(tot);let prof=tot-spent;try{bxWager(spent)}catch(e){}let gotPk=DD.bjEnd(prof,bjw);setHole(!1);setRes({lines,prof,tot,bjw});setPh("end");setBz(!1);setMsg(bjw?"BLACKJACK! Sigma!":prof>0?"Gewonnen! Gut gespielt.":prof===0?"Unentschieden.":(lines.every((l)=>l.pv>21)?"Zu viel! Das war's.":"Das Haus gewinnt."));if(bjw)fan([523,659,784,1047,1319],.1);else if(prof>0)fan([523,659,784],.1);else if(prof<0)fan([330,262,196],.15);if(gotPk)setTimeout(()=>{DD.note(bjw?"🍾 BLACKJACK = 6 Flaschen – Fläschchen-Pack gesammelt!":"🍾 5 Hände gewonnen – Fläschchen-Pack gesammelt!")},1500)};
 let dealer=(H)=>{setPh("dealer");setHole(!1);setBz(!0);setMsg("Der Dealer ist dran …");let D=[...dc],all=H.every((h)=>bjV(h.c)>21),step=()=>{if(!all&&bjV(D)<17){D=[...D,draw(0)];setDc(D);tn(900,.06,"square",0,.12);setTimeout(step,750)}else fin(H,D,!1)};setTimeout(step,750)};
 let adv=(H,i)=>{let n=H.findIndex((h,k)=>k>i&&!h.done);if(n>=0){setHi(n);return}dealer(H)};
 let upd=(H,i,fn)=>H.map((h,k)=>k===i?fn(h):h);
