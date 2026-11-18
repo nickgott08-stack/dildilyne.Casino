@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
+import { onPoker, leave as pokerLeave, pokerStatus } from './poker.js';
 
 const PORT = +process.env.PORT || 8080;
 const MAX_PLAYERS = 10;
@@ -30,7 +31,7 @@ const server = http.createServer((req, res) => {
     const rooms = {}, crews = {};
     for (const [k, r] of ROOMS) { rooms[k] = r.players.size; if (r.crews.size) crews[k] = r.crews.size; }
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
-    res.end(JSON.stringify({ ok: true, max: MAX_PLAYERS, rooms, crews }));
+    res.end(JSON.stringify({ ok: true, max: MAX_PLAYERS, rooms, crews, poker: pokerStatus() }));
     return;
   }
   res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
@@ -149,6 +150,7 @@ wss.on('connection', (ws) => {
     let m;
     try { m = JSON.parse(data); } catch (e) { return; }
     if (!m || typeof m !== 'object') return;
+    if (m.t === 'pk') { onPoker(ws, m); return; } // Online-Poker (eigene Verbindung aus dem Casino, ohne Raum)
 
     if (m.t === 'join' && !me) {
       const code = clean(m.room, 12).toLowerCase() || 'dildi';
@@ -185,6 +187,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    pokerLeave(ws, true);
     if (!me) return;
     leaveCrew(me);
     const room = me.room;
