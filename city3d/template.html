@@ -190,6 +190,9 @@ body.notouch #bCam,body.notouch #bPause{display:none}
 .cb:active,.swb:active{transform:scale(.94)}
 #callBox{position:absolute;left:50%;top:calc(4px + env(safe-area-inset-top));transform:translateX(-50%);display:none;align-items:center;gap:10px;pointer-events:auto;background:linear-gradient(180deg,#2a2208,#16120a);border:2px solid #ffd23b;border-radius:16px;padding:8px 10px;box-shadow:0 0 22px rgba(255,210,59,.45);max-width:94vw;z-index:6}
 #callBox.show{display:flex;animation:callIn .35s}
+#callPick{display:flex;gap:5px;margin:4px 0 2px;flex-wrap:wrap}
+#callBox #callPick button{padding:6px 9px;font-size:17px;border-radius:9px;background:#3a3010;border:1px solid #6a5a20}
+#callBox #callPick button.sel{background:#ffd23b;border-color:#fff}
 @keyframes callIn{from{transform:translate(-50%,-20px);opacity:0}to{transform:translateX(-50%);opacity:1}}
 #callIco{font-size:30px;animation:ring .25s infinite alternate}
 .cInfo{font-size:13px;line-height:1.3;white-space:nowrap}.cInfo b{color:#ffd23b;font-size:14px}.cInfo small{opacity:.75;font-size:11px}
@@ -298,7 +301,7 @@ body.notouch #bCam,body.notouch #bPause{display:none}
   <div id="areaName"></div>
   <div id="hitDir"></div>
   <div id="job" class="pill"><div id="jobTitle"></div><div id="jobLine"></div><div id="jobSub"></div></div>
-  <div id="callBox"><div id="callIco">📞</div><div class="cInfo"><b>Anruf für dich!</b><div><span id="callJob"></span> · <span id="callPay"></span></div><small>Annehmen = Route zur Telefonzelle · <span id="callT"></span></small></div><button id="callNo">✕</button><button id="callYes">Annehmen</button></div>
+  <div id="callBox"><div id="callIco">📞</div><div class="cInfo"><b>Anruf für dich!</b><div><span id="callJob"></span> · <span id="callPay"></span></div><div id="callPick"></div><small>Auftrag antippen zum Wechseln · Annehmen = Route zur Telefonzelle · <span id="callT"></span></small></div><button id="callNo">✕</button><button id="callYes">Annehmen</button></div>
   <div id="banner"><div id="bannerT"></div><div id="bannerS"></div></div>
   <div id="vign"></div>
 </div>
