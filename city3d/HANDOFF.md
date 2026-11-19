@@ -469,3 +469,7 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   - Mitfahren: EIN neben einem Spieler-Auto → `seat`, Fahrer bestätigt automatisch (Sitze: Motorrad/Roller 2, Bus 8, sonst 4).
     Mitfahrer: `G.ride`, Position = Sitz (`seatPos`), zielen/schießen geht, EIN = aussteigen. Crew-Mitglieder dürfen auch ohne ⚔️ mitfahren.
   - Auto übernehmen: abgestelltes Auto (`G.lastCar`) wird als `pk` gesendet; EIN daneben → `own` → Besitzer entfernt es, `ownok` mit Typ/Farbe/Stufe/Schaden.
+
+## Anrufe: Auftrag aussuchen (19.11., Nick bekam 5× Radjs Lieferung)
+- `missions.js` `updatePhones`: nie zweimal hintereinander derselbe Auftrag (`phone.last`), alle 4 gleich wahrscheinlich.
+- Anruf-Box: Reihe mit 🏁 🏜️ 🎯 📦 (`#callPick`, `showCallOffer()`), antippen wechselt den Auftrag (Zeit mind. 12 s).

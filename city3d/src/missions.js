@@ -656,15 +656,21 @@ export class Missions {
     const cand = this.booths.filter((b) => { const d = Math.hypot(b.x - pp.x, b.z - pp.z); return d > 40 && d < 420; });
     if (!cand.length) { ph.next = 20; return; }
     ph.ringing = pick(cand);
-    ph.offer = pick(['race', 'hit', 'radj', 'radj']);
-    if (ph.offer === 'race' && Math.random() < 0.5) ph.offer = 'raceD'; // desert route
+    // never the same job twice in a row (Nick got Radj's delivery 5 times); he can switch it in the call box anyway
+    const pool = ['race', 'raceD', 'hit', 'radj'].filter((k) => k !== ph.last);
+    ph.offer = pick(pool);
     ph.accepted = false;
     ph.askT = 20;
-    const T = this.offerText(ph.offer);
-    $('callJob').textContent = T[0];
-    $('callPay').textContent = T[2];
+    this.showCallOffer();
     $('callBox').classList.add('show');
     G.audio.tone(0.18, 900, 1300, 0.15, 'triangle');
+  }
+  // call box: the offered job + one button per job type to pick another one
+  showCallOffer() {
+    const ph = this.phone, T = this.offerText(ph.offer);
+    $('callJob').textContent = T[0];
+    $('callPay').textContent = T[2];
+    $('callPick').innerHTML = ['race', 'raceD', 'hit', 'radj'].map((k) => `<button data-k="${k}" class="${k === ph.offer ? 'sel' : ''}" title="${this.offerText(k)[0]}">${this.offerText(k)[0].split(' ')[0]}</button>`).join('');
   }
   offerText(k) {
     return {
@@ -704,6 +710,7 @@ export class Missions {
     const ph = this.phone;
     if (!ph.ringing || !ph.accepted) return;
     const k = ph.offer;
+    ph.last = k;
     this.dropCall(180);
     const TXT = this.offerText(k);
     this.offer = k;
@@ -1237,6 +1244,14 @@ export class Missions {
     $('phoneNo').addEventListener('click', () => this.acceptOffer(false));
     $('callYes').addEventListener('click', () => this.takeCall(true));
     $('callNo').addEventListener('click', () => this.takeCall(false));
+    $('callPick').addEventListener('click', (e) => {
+      const k = e.target.closest && e.target.closest('button') && e.target.closest('button').dataset.k;
+      const ph = this.phone;
+      if (!k || !ph || !ph.ringing || ph.accepted) return;
+      ph.offer = k; ph.askT = Math.max(ph.askT, 12);
+      this.showCallOffer();
+      this.G.audio.click && this.G.audio.click();
+    });
     // dial: drag to rotate, buttons for fine control
     const face = $('dialWrap');
     let lastX = null;
