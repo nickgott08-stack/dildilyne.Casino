@@ -118,6 +118,7 @@ const GARAGE_CARS = [
   { type: 'van', color: '#f5f5f5', icon: '🚐', info: 'Für den Docks-Coup', price: P10(25000) },
   { type: 'rs6', color: '#8e9397', icon: '🚙', info: 'Schneller Kombi', price: P10(60000) },
   { type: 'ferrari', color: '#d40000', icon: '🏎️', info: 'Supersportwagen', price: P10(150000) },
+  { type: 'rim', color: '#b01818', icon: '🛻', info: 'Pickup – bei Customs bis zum Monster-Truck', price: P10(80000) },
 ];
 const loadOwned = () => { try { return { skoda: 1, ...JSON.parse(store.get('dc3d_owned') || '{}') }; } catch (e) { return { skoda: 1 }; } };
 
@@ -499,7 +500,9 @@ export class Missions {
     h += `<div class="crow"><b>Lack</b> <span class="cpr">${fmtD(P10(250))} D$</span><div class="sw">${COLORS.map((c) => `<button class="swb${(t.col || v.color) === c ? ' sel' : ''}" style="background:${c}" data-act="col:${c}"></button>`).join('')}</div></div>`;
     h += `<div class="crow"><b>Neon-Unterboden</b> <span class="cpr">${fmtD(P10(1500))} D$</span><div class="sw">${NEONS.map((c) => `<button class="swb neon${t.neon === c ? ' sel' : ''}" style="background:${c};box-shadow:0 0 10px ${c}" data-act="neon:${c}"></button>`).join('')}<button class="swb${!t.neon ? ' sel' : ''}" data-act="neon:" style="background:#222">✕</button></div></div>`;
     h += `<div class="crow"><b>Fahrwerk</b><div class="cbs">${btn('⬇ Tieferlegen', P10(1000), t.low, 'low')}</div></div>`;
-    h += `<div class="crow"><b>Heckspoiler</b> <small>mehr Tempo & Grip</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k} (+${k * 7}%)`, P10([0, 2500, 5000, 10000][k]), (t.spoiler || 0) >= k, 'spoiler:' + k)).join('')}</div></div>`;
+    h += `<div class="crow"><b>Reparatur</b> <small>${v.health >= v.maxHealth ? 'kein Schaden' : 'Zustand ' + Math.max(0, Math.round(v.health / v.maxHealth * 100)) + ' %'}</small><div class="cbs">${btn('🔧 Reparieren', P10(500), v.health >= v.maxHealth, 'repair')}</div></div>`;
+    if (v.type === 'rim') h += `<div class="crow"><b>Fahrwerk</b> <small>Höherlegung · Monster-Truck</small><div class="cbs">${btn('Stufe 2 · Offroad', P10(15000), (t.stage || 1) >= 2, 'stage:2')}${btn('Stufe 3 · Monster-Truck', P10(40000), (t.stage || 1) >= 3, 'stage:3')}</div></div>`;
+    if (v.type !== 'rim') h += `<div class="crow"><b>Heckspoiler</b> <small>mehr Tempo & Grip</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k} (+${k * 7}%)`, P10([0, 2500, 5000, 10000][k]), (t.spoiler || 0) >= k, 'spoiler:' + k)).join('')}</div></div>`;
     h += `<div class="crow"><b>Panzerung</b> <small>+40 % Leben pro Stufe</small><div class="cbs">${[1, 2, 3].map((k) => btn(`Stufe ${k}`, P10([0, 5000, 12500, 25000][k]), (t.armor || 0) >= k, 'armor:' + k)).join('')}</div></div>`;
     el.innerHTML = h;
     el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => this.buyTune(b.dataset.act)));
@@ -510,7 +513,13 @@ export class Missions {
     const t = { ...(all[v.type] || {}) };
     const [k, val] = act.split(':');
     let price = 0;
-    if (k === 'col') { if (t.col === val) return; price = P10(250); t.col = val; }
+    if (k === 'repair') {
+      if (v.health >= v.maxHealth) return;
+      if (P10(500) > G.money) { this.api.toast(`💸 Zu wenig Geld (${fmt(P10(500))} D$)`); return; }
+      this.api.addMoney(-P10(500)); v.repairAll(); G.audio.tone(0.2, 600, 1200, 0.15, 'triangle'); this.api.toast('🔧 Repariert'); this.renderCustoms(); return;
+    }
+    if (k === 'stage') { const n = +val; if ((t.stage || 1) >= n) return; if (n > (t.stage || 1) + 1) { this.api.toast('Erst Stufe 2 einbauen'); return; } price = P10(n === 2 ? 15000 : 40000); t.stage = n; }
+    else if (k === 'col') { if (t.col === val) return; price = P10(250); t.col = val; }
     else if (k === 'neon') { if ((t.neon || '') === val) return; price = val ? P10(1500) : 0; t.neon = val || null; }
     else if (k === 'low') { if (t.low) return; price = P10(1000); t.low = true; }
     else if (k === 'spoiler') { const n = +val; if ((t.spoiler || 0) >= n) return; price = P10([0, 2500, 5000, 10000][n]); t.spoiler = n; }
@@ -522,6 +531,7 @@ export class Missions {
     // rebuild the car with the new parts
     const nv = new Vehicle(this.scene, v.type, v.pos.x, v.pos.z, v.h, v.color, t);
     nv.mine = true;
+    nv.health = Math.min(nv.maxHealth, v.health / v.maxHealth * nv.maxHealth); nv.showDamage();
     v.driver = null;
     G.vehicles.push(nv);
     this.api.putPlayerInVehicle(nv);

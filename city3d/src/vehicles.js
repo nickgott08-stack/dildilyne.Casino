@@ -19,6 +19,7 @@ export const MODELS = {
   police: { name: 'Polizei-Skoda', len: 4.7, wid: 1.82, maxSpeed: 36, accel: 11, brake: 24, grip: 8.5, turn: 2.2, mass: 1.5, colors: ['#e8eef5'], police: true },
   bus: { name: 'Dildi Bus', len: 10.5, wid: 2.5, maxSpeed: 16, accel: 4, brake: 14, grip: 6, turn: 1.3, mass: 3.5, colors: ['#d81e2a', '#f4c20d', '#1f5fa8'] },
   truck: { name: 'LKW', len: 7.3, wid: 2.45, maxSpeed: 19, accel: 4.5, brake: 14, grip: 6, turn: 1.4, mass: 3, colors: ['#1f5fa8', '#c0392b', '#f5f5f5'] },
+  rim: { name: 'RIM 1500', len: 5.9, wid: 2.1, maxSpeed: 30, accel: 10, brake: 22, grip: 7.5, turn: 1.8, mass: 2.2, colors: ['#b01818', '#111111', '#e8e8e8', '#1f5fa8'] },
   jeep: { name: 'Schmuggler-Jeep', len: 4.3, wid: 1.9, maxSpeed: 23, accel: 8, brake: 20, grip: 8, turn: 2.0, mass: 1.7, colors: ['#5b6b3a'] },
   taxi: { name: 'Dildi Taxi', len: 4.7, wid: 1.82, maxSpeed: 17.5, accel: 7, brake: 20, grip: 7.5, turn: 2.0, mass: 1.3, colors: ['#f4c20d'], taxi: true },
 };
@@ -74,7 +75,7 @@ function buildCar(type, color, tune) {
   const tg = [];
   if (tune && !MODELS[type].bike) {
     const top = type === 'van' ? 2.15 : type === 'rs6' ? 1.4 : type === 'ferrari' ? 1.1 : 1.45;
-    if (tune.spoiler) {
+    if (tune.spoiler && type !== 'rim') {
       const sh = [0, 0.18, 0.32, 0.46][tune.spoiler];
       const rz = -Ln / 2 + (type === 'van' ? 0.2 : 0.45);
       const ry = { van: 1.98, rs6: 1.12, ferrari: 0.86, skoda: 1.06 }[type] || 0.95;
@@ -85,7 +86,7 @@ function buildCar(type, color, tune) {
   }
   // new detailed models (dildi_cars.js) for the main car types
   if (DC && DC.types.includes(type)) {
-    const m = DC.dildiCityVehicle(THREE, type, color, { body: vehMat, lights: lightMat.clone(), wheel: wheelMat }, tg);
+    const m = DC.dildiCityVehicle(THREE, type, color, { body: vehMat, lights: lightMat.clone(), wheel: wheelMat }, tg, { stage: (tune && tune.stage) || 1 });
     // low-poly stand-in for cars far away
     let pg;
     if (type === 'truck') {
@@ -285,10 +286,14 @@ export class Vehicle {
       M.accel *= (1 + 0.08 * sp) * (1 - 0.04 * ar);
       M.grip += sp * 0.5;
       M.mass *= 1 + 0.15 * ar;
+      if (type === 'rim' && tune.stage >= 2) { const st = tune.stage; M.maxSpeed *= st === 3 ? 0.93 : 1.06; M.accel *= st === 3 ? 1.15 : 1.08; M.grip += st === 3 ? 1.5 : 0.5; M.mass *= st === 3 ? 1.6 : 1.15; }
     }
     this.color = (tune && tune.col) || color || pick(this.M.colors);
     const m = buildCar(type, this.color, tune);
     Object.assign(this, m);
+    // damage model of dildi_cars.js keeps its state on the model object → mirror level + steering pull onto the vehicle
+    if (m.setDamage) this.setDamage = (d) => { const r = m.setDamage(d); this.damageLevel = m.damageLevel; this.steerPull = m.steerPull; return r; };
+    this.steerPull = 0; this.damageLevel = 0;
     this.scene = scene;
     scene.add(this.group);
     this.pos = new THREE.Vector3(x, groundAt(x, z, 1e9), z);
@@ -367,7 +372,7 @@ export class Vehicle {
     // air drag
     vF -= vF * Math.abs(vF) * 0.0009 * dt;
     // steering
-    const steerTarget = inp.steer;
+    const steerTarget = Math.max(-1, Math.min(1, inp.steer + (this.driver === 'player' && this.steerPull ? this.steerPull : 0))); // damaged car pulls
     this.steer = damp(this.steer, steerTarget, M.bike ? 4.5 : 8, dt);
     const sp = Math.abs(vF);
     const steerScale = 1 / (1 + sp * 0.035);
@@ -500,9 +505,18 @@ export class Vehicle {
   damage(d, G, byPlayer) {
     if (this.dead) return;
     this.health -= d;
+    this.showDamage();
     if (byPlayer) this.lastAttacker = 'player';
     if (byPlayer &&this.driver && this.driver !== 'player' && this.driver.onAttacked) this.driver.onAttacked(G);
     if (this.health <= 0 && this.burn <= 0) this.explodeSoon(G);
+  }
+  // dents, open hood, bent front wheel (dildi_cars.js setDamage) from the health; steerPull = car pulls to one side
+  showDamage() {
+    if (this.setDamage && !this.dead) this.setDamage(1 - Math.max(0, this.health) / this.maxHealth);
+  }
+  repairAll() {
+    this.health = this.maxHealth;
+    if (this.setDamage) this.setDamage(0);
   }
   explodeSoon() {
     if (this.burn > 0 || this.dead) return;

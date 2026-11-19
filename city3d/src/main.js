@@ -507,6 +507,19 @@ function castShot(o, d, maxT, minT, exclude) {
     const t = rayVehicle(o, d, v);
     if (t !== null && t > minT && t < best.t) best = { t, kind: 'veh', v };
   }
+  const OT = online.pvpTargets();
+  if (OT) {
+    for (const p of OT.peds) {
+      if (p === exclude) continue;
+      const t = rayHuman(o, d, p);
+      if (t !== null && t > minT && t < best.t) best = { t, kind: 'ped', p };
+    }
+    for (const v of OT.vehs) {
+      if (online.ride && v.remoteOf && v.remoteOf.id === online.ride.id) continue; // the car I ride in
+      const t = rayVehicle(o, d, v);
+      if (t !== null && t > minT && t < best.t) best = { t, kind: 'veh', v };
+    }
+  }
   return best;
 }
 
@@ -575,7 +588,14 @@ function fire() {
   G.shake = Math.min(1, G.shake + (player.weapon === 2 ? 0.12 : 0.1));
   cam.recoil = (cam.recoil || 0) + (player.weapon === 2 ? 0.012 : 0.02);
   if (hit.kind === 'world' || hit.kind === 'ground') { fx.sparks(hp.x, hp.y, hp.z, 4); fx.dust(hp.x, hp.y, hp.z); }
-  else if (hit.kind === 'ped') {
+  else if (hit.kind === 'ped' && hit.p.remote) {
+    // another online player: he takes the damage on his side
+    online.hitRemote(hit.p.remote, W.dmg * (hp.y - hit.p.pos.y > 1.65 ? 2.5 : 1), player.weapon, false);
+    fx.sparks(hp.x, hp.y, hp.z, 3);
+  } else if (hit.kind === 'veh' && hit.v.remoteOf) {
+    online.hitRemote(hit.v.remoteOf, W.dmg * 0.35, player.weapon, true);
+    fx.sparks(hp.x, hp.y, hp.z, 5);
+  } else if (hit.kind === 'ped') {
     const p = hit.p;
     const wasCop = p.role === 'cop';
     const head = hp.y - p.pos.y > 1.65;
@@ -628,6 +648,16 @@ function findTarget(o, d, cone, range, exclude) {
     _v1.divideScalar(L);
     const a = Math.acos(clamp(_v1.dot(d), -1, 1));
     const sc = a * targetScore(p) + L * 0.0015;
+    if (sc < bs && !G.rayBlocked(o.x, o.y, o.z, p.pos.x, p.pos.y + 1.25, p.pos.z)) { bs = sc; best = p; }
+  }
+  const OT = online.pvpTargets();
+  if (OT) for (const p of OT.peds) {
+    if (p.dead || p === exclude) continue;
+    _v1.set(p.pos.x, p.pos.y + 1.25, p.pos.z).sub(o);
+    const L = _v1.length();
+    if (L > range || L < 1) continue;
+    _v1.divideScalar(L);
+    const sc = Math.acos(clamp(_v1.dot(d), -1, 1)) * 0.6 + L * 0.0015;
     if (sc < bs && !G.rayBlocked(o.x, o.y, o.z, p.pos.x, p.pos.y + 1.25, p.pos.z)) { bs = sc; best = p; }
   }
   return best;
@@ -711,6 +741,8 @@ G.copShoot = (cop, d) => {
   fx.muzzle(from.x, from.y, from.z, (to.x - from.x) / d, 0, (to.z - from.z) / d);
 };
 
+G.damagePlayer = (dmg, from) => damagePlayer(dmg, from);
+G.putPlayerIn = (v) => putPlayerIn(v);
 function damagePlayer(dmg, from) {
   if (player.dead) return;
   if (player.inVehicle) {
@@ -756,9 +788,11 @@ G.explosion = (x, y, z, src) => {
 
 // ---------- vehicles: enter/exit ----------
 function tryEnter() {
+  if (G.ride) { online.unride(); return; }
   const ctxA = missions.contextHint();
   if (ctxA) { ctxA.run(); return; }
   if (player.inVehicle) return exitVehicle();
+  if (online.tryRide()) return;
   let best = null, bd = 4.2;
   for (const v of G.vehicles) {
     if (v.dead || v.removed || v.burn > 0) continue;
@@ -945,6 +979,13 @@ function updatePlayer(dt) {
   const wantAim = (input.aim || input.shoot) && player.weapon > 0;
   const aimK = wantAim ? 1 : 0;
   cam.aim = damp(cam.aim, aimK, 10, dt);
+  const rideP = G.ride ? online.rideStep() : null;
+  if (rideP) {
+    // riding along in an online player's car: aim and shoot out of the window
+    player.speed = 0; player.vx = player.vz = player.vy = 0; player.grounded = true; player.cover = null;
+    player.yaw = wantAim ? dampAngle(player.yaw, cam.yaw, 22, dt) : rideP.h;
+    input.consume('jump');
+  } else {
   const fwdx = Math.sin(cam.yaw), fwdz = Math.cos(cam.yaw);
   const rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
   let mx = fwdx * input.my + rx * input.mx;
@@ -1044,6 +1085,7 @@ function updatePlayer(dt) {
       }
     }
   }
+  } // end of walking (not riding)
   // shooting
   if (input.shoot && player.fireT <= 0) {
     const W = WEAPONS[player.weapon];
@@ -1058,6 +1100,7 @@ function updatePlayer(dt) {
   animateHuman(player.h, dt, { speed: player.speed, grounded: player.grounded, aim: cam.aim, pitch: -pitch * 0.9, twoHand: player.weapon === 2, punch: player.punchT > 0 ? 1 : 0, lean: player.knockT > 0 ? -0.6 : 0 });
   player.h.root.position.copy(player.pos);
   player.h.root.rotation.y = player.yaw;
+  if (G.ride) player.h.root.visible = false;
   if (player.hurtT > 0) player.hurtT -= dt;
   // heal slowly when not hurt
   if (player.hp < 100 && G.wanted.stars === 0) player.hp = Math.min(100, player.hp + dt * (player.hp < 50 ? 1.5 : 0.6));
@@ -1086,6 +1129,7 @@ function switchWeapon(dir) {
 function killPlayer() {
   if (player.dead) return;
   if (player.inVehicle) exitVehicleForce();
+  online.onDeath();
   player.dead = true;
   player.deadT = 4;
   missions.onPlayerDeath();

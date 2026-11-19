@@ -46,7 +46,8 @@ let nextId = 1;
 const clean = (s, n) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
 const num = (v, lim = 1e5) => (typeof v === 'number' && isFinite(v) ? Math.max(-lim, Math.min(lim, Math.round(v * 100) / 100)) : 0);
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
-const VEH = new Set(['skoda', 'rs6', 'van', 'bike', 'ferrari', 'roller', 'police', 'jeep', 'taxi', 'plane', 'bus', 'truck']);
+const VEH = new Set(['skoda', 'rs6', 'van', 'bike', 'ferrari', 'roller', 'police', 'jeep', 'taxi', 'plane', 'bus', 'truck', 'rim']);
+const DIRECT = new Set(['ram', 'hit', 'seat', 'seatok', 'seatno', 'unseat', 'own', 'ownok', 'ownno']);
 const CREW_MAX = 4; // Koop-Coup: bis zu 4 Spieler pro Crew
 
 function cleanLook(l) {
@@ -62,7 +63,13 @@ function cleanState(m) {
   const p = Array.isArray(m.p) ? m.p.slice(0, 4).map((v) => num(v)) : [0, 0, 0, 0];
   const st = { p, sp: num(m.sp, 500), f: m.f | 0 };
   if (m.v && typeof m.v === 'object' && VEH.has(m.v.ty)) {
-    st.v = { ty: m.v.ty, c: COLOR.test(m.v.c) ? m.v.c : '#888888', h: num(m.v.h), pi: num(m.v.pi, 10), ro: num(m.v.ro, 10) };
+    st.v = { ty: m.v.ty, c: COLOR.test(m.v.c) ? m.v.c : '#888888', h: num(m.v.h), pi: num(m.v.pi, 10), ro: num(m.v.ro, 10), sg: Math.max(1, Math.min(3, m.v.sg | 0)), dm: Math.max(0, Math.min(1, num(m.v.dm, 1))) };
+  }
+  // Online-Kollision: pv = Schalter AN, rd = fährt bei Spieler <id> mit, pk = zuletzt abgestelltes Auto (zum Übernehmen)
+  if (m.pv) st.pv = 1;
+  if (m.rd != null) st.rd = clean(m.rd, 8);
+  if (m.pk && typeof m.pk === 'object' && VEH.has(m.pk.ty) && m.pk.ty !== 'plane') {
+    st.pk = { ty: m.pk.ty, c: COLOR.test(m.pk.c) ? m.pk.c : '#888888', x: num(m.pk.x), y: num(m.pk.y), z: num(m.pk.z), h: num(m.pk.h), sg: Math.max(1, Math.min(3, m.pk.sg | 0)), dm: Math.max(0, Math.min(1, num(m.pk.dm, 1))) };
   }
   return st;
 }
@@ -177,6 +184,26 @@ wss.on('connection', (ws) => {
       const e = JSON.stringify(m.e);
       if (e.length > 400) return;
       crewcast(me.room, c, { t: 'cev', id: me.id, name: me.name, e: JSON.parse(e) }, ws);
+      return;
+    }
+    // Online-Kollision: an genau einen Spieler weiterleiten (Rammen, Treffer, Mitfahren, Auto übernehmen)
+    if (DIRECT.has(m.t)) {
+      const to = me.room.players.get(clean(m.to, 8));
+      if (!to || to === me) return;
+      const o = { t: m.t, from: me.id };
+      if (m.imp != null) o.imp = Math.max(0, Math.min(60, num(m.imp)));
+      if (m.dmg != null) o.dmg = Math.max(0, Math.min(100, num(m.dmg)));
+      if (m.dir && typeof m.dir === 'object') o.dir = { x: num(m.dir.x, 1), z: num(m.dir.z, 1) };
+      if (m.seat != null) o.seat = Math.max(0, Math.min(8, m.seat | 0));
+      if (m.weapon != null) o.weapon = Math.max(0, Math.min(5, m.weapon | 0));
+      if (m.veh) o.veh = 1;
+      if (m.car && typeof m.car === 'object' && VEH.has(m.car.ty)) o.car = { ty: m.car.ty, c: COLOR.test(m.car.c) ? m.car.c : '#888888', sg: Math.max(1, Math.min(3, m.car.sg | 0)), dm: Math.max(0, Math.min(1, num(m.car.dm, 1))) };
+      send(to.ws, o);
+      return;
+    }
+    if (m.t === 'dead') {
+      const by = me.room.players.get(clean(m.by, 8));
+      if (by && by !== me) broadcast(me.room, { t: 'kill', by: by.id, byName: by.name, id: me.id, name: me.name });
       return;
     }
     if (m.t === 'chat') {

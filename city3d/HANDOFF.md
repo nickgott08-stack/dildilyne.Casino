@@ -451,3 +451,21 @@ in der Mitte, U-förmige Halle mit 2 Treppen über dem Pool, Poolterrasse an der
   Buy-in min(Bits, 60 × Tisch); Stapel in `DD.s.pko` – zurück beim Aufstehen (pkbye), Verbindungsabbruch oder nächsten Login (jfix).
   Statistik/Pass/Börse/Insgesamt erspielt wie beim normalen Poker. Test: 2 Browser gegen lokalen Server, Bits stimmen nach dem Aufstehen.
 - Kartenvorderseite passend zum Rücken-Skin (`psCardFront`): Schwarz-Gold (schwarz, gold/rot), Sigma-Lila (lila, weiß/rosa).
+
+## RIM-Pickup, Schäden, Online-Kollision (19.11., Nicks dildi_cars.js + `models/ONLINE_KOLLISION.md`)
+- `dildi_cars.js`: Patch aus Nicks Commit 77643b6 übernommen (RIM_STAGES, `VEHICLES.rim`, `addDamage`/`setDamage`/`repair`/`steerPull`),
+  unsere Anpassungen bleiben. `dildiCityVehicle(..., {stage})`.
+- `vehicles.js`: Modell `rim` (RIM 1500), `tune.stage` 2 = Offroad (etwas schneller), 3 = Monster-Truck (schwerer, mehr Grip, etwas langsamer),
+  kein Spoiler. Schadensbild folgt der Gesundheit (`showDamage()` nach `damage()`), `repairAll()`, beschädigtes Auto zieht (`steerPull`, nur Spieler).
+- `missions.js`: Autohaus RIM 80.000 D$ (×10 in Saison), Customs: „🔧 Reparieren“ 500, RIM-Fahrwerk Stufe 2 15.000 / Stufe 3 40.000.
+- Online (`online.js`, `server/server.js`):
+  - Schalter „Kollision ⚔️ AN / 🕊️ AUS“ im Online-Menü (`dc3d_pvp`), im Zustand `pv:1`, ⚔️ am Namen. Alles nur, wenn **beide** AN.
+  - Zustand zusätzlich: `v.sg` (Stufe), `v.dm` (Schaden 0–1, Dellen bei den anderen), `rd` (fährt mit bei id), `pk` (zuletzt abgestelltes Auto).
+  - Server leitet `ram/hit/seat/seatok/seatno/unseat/own/ownok/ownno` an `to` weiter (mit `from`), `dead` → an alle `kill` („X hat Y erledigt“).
+  - Rammen: `ramCheck` (Kreise wie `collideVehicles`), jeder rechnet nur sich selbst, `ram`-Nachricht an den anderen, 0,8 s Sperre gegen doppelt.
+    Fremdes Auto fährt einen zu Fuß um → Stoß + Schaden.
+  - Schießen: `castShot`/`findTarget` (main.js) kennen andere Spieler (`online.pvpTargets()`), Treffer → `hit` (Schaden ×0,5), der Getroffene
+    zieht selbst ab (Prüfung: ≤190 m, ≤12 Treffer/s). Schuss aufs Auto → Fahrzeugschaden beim Besitzer.
+  - Mitfahren: EIN neben einem Spieler-Auto → `seat`, Fahrer bestätigt automatisch (Sitze: Motorrad/Roller 2, Bus 8, sonst 4).
+    Mitfahrer: `G.ride`, Position = Sitz (`seatPos`), zielen/schießen geht, EIN = aussteigen. Crew-Mitglieder dürfen auch ohne ⚔️ mitfahren.
+  - Auto übernehmen: abgestelltes Auto (`G.lastCar`) wird als `pk` gesendet; EIN daneben → `own` → Besitzer entfernt es, `ownok` mit Typ/Farbe/Stufe/Schaden.
