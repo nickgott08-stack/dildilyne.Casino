@@ -12,7 +12,7 @@
  * Diese Datei muss VOR dem Spiel-Code geladen sein (oder Inhalt oben ins Script kopieren).
  * THREE = das three.js-Namespace-Objekt des Spiels (import * as THREE from 'three').
  *
- * 1) FAHRZEUGE  -  Typen: 'rs6', 'ferrari', 'skoda', 'police', 'taxi', 'van', 'jeep', 'bus', 'truck'
+ * 1) FAHRZEUGE  -  Typen: 'rs6', 'ferrari', 'skoda', 'police', 'taxi', 'van', 'jeep', 'bus', 'truck', 'rim'
  *    Die Funktion, die Fahrzeugmodelle baut (bekommt typ, farbe, tuning und gibt
  *    { group, tilt, body, lights, wheels:[{piv,w,front}], wheelR, siren } zurueck), ganz am Anfang:
  *
@@ -31,6 +31,21 @@
  *      bus:{name:"Dildi Bus",len:10.5,wid:2.5,maxSpeed:16,accel:4,brake:14,grip:6,turn:1.3,mass:3.5,colors:["#d81e2a","#f4c20d","#1f5fa8"]}
  *      truck:{name:"LKW",len:7.3,wid:2.45,maxSpeed:19,accel:4.5,brake:14,grip:6,turn:1.4,mass:3,colors:["#1f5fa8","#c0392b","#f5f5f5"]}
  *    - Masse passen zur Fahrzeugliste: RS6 5.0x1.95, Ferrari 4.6x1.96, Skoda 4.7x1.83, Van 5.1x1.95.
+ *
+ * 1b) NEU: PICKUP 'rim' (grosser US-Pickup, Schriftzug "RIM") mit 3 Tuning-Stufen:
+ *      DildiCars.dildiCityVehicle(THREE, 'rim', farbe, mats, extra, { stage: 1|2|3 })
+ *      1 = Serie, 2 = hoeher + Bullbar + LED-Bar + breitere Reifen, 3 = Monster-Truck (riesige Reifen,
+ *      2 lange Auspuff-Stacks, Ueberrollbuegel, offenes Fahrwerk). In die Fahrzeugliste eintragen, z. B.
+ *      rim:{name:"RIM 1500",len:5.9,wid:2.1,maxSpeed:30,accel:10,brake:22,grip:7.5,turn:1.8,mass:2.2,colors:["#b01818","#111111","#e8e8e8","#1f5fa8"]}
+ *      Stufe im Tuning (Dildi Customs) speichern und beim Bauen als { stage } uebergeben. Fuer Stufe 3
+ *      die Fahrphysik anpassen: Radhoehe = wheelR (0.95), Schwerpunkt hoeher, mehr Bodenfreiheit.
+ *
+ * 1c) NEU: SCHADENSMODELL (alle Fahrzeuge aus dildiCityVehicle):
+ *      Bei jeder Aenderung der Lebenspunkte:  auto.setDamage(1 - health / maxHealth)
+ *      20 %: Dellen + Kratzer   40 %: Motorhaube springt auf   60 %: Vorderrad verbogen
+ *      80 %: stark zerbeult, ein Scheinwerfer kaputt   100 %: wie bisher Feuer/Explosion.
+ *      Lenkzug: beim Fahren  steer = eingabe + auto.steerPull   (zieht nach rechts, muss gegengelenkt werden)
+ *      Reparieren (Garage/Tanke): auto.repair()
  *
  * 2) FLUGZEUG  -  in der Funktion, die das Flugzeug baut (gibt { root, tilt, prop } zurueck):
  *      return DildiCars.dildiCityPlane(THREE, farbe, { body: <bisheriges Flugzeug-Material mit vertexColors> });
@@ -1581,6 +1596,172 @@
     return { group: root, add, update, scatterAlong, items, glow: glowMat };
   }
 
+
+  // ======================================================================
+  // "RIM" Pickup (grosser US-Pickup) mit 3 Tuning-Stufen
+  //   Stufe 1: Serie (grosse AT-Reifen)   Stufe 2: Hoeherlegung, Bullbar, LED-Bar, breitere Reifen
+  //   Stufe 3: Monster-Truck: riesige Reifen, offenes Fahrwerk, 2 lange Auspuff-Stacks, Ueberrollbuegel
+  // ======================================================================
+  const RIM_STAGES = {
+    1: { r: 0.45, w: 0.32, x: 0.90, lift: 0.0, rimR: 0.26 },
+    2: { r: 0.58, w: 0.40, x: 1.02, lift: 0.32, rimR: 0.30 },
+    3: { r: 0.95, w: 0.72, x: 1.35, lift: 1.05, rimR: 0.42 },
+  };
+  function rimAxles(stage) {
+    const S = RIM_STAGES[stage] || RIM_STAGES[1];
+    return [{ z: 1.75, r: S.r, w: S.w, x: S.x, arch: 0.6, liner: 0.7 }, { z: -1.85, r: S.r, w: S.w, x: S.x, arch: 0.6, liner: 0.7 }];
+  }
+
+  // Offroad-Rad mit grobem Profil (eigene Proportionen: kleine Felge, dicker Reifen)
+  function buildBigWheel(R, W, rimR) {
+    const mb = new MB(), n = 18, hw = W / 2;
+    const rp = (r, x, a) => [x, r * Math.cos(a), r * Math.sin(a)];
+    const prof = [[rimR, -hw + 0.02], [R * 0.86, -hw], [R * 0.97, -hw + W * 0.12], [R * 0.97, hw - W * 0.12], [R * 0.86, hw], [rimR, hw - 0.02]];
+    for (let i = 0; i < n; i++) {
+      const a0 = 2 * Math.PI * i / n, a1 = 2 * Math.PI * (i + 1) / n, core = rp((R + rimR) / 2, 0, (a0 + a1) / 2);
+      for (let j = 0; j < prof.length - 1; j++) {
+        const [r0, x0] = prof[j], [r1, x1] = prof[j + 1];
+        mb.triO('Tire', rp(r0, x0, a0), rp(r0, x0, a1), rp(r1, x1, a1), core);
+        mb.triO('Tire', rp(r0, x0, a0), rp(r1, x1, a1), rp(r1, x1, a0), core);
+      }
+      // Stollen (versetzt links/rechts)
+      const am = (a0 + a1) / 2, side = i % 2 ? 1 : -1, xa = side * W * 0.18;
+      const d = [0, Math.cos(am), Math.sin(am)], t = [0, -Math.sin(am), Math.cos(am)], bw = Math.PI * R / n * 0.55;
+      const c0 = add([xa, 0, 0], mul(d, R * 0.97)), c1 = add([xa, 0, 0], mul(d, R));
+      const q = (c, sx, st) => add(add(c, [sx * W * 0.3, 0, 0]), mul(t, st * bw));
+      mb.hexa('Tire', [q(c0, -1, -1), q(c0, 1, -1), q(c0, 1, 1), q(c0, -1, 1), q(c1, -1, -1), q(c1, 1, -1), q(c1, 1, 1), q(c1, -1, 1)]);
+      // Felgenbett innen
+      mb.triO('RimInner', rp(rimR, -hw + 0.03, a0), rp(rimR, -hw + 0.03, a1), rp(rimR, hw - 0.04, a1), rp(2, 0, am));
+      mb.triO('RimInner', rp(rimR, -hw + 0.03, a0), rp(rimR, hw - 0.04, a1), rp(rimR, hw - 0.04, a0), rp(2, 0, am));
+    }
+    // Felgenstern (6 Speichen) + Nabe mit Bolzen
+    const xo = hw - 0.05;
+    const disc = [];
+    for (let i = 0; i < 12; i++) disc.push(rp(rimR * 0.95, xo - 0.04, 2 * Math.PI * i / 12));
+    mb.prism('RimInner', disc, [0.02, 0, 0]);
+    for (let k = 0; k < 6; k++) {
+      const th = k * Math.PI / 3, d = [0, Math.cos(th), Math.sin(th)], t = [0, -Math.sin(th), Math.cos(th)];
+      const f = [add([xo, 0, 0], add(mul(d, rimR * 0.2), mul(t, -rimR * 0.12))), add([xo, 0, 0], add(mul(d, rimR * 0.2), mul(t, rimR * 0.12))),
+        add([xo, 0, 0], add(mul(d, rimR * 0.95), mul(t, rimR * 0.16))), add([xo, 0, 0], add(mul(d, rimR * 0.95), mul(t, -rimR * 0.16)))];
+      mb.hexa('Rim', f.concat(f.map((p) => sub(p, [0.05, 0, 0]))));
+    }
+    mb.prism('Rim', hexagon(0, 0, 0, rimR * 0.28, 8, 0, 1, 1).map(([a, b]) => [xo, a, b]), [0.04, 0, 0]);
+    for (let k = 0; k < 6; k++) { const th = k * Math.PI / 3; mb.box('Chrome', [xo + 0.03, Math.cos(th) * rimR * 0.18 - 0.015, Math.sin(th) * rimR * 0.18 - 0.015], [xo + 0.06, Math.cos(th) * rimR * 0.18 + 0.015, Math.sin(th) * rimR * 0.18 + 0.015]); }
+    return mb;
+  }
+
+  // Block-Buchstaben (R, I, M) aus Quadern, in der x/y-Ebene, Front zeigt nach +z
+  function blockText(mb, m, text, x, y, z, h, depth, dir = 1) {
+    const u = h / 5;
+    const G = { R: [[0, 0, 1, 5], [1, 4, 3, 5], [3, 2.5, 4, 5], [1, 2.5, 3, 3.5], [2, 0, 3, 2.5], [3, 0, 4, 1.5]], I: [[0, 0, 1, 5]], M: [[0, 0, 1, 5], [4, 0, 5, 5], [1, 3, 2, 4.5], [3, 3, 4, 4.5], [2, 2, 3, 3.5]] };
+    const W = { R: 4, I: 1, M: 5 };
+    let total = 0; for (const c of text) total += W[c] + 1; total -= 1;
+    // von vorn (+z) gesehen zeigt +x nach rechts; von hinten (-z) nach links -> dir spiegelt
+    let ox = -total * u / 2;
+    for (const c of text) {
+      for (const [a, b, cc, d] of G[c]) {
+        const xa = x + dir * (ox + a * u), xb = x + dir * (ox + cc * u);
+        mb.box(m, [Math.min(xa, xb), y + b * u, z], [Math.max(xa, xb), y + d * u, z + depth]);
+      }
+      ox += (W[c] + 1) * u;
+    }
+  }
+
+  function rimBody(stage) {
+    const S = RIM_STAGES[stage] || RIM_STAGES[1], L = S.lift, mb = new MB();
+    const hw = 1.04, zf = 2.95, zr = -2.9, y0 = 0.62 + L;           // Unterkante Karosserie
+    const axles = rimAxles(stage);
+    // Unterbau mit Radausschnitten (bei Stufe 3 sitzt die Karosserie ueber den Reifen)
+    if (stage < 3) skirt(mb, 'Paint', hw, y0, y0 + 0.5, zf, zr, axles);
+    else mb.box('Paint', [-hw, y0, zr], [hw, y0 + 0.5, zf]);
+    // Motorhaube (hoch, kantig), Kotfluegel mit Kante
+    mb.hexa('Paint', [[-hw, y0 + 0.5, zf], [hw, y0 + 0.5, zf], [hw - 0.04, y0 + 0.98, zf - 0.08], [-hw + 0.04, y0 + 0.98, zf - 0.08],
+      [-hw, y0 + 0.5, 0.95], [hw, y0 + 0.5, 0.95], [hw - 0.02, y0 + 1.06, 0.95], [-hw + 0.02, y0 + 1.06, 0.95]]);
+    mb.hexa('Paint', [[-0.45, y0 + 0.97, zf - 0.15], [0.45, y0 + 0.97, zf - 0.15], [0.4, y0 + 1.06, zf - 0.3], [-0.4, y0 + 1.06, zf - 0.3],
+      [-0.45, y0 + 1.04, 1.0], [0.45, y0 + 1.04, 1.0], [0.4, y0 + 1.12, 1.0], [-0.4, y0 + 1.12, 1.0]]);   // Powerdome
+    // Kabine (Crew Cab): Scheiben, Dach
+    const yb = y0 + 1.06, yt = y0 + 1.68;
+    mb.box('Paint', [-hw, y0 + 0.5, -0.95], [hw, yb, 0.95]);
+    mb.hexa('Glass', [[-hw + 0.06, yb, 0.95], [hw - 0.06, yb, 0.95], [hw - 0.1, yt, 0.35], [-hw + 0.1, yt, 0.35],
+      [-hw + 0.06, yb, 0.9], [hw - 0.06, yb, 0.9], [hw - 0.1, yt, 0.3], [-hw + 0.1, yt, 0.3]]);
+    mb.hexa('Paint', [[-hw + 0.04, yb, 0.9], [hw - 0.04, yb, 0.9], [hw - 0.1, yt, 0.32], [-hw + 0.1, yt, 0.32],
+      [-hw + 0.04, yb, -0.95], [hw - 0.04, yb, -0.95], [hw - 0.1, yt, -0.95], [-hw + 0.1, yt, -0.95]]);
+    mb.box('Paint', [-hw + 0.1, yt, -0.95], [hw - 0.1, yt + 0.08, 0.32]);
+    for (const s of SIDES) {
+      mb.box('Glass', [s * (hw - 0.02) - 0.02, yb + 0.06, -0.85], [s * (hw - 0.02) + 0.02, yt - 0.06, 0.75]);
+      mb.box('TrimGloss', [s * (hw - 0.02) - 0.03, yb, -0.1], [s * (hw - 0.02) + 0.03, yt, 0.0]);
+      for (const z of [0.45, -0.55]) mb.box('Chrome', [s > 0 ? hw - 0.01 : -hw - 0.03, y0 + 0.88, z - 0.1], [s > 0 ? hw + 0.03 : -hw + 0.01, y0 + 0.94, z + 0.1]);
+      mb.box('TrimGloss', [s * (hw + 0.02), yb + 0.05, 0.75], [s * (hw + 0.28), yb + 0.33, 0.95]);   // grosse Spiegel
+    }
+    mb.box('TrimGloss', [-hw - 0.01, y0 + 0.5, -0.97], [hw + 0.01, yt, -0.93]);
+    mb.box('Glass', [-0.6, yb + 0.1, -0.97], [0.6, yt - 0.1, -0.95]);
+    // Ladeflaeche mit Waenden, Heckklappe
+    mb.box('Underbody', [-hw + 0.08, y0 + 0.5, zr + 0.05], [hw - 0.08, y0 + 0.56, -1.0]);
+    for (const s of SIDES) mb.box('Paint', [s > 0 ? hw - 0.08 : -hw, y0 + 0.5, zr], [s > 0 ? hw : -hw + 0.08, yb + 0.02, -0.95]);
+    mb.box('Paint', [-hw, y0 + 0.5, zr], [hw, yb + 0.02, zr + 0.08]);
+    mb.box('TrimGloss', [-hw, yb, zr - 0.01], [hw, yb + 0.04, -0.95]);
+    blockText(mb, 'Chrome', 'RIM', 0, y0 + 0.65, zr - 0.04, 0.22, 0.03, -1);
+    for (const s of SIDES) { mb.box('TailLight', [s * (hw - 0.02) - 0.06, y0 + 0.6, zr - 0.03], [s * (hw - 0.02) + 0.06, yb - 0.04, zr + 0.02]); }
+    mb.box('TrimGloss', [-hw - 0.04, y0 - 0.02, zr - 0.15], [hw + 0.04, y0 + 0.26, zr + 0.05]);
+    mb.box('Plate', [-0.26, y0 + 0.02, zr - 0.17], [0.26, y0 + 0.13, zr - 0.15]);
+    // Front: grosser Grill mit Querstreben, RIM-Schriftzug, Scheinwerfer, Stossstange
+    mb.box('TrimGloss', [-0.82, y0 + 0.2, zf], [0.82, y0 + 0.92, zf + 0.04]);
+    for (const y of [0.34, 0.5, 0.66, 0.82]) mb.box('Chrome', [-0.8, y0 + y - 0.02, zf + 0.04], [0.8, y0 + y + 0.02, zf + 0.07]);
+    mb.box('Chrome', [-0.84, y0 + 0.18, zf], [0.84, y0 + 0.22, zf + 0.06]);
+    mb.box('Chrome', [-0.84, y0 + 0.9, zf], [0.84, y0 + 0.94, zf + 0.06]);
+    mb.box('TrimGloss', [-0.36, y0 + 0.44, zf + 0.06], [0.36, y0 + 0.7, zf + 0.08]);
+    blockText(mb, 'Chrome', 'RIM', 0, y0 + 0.47, zf + 0.08, 0.2, 0.03);
+    for (const s of SIDES) {
+      mb.box('LightLens', [s * 0.94 - 0.13, y0 + 0.55, zf], [s * 0.94 + 0.13, y0 + 0.9, zf + 0.05]);
+      mb.box('HeadLight', [s * 0.94 - 0.1, y0 + 0.6, zf + 0.04], [s * 0.94 + 0.1, y0 + 0.66, zf + 0.06]);
+      mb.box('HeadLight', [s * 0.94 - 0.04, y0 + 0.6, zf + 0.04], [s * 0.94 + 0.04, y0 + 0.86, zf + 0.06]);
+    }
+    mb.box('TrimGloss', [-hw - 0.04, y0 - 0.05, zf], [hw + 0.04, y0 + 0.22, zf + 0.2]);
+    mb.box('Plate', [-0.26, y0 + 0.0, zf + 0.2], [0.26, y0 + 0.11, zf + 0.22]);
+    // Fahrwerk sichtbar (ab Stufe 2): Rahmen, Achsen, Federbeine
+    if (stage >= 2) {
+      for (const s of SIDES) mb.box('DarkSteel', [s * 0.55 - 0.08, L + 0.35, zr + 0.3], [s * 0.55 + 0.08, y0, zf - 0.3]);
+      for (const a of axles) {
+        mb.box('DarkSteel', [-a.x + 0.1, a.r - 0.08, a.z - 0.08], [a.x - 0.1, a.r + 0.08, a.z + 0.08]);
+        mb.box('DarkSteel', [-0.18, a.r - 0.15, a.z - 0.18], [0.18, a.r + 0.15, a.z + 0.18]);
+        for (const s of SIDES) {
+          strut(mb, 'Hazard', [s * (a.x - 0.35), a.r + 0.05, a.z + 0.25], [s * 0.62, y0 - 0.02, a.z + 0.15], 0.11);
+          strut(mb, 'Hazard', [s * (a.x - 0.35), a.r + 0.05, a.z - 0.25], [s * 0.62, y0 - 0.02, a.z - 0.15], 0.11);
+          strut(mb, 'DarkSteel', [s * 0.4, a.r, a.z], [s * 0.55, y0 - 0.02, a.z + (a.z > 0 ? -0.8 : 0.8)], 0.07);
+        }
+      }
+      // Bullbar + LED-Lichtbalken auf dem Dach
+      for (const s of SIDES) strut(mb, 'Black', [s * 0.7, y0 + 0.05, zf + 0.35], [s * 0.6, y0 + 1.0, zf + 0.25], 0.08);
+      strut(mb, 'Black', [-0.75, y0 + 0.05, zf + 0.35], [0.75, y0 + 0.05, zf + 0.35], 0.09);
+      strut(mb, 'Black', [-0.6, y0 + 1.0, zf + 0.25], [0.6, y0 + 1.0, zf + 0.25], 0.08);
+      mb.box('Black', [-0.85, yt + 0.08, 0.15], [0.85, yt + 0.2, 0.3]);
+      mb.box('HeadLight', [-0.8, yt + 0.1, 0.3], [0.8, yt + 0.18, 0.32]);
+      // Kotfluegel-Verbreiterungen
+      for (const a of axles) for (const s of SIDES) mb.box('Black', [s > 0 ? hw - 0.02 : -hw - 0.16, y0 - 0.05, a.z - 0.75], [s > 0 ? hw + 0.16 : -hw + 0.02, y0 + 0.08, a.z + 0.75]);
+    }
+    // Monster-Truck-Extras
+    if (stage >= 3) {
+      for (const s of SIDES) {
+        // zwei lange Auspuff-Stacks hinter der Kabine, schraeg abgeschnitten
+        const ex = s * 0.75, ez = -1.1;
+        mb.prism('Chrome', hexagon(ex, ez, 0, 0.11, 10, 0, 1, 1).map(([a, b]) => [a, y0 + 0.5, b]), [0, 2.3, 0]);
+        mb.prism('Chrome', hexagon(ex, ez, 0, 0.14, 10, 0, 1, 1).map(([a, b]) => [a, y0 + 1.1, b]), [0, 0.25, 0]);
+        mb.hexa('Black', [[ex - 0.1, y0 + 2.8, ez - 0.1], [ex + 0.1, y0 + 2.8, ez - 0.1], [ex + 0.1, y0 + 3.05, ez + 0.1], [ex - 0.1, y0 + 3.05, ez + 0.1],
+          [ex - 0.1, y0 + 2.79, ez - 0.1], [ex + 0.1, y0 + 2.79, ez - 0.1], [ex + 0.1, y0 + 2.8, ez + 0.1], [ex - 0.1, y0 + 2.8, ez + 0.1]]);
+        // Ueberrollbuegel auf der Ladeflaeche
+        strut(mb, 'Black', [s * 0.9, yb, -1.15], [s * 0.75, yt + 0.25, -1.3], 0.1);
+        strut(mb, 'Black', [s * 0.75, yt + 0.25, -1.3], [s * 0.85, yb, -2.2], 0.08);
+      }
+      strut(mb, 'Black', [-0.75, yt + 0.25, -1.3], [0.75, yt + 0.25, -1.3], 0.1);
+      for (const s of SIDES) mb.box('HeadLight', [s * 0.4 - 0.15, yt + 0.12, -1.38], [s * 0.4 + 0.15, yt + 0.38, -1.34]);
+      // Verstaerkte Achsen + Stossdaempfer-Paare
+      for (const a of axles) for (const s of SIDES) for (const dz of [-0.4, 0.4])
+        strut(mb, 'ChipRed', [s * (a.x - 0.55), a.r, a.z + dz], [s * 0.7, y0 - 0.02, a.z + dz * 0.6], 0.13);
+    }
+    calipers(mb, axles, 0.03);
+    return mb;
+  }
+
   // ======================================================================
   // three.js-Aufbau
   // ======================================================================
@@ -1753,6 +1934,7 @@
   }
 
   const RED_CAL = [0.75, 0.05, 0.04], GREY_CAL = [0.35, 0.36, 0.38];
+  const RIM_AXLES_DYN = 'dyn';
   const VEHICLES = {
     rs6: { body: () => rs6Body(), axles: RS6_AXLES, paint: '#8e9397', rim: [0.55, 0.56, 0.58], caliper: RED_CAL },
     ferrari: { body: () => ferrariBody(), axles: F_AXLES, paint: '#d40000', rim: [0.32, 0.33, 0.35], caliper: [0.95, 0.78, 0.05] },
@@ -1762,14 +1944,90 @@
     bus: { body: () => busBody(), axles: BUS_AXLES, paint: '#d81e2a', rim: [0.75, 0.76, 0.78], caliper: GREY_CAL },
     truck: { body: () => truckBody(), axles: TRUCK_AXLES, paint: '#1f5fa8', rim: [0.75, 0.76, 0.78], caliper: GREY_CAL },
     jeep: { body: () => jeepBody(), axles: JEEP_AXLES, paint: '#5b6b3a', rim: [0.15, 0.15, 0.16], caliper: GREY_CAL },
+    rim: { body: (st) => rimBody(st), axles: RIM_AXLES_DYN, paint: '#b01818', rim: [0.12, 0.12, 0.13], caliper: [0.75, 0.05, 0.04], big: true },
     van: { body: () => vanBody(), axles: VAN_AXLES, paint: '#f5f5f5', rim: [0.60, 0.61, 0.63], caliper: GREY_CAL },
   };
 
-  function dildiCityVehicle(THREE, type, color, mats, extraGeos) {
+
+  // ======================================================================
+  // SCHADENSMODELL fuer alle Fahrzeuge
+  //   out.setDamage(d)  d = verlorene Lebenspunkte 0..1  (z. B. 1 - health/maxHealth)
+  //   >=20%: Dellen + Kratzer   >=40%: Motorhaube springt auf, mehr Dellen
+  //   >=60%: Vorderrad verbogen -> out.steerPull (Auto zieht zur Seite, Spieler muss gegenlenken)
+  //   >=80%: schwer zerbeult, ein Scheinwerfer kaputt, Haube verbogen    100%: Spiel laesst es explodieren
+  // ======================================================================
+  function addDamage(THREE, out, paint, axles) {
+    const geo = out.body.geometry, P = geo.attributes.position, C = geo.attributes.color;
+    const P0 = P.array.slice(), C0 = C.array.slice();
+    const LG = out.lights.geometry, LC = LG.attributes.color, LC0 = LC.array.slice(), LP = LG.attributes.position;
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox, cy = (bb.min.y + bb.max.y) / 2, hx = bb.max.x, zF = bb.max.z, zR = bb.min.z, len = zF - zR;
+    // Einschlagstellen: Front links/rechts, Seiten, Heck (Reihenfolge = wann sie dazukommen)
+    const I = [[hx * 0.7, cy, zF - 0.2, -1, 0, -1], [-hx, cy + 0.1, 0.3 * len / 2, 1, 0, 0], [-hx * 0.6, cy, zF - 0.15, 1, 0, -1], [0, cy, zR + 0.1, 0, 0, 1],
+      [hx, cy, -0.25 * len / 2, -1, 0, 0], [hx * 0.3, bb.max.y, 0.1, 0, -1, 0], [-hx * 0.8, cy - 0.1, zR + 0.4, 1, 0, 1], [hx * 0.9, cy - 0.1, zR + 0.4, -1, 0, 1]];
+    const grey = new THREE.Color(0.42, 0.42, 0.44);
+    // Motorhaube als eigene Klappe (erst ab 40% sichtbar)
+    let hy = bb.min.y;
+    const zh0 = zF - len * 0.32, zh1 = zF - 0.12;
+    for (let i = 0; i < P.count; i++) { const x = P0[i * 3], y = P0[i * 3 + 1], z = P0[i * 3 + 2]; if (Math.abs(x) < 0.3 && z > zh0 && z < zh1 && y < bb.max.y - 0.2) hy = Math.max(hy, y); }
+    const hmat = new THREE.MeshStandardMaterial({ color: paint, roughness: 0.45, metalness: 0.2 });
+    const hl = (zh1 - zh0) / 2;
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(hx * 1.55, 0.07, hl), hmat);
+    hood.geometry.translate(0, 0.035, hl / 2);
+    const hood2 = new THREE.Mesh(new THREE.BoxGeometry(hx * 1.55, 0.07, hl), hmat);   // vordere Haelfte, knickt bei Totalschaden
+    hood2.geometry.translate(0, 0.035, hl / 2);
+    const knick = new THREE.Group(); knick.position.z = hl; knick.add(hood2); hood.add(knick);
+    hood.castShadow = hood2.castShadow = true;
+    const hingePivot = new THREE.Group(); hingePivot.position.set(0, hy + 0.02, zh0); hingePivot.add(hood); hingePivot.visible = false;
+    out.tilt.add(hingePivot);
+    // verbogenes Vorderrad: Zwischengruppe zwischen Lenk-Pivot und Rad
+    const fw = out.wheels.find((w) => w.front && w.piv.position.x > 0) || out.wheels[0];
+    const toe = new THREE.Group(); fw.piv.remove(fw.w); toe.add(fw.w); fw.piv.add(toe);
+    out.steerPull = 0;
+    out.damageLevel = 0;
+    out.setDamage = (d) => {
+      d = Math.max(0, Math.min(1, d));
+      const lvl = d >= 0.8 ? 4 : d >= 0.6 ? 3 : d >= 0.4 ? 2 : d >= 0.2 ? 1 : 0;
+      if (lvl === out.damageLevel && out._dmgInit) return lvl;
+      out._dmgInit = true; out.damageLevel = lvl;
+      const nImp = [0, 2, 4, 5, 8][lvl], depth = [0, 0.07, 0.13, 0.18, 0.26][lvl], R2 = 2 * 0.55 * 0.55;
+      for (let i = 0; i < P.count; i++) {
+        let x = P0[i * 3], y = P0[i * 3 + 1], z = P0[i * 3 + 2], w = 0, dx = 0, dy = 0, dz = 0;
+        for (let k = 0; k < nImp; k++) {
+          const c = I[k], dd = (x - c[0]) ** 2 + (y - c[1]) ** 2 + (z - c[2]) ** 2, f = Math.exp(-dd / R2);
+          // leichtes "Knittern": Rauschen aus der Position, damit Dellen nicht glatt aussehen
+          const n = 0.6 + 0.4 * Math.sin(x * 13.1 + z * 7.3) * Math.cos(y * 11.7 - z * 5.1);
+          dx += c[3] * f * depth * n; dy += c[4] * f * depth * n; dz += c[5] * f * depth * n; w = Math.max(w, f);
+        }
+        P.array[i * 3] = x + dx; P.array[i * 3 + 1] = y + dy; P.array[i * 3 + 2] = z + dz;
+        const sc = Math.min(0.75, w * (0.25 + lvl * 0.15)) * (Math.sin(x * 31 + y * 17 + z * 23) > 0.2 ? 1 : 0.35);
+        for (let j = 0; j < 3; j++) C.array[i * 3 + j] = C0[i * 3 + j] + ((j === 0 ? grey.r : j === 1 ? grey.g : grey.b) * (1 - lvl * 0.15) - C0[i * 3 + j]) * sc;
+      }
+      P.needsUpdate = true; C.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+      // Motorhaube
+      hingePivot.visible = lvl >= 2;
+      hingePivot.rotation.set(lvl >= 4 ? -0.7 : -0.45, lvl >= 4 ? 0.1 : 0, lvl >= 4 ? 0.08 : 0);
+      knick.rotation.x = lvl >= 4 ? 0.55 : 0.12;
+      // Rad verbogen + Lenkzug
+      toe.rotation.set(0, lvl >= 3 ? (lvl >= 4 ? 0.28 : 0.18) : 0, lvl >= 3 ? 0.12 : 0);
+      out.steerPull = lvl >= 4 ? 0.22 : lvl >= 3 ? 0.13 : 0;
+      // Scheinwerfer rechts vorn kaputt ab 80%
+      for (let i = 0; i < LC.count; i++) {
+        const broken = lvl >= 4 && LP.array[i * 3] > 0 && LP.array[i * 3 + 2] > 0;
+        for (let j = 0; j < 3; j++) LC.array[i * 3 + j] = broken ? 0.02 : LC0[i * 3 + j];
+      }
+      LC.needsUpdate = true;
+      return lvl;
+    };
+    out.repair = () => out.setDamage(0);
+  }
+
+  function dildiCityVehicle(THREE, type, color, mats, extraGeos, opts) {
     const V = VEHICLES[type];
     if (!V) throw new Error('DildiCars: unbekannter Fahrzeugtyp ' + type);
-    const mb = V.body();
-    const axles = V.axles;
+    const stage = Math.max(1, Math.min(3, (opts && opts.stage) || 1));
+    const mb = V.body(stage);
+    const axles = V.axles === 'dyn' ? rimAxles(stage) : V.axles;
     const paint = new THREE.Color(color || V.paint);
     const caliper = new THREE.Color().setRGB(...V.caliper, THREE.SRGBColorSpace);
     const rim = new THREE.Color().setRGB(...V.rim, THREE.SRGBColorSpace);
@@ -1793,7 +2051,7 @@
     group.add(tilt);
     const wheels = [];
     axles.forEach((ax, ai) => {
-      const wmb = buildWheel(ax.r, ax.w);
+      const wmb = V.big ? buildBigWheel(ax.r, ax.w, RIM_STAGES[stage].rimR) : buildWheel(ax.r, ax.w);
       const geoL = vcGeometry(THREE, wmb, () => true, colorOf);
       const geoR = vcGeometry(THREE, wmb, () => true, colorOf, (p) => [-p[0], p[1], -p[2]]);  // Felge nach aussen
       for (const s of SIDES) {
@@ -1815,7 +2073,9 @@
       tilt.add(red, blue);
       siren = { red, blue };
     }
-    return { group, tilt, body, lights, wheels, wheelR: axles[1].r, siren };
+    const out = { group, tilt, body, lights, wheels, wheelR: axles[1].r, siren, stage };
+    addDamage(THREE, out, paint, axles);
+    return out;
   }
 
   // ======================================================================
